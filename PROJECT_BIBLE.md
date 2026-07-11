@@ -1,202 +1,426 @@
-# SHIK ROLL Platform
-## PROJECT BIBLE
+---
+Document ID: PB-002
 
+Document Name: PROJECT BIBLE
+
+Book: Foundation
+
+Version: 2.0.0
+
+Status: APPROVED
+
+Project: SHIK Platform
+
+First Brand: SHIK ROLL
+
+Repository: SHIK-ROLL-PLATFORM
+
+Owner: Arslan Berslanov
+
+Solution Architect: OpenAI ChatGPT
+
+AI Software Engineer: Claude Code
+
+AI Design Assistant: Claude Design
+
+Last Updated: July 2026
+
+Classification: Internal
 ---
 
-**Document Version:** 1.0.0
+# PROJECT BIBLE
 
-**Document Status:** Draft
+## Purpose
 
-**Project:** SHIK ROLL Platform
+PROJECT BIBLE является главным навигационным документом SHIK Platform Engineering Handbook.
 
-**Product Owner:** Arslan Berslanov
+Он определяет:
 
-**Technical Architect:** OpenAI ChatGPT
-
-**Primary AI Development Assistant:** Claude Code
-
-**Primary AI Design Assistant:** Claude Design
-
-**Repository:** SHIK-ROLL-PLATFORM
-
-**Created:** July 2026
-
----
-
-# Purpose
-
-PROJECT BIBLE является главным документом платформы SHIK ROLL.
-
-Он описывает:
-
-- стратегию продукта;
-- архитектурные принципы;
-- цели проекта;
-- правила разработки;
+- стратегию платформы;
 - структуру документации;
-- этапы развития платформы.
+- жизненный цикл продукта;
+- архитектурную карту;
+- взаимосвязь между всеми документами Engineering Handbook.
 
-Этот документ НЕ содержит детального описания отдельных модулей.
+PROJECT BIBLE не содержит детального описания отдельных модулей.
 
-Все подробности находятся в документах Product Book.
-
----
-
-# Vision
-
-Создать современную облачную платформу автоматизации ресторанов быстрого питания нового поколения.
-
-Платформа должна позволять ресторану работать полностью независимо от сторонних систем автоматизации и при необходимости интегрироваться с ними.
+Для этого существуют специализированные документы.
 
 ---
 
-# Mission
+# Product Vision
 
-Упростить управление рестораном.
+SHIK Platform — это облачная модульная платформа автоматизации ресторанного бизнеса.
 
-Сделать процесс заказа быстрым для клиента.
+Первым брендом платформы является SHIK ROLL.
 
-Упростить работу персонала.
+Архитектура платформы проектируется таким образом, чтобы поддерживать:
 
-Предоставить владельцу полный контроль над бизнесом в режиме реального времени.
-
----
-
-# Core Principles
-
-Проект строится на следующих принципах.
-
-## 1. Cloud First
-
-Все сервисы работают через облачную инфраструктуру Google Cloud.
+- один ресторан;
+- сеть ресторанов;
+- несколько независимых брендов.
 
 ---
 
-## 2. Mobile First
+# Platform Layers
 
-Все основные процессы должны быть доступны с мобильных устройств.
+Платформа состоит из трех уровней.
+
+## Layer 1 — Core Platform
+
+Ядро платформы.
+
+Содержит универсальные сервисы:
+
+- Authentication
+- Users
+- Orders
+- Menu
+- Kitchen
+- Delivery
+- POS
+- Inventory
+- Loyalty
+- Notifications
+- Analytics
+- Payments
+- Integration Layer
+- Map Provider Layer
+
+Core Platform не содержит информации о конкретном ресторане.
 
 ---
 
-## 3. Modular Architecture
+## Layer 2 — Brand Layer
 
-Каждый модуль платформы является независимым.
+Все, что относится к бренду.
+
+Для SHIK ROLL:
+
+- логотип;
+- фирменные цвета;
+- фотографии;
+- категории меню;
+- маркетинговые материалы;
+- тексты.
+
+В будущем может существовать несколько Brand Layer.
+
+---
+
+## Layer 3 — Configuration Layer
+
+Настройки, изменяемые владельцем через Back Office.
 
 Например:
 
-- Client App
-- Kitchen App
-- Courier App
-- Admin Panel
-- Owner Dashboard
-- Manager App
-- Backend API
+- меню;
+- цены;
+- акции;
+- бонусы;
+- фотографии;
+- филиалы;
+- зоны доставки;
+- сотрудники;
+- роли;
+- стоп-листы;
+- рабочее время.
 
-Каждый модуль развивается отдельно.
-
----
-
-## 4. API First
-
-Любое взаимодействие происходит через Backend API.
-
-Никаких прямых подключений между приложениями.
+Изменение Configuration Layer не требует изменения кода.
 
 ---
 
-## 5. Feature First
+# Engineering Handbook Structure
 
-Функции разрабатываются по бизнес-модулям.
+Engineering Handbook состоит из восьми книг.
 
-Например:
+## Book 0
 
-Authentication
+Navigation
+
+---
+
+## Book 1
+
+Foundation
+
+---
+
+## Book 2
+
+Business
+
+---
+
+## Book 3
+
+Product
+
+---
+
+## Book 4
+
+Brand & Design
+
+---
+
+## Book 5
+
+Architecture
+
+---
+
+## Book 6
+
+Engineering
+
+---
+
+## Book 7
+
+Operations
+
+---
+
+## Book 8
+
+Future
+
+---
+
+# Platform Modules
+
+Платформа состоит из независимых модулей.
+
+## Customer
+
+Mobile Application
+
+---
+
+## Kitchen
+
+Kitchen Display System
+
+---
+
+## Courier
+
+Courier Application
+
+---
+
+## POS
+
+Cashier Application
+
+---
+
+## Owner
+
+Owner Dashboard
+
+---
+
+## Admin
+
+Back Office
+
+---
+
+## Backend
+
+Business Services
+
+---
+
+## Integrations
+
+External Systems
+
+---
+
+# AI Development Workflow
+
+Разработка платформы строится следующим образом.
+
+Business
 
 ↓
 
-Menu
+Documentation
 
 ↓
 
-Orders
+Architecture
 
 ↓
 
-Kitchen
+Design
 
 ↓
 
-Delivery
+Development
 
 ↓
 
-Analytics
+Testing
+
+↓
+
+Deployment
+
+↓
+
+Support
+
+AI используется на каждом этапе.
+
+ChatGPT
+
+↓
+
+Claude Design
+
+↓
+
+Claude Code
 
 ---
 
-## 6. AI Assisted Development
+# Documentation Workflow
 
-Проект создается совместно с AI.
+Каждая новая функция проходит следующий путь.
 
-Claude Code отвечает за разработку.
+Idea
 
-Claude Design отвечает за дизайн.
+↓
 
-ChatGPT отвечает за архитектуру продукта.
+Documentation
 
----
+↓
 
-## 7. Documentation First
+ADR
 
-Сначала документация.
+↓
 
-Потом дизайн.
+Design
 
-Потом код.
+↓
 
-Потом тестирование.
+Development
 
-Потом публикация.
+↓
 
----
+Testing
 
-## 8. Scalable Platform
+↓
 
-Архитектура сразу должна поддерживать:
-
-• одну точку;
-
-• несколько филиалов;
-
-• сеть ресторанов.
+Release
 
 ---
 
-## 9. Vendor Independence
+# Architecture Principles
 
-Платформа не должна зависеть от конкретной POS-системы.
+Подробные инженерные принципы находятся в:
 
-Quick Resto
-
-iiko
-
-Poster
-
-r_keeper
-
-являются только возможными интеграциями.
+PB-001 PROJECT_MANIFEST
 
 ---
 
-## 10. Maintainability
+# Architecture Decision Records
 
-Каждый модуль должен иметь возможность развиваться независимо.
+Все ключевые решения фиксируются через ADR.
+
+Каталог:
+
+docs/19-decisions/
 
 ---
 
-# Technology Stack
+# Repository Structure
 
-Frontend
+SHIK-ROLL-PLATFORM/
+
+README.md
+
+PROJECT_BIBLE.md
+
+PROJECT_MANIFEST.md
+
+DECISIONS.md
+
+docs/
+
+design/
+
+assets/
+
+prompts/
+
+apps/
+
+packages/
+
+scripts/
+
+docker/
+
+infrastructure/
+
+---
+
+# Product Lifecycle
+
+Research
+
+↓
+
+Planning
+
+↓
+
+Design
+
+↓
+
+Development
+
+↓
+
+Testing
+
+↓
+
+Release
+
+↓
+
+Support
+
+↓
+
+Evolution
+
+---
+
+# Supported Map Providers
+
+Платформа официально поддерживает:
+
+- Google Maps
+- Яндекс Карты
+- 2GIS
+
+Работа осуществляется через единый Map Provider Layer.
+
+Добавление новых провайдеров не должно влиять на бизнес-логику.
+
+---
+
+# Technology Baseline
+
+Mobile
 
 Flutter
 
@@ -220,17 +444,13 @@ Queues
 
 BullMQ
 
-Authentication
-
-Firebase Auth
-
 Cloud
 
 Google Cloud Platform
 
-Storage
+Authentication
 
-Google Cloud Storage
+Firebase Authentication
 
 Notifications
 
@@ -242,179 +462,49 @@ Next.js
 
 ---
 
-# Map Provider Layer
+# Engineering Rules
 
-Платформа поддерживает несколько картографических сервисов.
+1. Documentation First
 
-Google Maps
+2. Design Before Development
 
-Яндекс Карты
+3. API First
 
-2GIS
+4. Modular Architecture
 
-Архитектура должна позволять добавлять новые сервисы без изменения бизнес-логики.
+5. Clean Architecture
 
----
+6. Security By Design
 
-# Integration Layer
+7. Vendor Independence
 
-В платформе существует отдельный слой интеграций.
+8. Configuration First
 
-Он используется для подключения:
+9. AI Assisted Development
 
-Quick Resto
-
-iiko
-
-Poster
-
-r_keeper
-
-1С
-
-Telegram
-
-Email
-
-Платежных систем
-
-Агрегаторов доставки
-
----
-
-# Product Modules
-
-Client App
-
-Kitchen App
-
-Courier App
-
-Admin Panel
-
-Owner Dashboard
-
-Manager App
-
-Backend API
-
-Integration Layer
-
----
-
-# Documentation Structure
-
-PROJECT_BIBLE.md
-
-PROJECT_MANIFEST.md
-
-README.md
-
-DECISIONS.md
-
-CHANGELOG.md
-
-CONTRIBUTING.md
-
-Product Book
-
-Business
-
-Brand
-
-Menu
-
-Architecture
-
-Database
-
-API
-
-Security
-
-Deployment
-
-Support
-
-Roadmap
-
----
-
-# Development Workflow
-
-Product Book
-
-↓
-
-Design
-
-↓
-
-Architecture Review
-
-↓
-
-Development
-
-↓
-
-Testing
-
-↓
-
-Release
-
-↓
-
-Support
-
----
-
-# Release Strategy
-
-MVP
-
-↓
-
-Version 1.0
-
-↓
-
-Version 1.5
-
-↓
-
-Version 2.0
-
-↓
-
-Version 3.0
-
----
-
-# Roadmap
-
-Подробная дорожная карта находится в:
-
-docs/17-roadmap/
+10. Continuous Documentation
 
 ---
 
 # Related Documents
 
-README.md
+PB-001 PROJECT_MANIFEST
 
-PROJECT_MANIFEST.md
+README
 
-DECISIONS.md
+DECISIONS
 
-docs/
+ADR Repository
+
+Engineering Handbook
 
 ---
 
 # Golden Rule
 
-Ни одна строка production-кода не пишется до тех пор, пока не завершен Product Book.
+Engineering Handbook является единственным источником истины для проекта SHIK Platform.
+
+Если возникает противоречие между кодом, дизайном и документацией, приоритет имеет утвержденная документация.
 
 ---
 
