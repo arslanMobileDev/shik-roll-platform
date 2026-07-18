@@ -399,7 +399,23 @@ RabbitMQ
 
 # Storage
 
-Google Cloud Storage
+Application Contract
+
+- Provider-neutral Object Storage Port
+
+Production Provider
+
+- Google Cloud Storage via a dedicated GCS Adapter
+
+Local / Development Provider
+
+- MinIO via the S3-Compatible Adapter
+
+Alternative Providers
+
+- S3-compatible object storage via the S3 Adapter
+
+Бизнес-логика не должна зависеть от SDK конкретного storage provider.
 
 Используется для хранения:
 
@@ -408,6 +424,10 @@ Google Cloud Storage
 - баннеров;
 - документов;
 - файлов импорта.
+
+Architecture Decision
+
+- ADR-1612 Object Storage Provider Model
 
 ---
 
@@ -597,6 +617,8 @@ Future Evolution
 Architecture Decision
 
 - ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+
+ADR-1612 Object Storage Provider Model
 
 ---
 

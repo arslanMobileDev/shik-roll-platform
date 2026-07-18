@@ -107,9 +107,26 @@ Future
 
 # Storage
 
-Object Storage
+Application Contract
 
-- S3 Compatible
+- Provider-neutral Object Storage Port
+
+Production
+
+- Google Cloud Storage
+- Dedicated GCS Adapter
+
+Local / Development
+
+- MinIO
+- S3-Compatible Adapter
+
+Alternative Providers
+
+- S3-compatible object storage
+- S3 Adapter
+
+Google Cloud Storage is not treated as an S3-compatible provider.
 
 Images
 
@@ -302,6 +319,8 @@ ARC-503 Microservices Strategy
 ARC-507 Deployment Architecture
 
 ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+
+ADR-1612 Object Storage Provider Model
 
 ARC-509 Caching Strategy
 

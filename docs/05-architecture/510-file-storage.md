@@ -28,18 +28,45 @@ Classification: Internal
 
 ---
 
-# Storage Technology
+# Storage Architecture
 
-Primary Storage
+Application
 
-- S3 Compatible Object Storage
+↓
 
-Supported Providers
+Object Storage Port
+
+↓
+
+Provider Adapter
+
+↓
+
+Object Storage Provider
+
+---
+
+# Provider Model
+
+## Production in Google Cloud
+
+- Google Cloud Storage
+- Dedicated GCS Adapter
+
+## Local / Development
+
+- MinIO
+- S3-Compatible Adapter
+
+## Alternative S3-Compatible Providers
 
 - AWS S3
 - Cloudflare R2
-- MinIO
 - DigitalOcean Spaces
+
+Google Cloud Storage is not treated as an S3-compatible provider and must use a separate adapter.
+
+All adapters must implement the same internal Object Storage Port and pass the same contract tests.
 
 ---
 
@@ -164,6 +191,8 @@ Permanent Removal
 ARC-507 Deployment Architecture
 
 ARC-508 Technology Stack
+
+ADR-1612 Object Storage Provider Model
 
 ARC-511 Search Architecture
 
