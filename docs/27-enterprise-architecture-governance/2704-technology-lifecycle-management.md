@@ -417,9 +417,9 @@ GOV-2703 Architecture Decision Records (ADR) Governance
 
 ADR-1611 Cloud Run for MVP and Kubernetes Evolution
 
-DEV-1201 TypeScript Development Standards
+DEV-1201 DEVOPS OVERVIEW
 
-SEC-1104 Secure Software Development Lifecycle
+SEC-1104 API SECURITY
 
 OPS-2606 Operational Excellence Framework
 

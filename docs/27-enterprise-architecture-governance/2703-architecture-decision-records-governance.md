@@ -404,7 +404,7 @@ GOV-2702 Architecture Review Board
 
 ADR-1600 Architecture Decision Records Index
 
-DEV-1207 Documentation Standards
+DEV-1207 MONITORING, LOGGING & OBSERVABILITY
 
 CMP-1901 Governance, Risk & Compliance Overview
 

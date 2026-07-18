@@ -255,7 +255,7 @@ Mitigation
 
 UI-801 Frontend Overview
 
-UI-802 Flutter Architecture
+UI-802 DESIGN SYSTEM
 
 ARC-508 Technology Stack
 

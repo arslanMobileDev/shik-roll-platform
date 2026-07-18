@@ -375,7 +375,7 @@ GOV-2701 Enterprise Architecture Governance Overview
 
 ADR-1600 Architecture Decision Records Index
 
-ADR-1601 REST API Architecture
+ADR-1601 ARCHITECTURE DECISION RECORDS OVERVIEW
 
 SEC-1101 Security Overview
 

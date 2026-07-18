@@ -370,7 +370,7 @@ SDK-2405 Plugin Development Kit
 
 SDK-2406 Extension Points & Customization
 
-AI-1406 AI Analytics & Reporting
+AI-1406 AI WORKFLOWS & BUSINESS AUTOMATION
 
 CMP-1906 Audit & Compliance Controls
 

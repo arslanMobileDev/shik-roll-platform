@@ -122,7 +122,7 @@ Individual ADR documents record one concrete architecture decision each.
 
 ADR-1600 Architecture Decision Records Index
 
-ARC-501 Architecture Vision
+ARC-501 SYSTEM OVERVIEW
 
 DEV-1202 Repository Structure
 

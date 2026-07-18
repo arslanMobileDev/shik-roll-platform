@@ -390,7 +390,7 @@ SDK-2405 Plugin Development Kit
 
 SDK-2406 Extension Points & Customization
 
-SEC-1104 Secure Software Development Lifecycle
+SEC-1104 API SECURITY
 
 CMP-1906 Audit & Compliance Controls
 

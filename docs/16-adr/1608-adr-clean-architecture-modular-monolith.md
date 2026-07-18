@@ -289,9 +289,9 @@ No Business Logic Rewrite Required
 
 # Related Documents
 
-ARC-502 Clean Architecture
+ARC-502 MODULAR ARCHITECTURE
 
-ARC-503 Modular Architecture
+ARC-503 MICROSERVICES STRATEGY
 
 ADR-1602 Monorepo Architecture
 

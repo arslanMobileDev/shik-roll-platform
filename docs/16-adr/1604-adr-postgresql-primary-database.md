@@ -273,6 +273,6 @@ SEC-1105 Database Security
 
 DEV-1205 Docker & Containerization
 
-ARC-505 Data Architecture
+ARC-505 DOMAIN MODEL
 
 END OF DOCUMENT

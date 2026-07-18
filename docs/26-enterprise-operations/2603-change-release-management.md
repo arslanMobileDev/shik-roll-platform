@@ -347,12 +347,12 @@ OPS-2601 Enterprise Operations Overview
 
 OPS-2602 Service Management
 
-DEV-1204 CI/CD Pipeline Standards
+DEV-1204 CI/CD PIPELINE SPECIFICATION
 
 OBS-2206 Alerting & Incident Detection Strategy
 
 BCP-2005 Failover & Recovery Procedures
 
-SEC-1104 Secure Software Development Lifecycle
+SEC-1104 API SECURITY
 
 END OF DOCUMENT
