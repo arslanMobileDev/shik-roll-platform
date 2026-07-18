@@ -264,7 +264,7 @@ Maintain
 - PostgreSQL Recovery
 - Redis Recovery
 - RabbitMQ Recovery
-- MinIO Recovery
+- Object Storage Provider Recovery
 - Backend Recovery
 - Infrastructure Recovery
 - Regional Recovery

@@ -91,7 +91,7 @@ Applicable To
 - PostgreSQL
 - Redis
 - RabbitMQ
-- MinIO
+- Active Object Storage Provider (self-hosted providers only; GCS scaling is managed)
 
 Guidelines
 
