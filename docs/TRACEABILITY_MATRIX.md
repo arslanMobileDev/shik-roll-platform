@@ -12,6 +12,8 @@ Project: SHIK Platform
 Standard: IEEE 29148 (Adapted)
 
 Owner: Arslan Berslanov
+Last Updated: July 2026
+
 
 Classification: Internal
 ---

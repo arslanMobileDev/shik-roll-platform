@@ -18,6 +18,8 @@ Owner: Arslan Berslanov
 Solution Architect: OpenAI ChatGPT
 
 Last Updated: July 2026
+Classification: Internal
+
 ---
 
 # SYSTEM OVERVIEW

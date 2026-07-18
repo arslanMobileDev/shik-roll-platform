@@ -16,6 +16,8 @@ First Brand: SHIK ROLL
 Owner: Arslan Berslanov
 
 Last Updated: July 2026
+Classification: Internal
+
 ---
 
 # BUSINESS VISION
