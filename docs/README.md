@@ -18,6 +18,7 @@ Classification: Internal
 - [PB-001 Project Manifest](../PROJECT_MANIFEST.md)
 - [PB-002 Project Bible](../PROJECT_BIBLE.md)
 - [RTM-001 Requirements Traceability Matrix](TRACEABILITY_MATRIX.md)
+- [PB-109 Terminology Glossary](01-business/TERMINOLOGY_GLOSSARY.md)
 - [Handbook Entry Point](00-handbook/README.md)
 
 ---
