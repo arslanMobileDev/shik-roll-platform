@@ -251,9 +251,13 @@ Cache
 
 Redis
 
-Queue
+Background Jobs
 
 BullMQ
+
+Event Bus
+
+RabbitMQ
 
 Cloud
 
@@ -283,7 +287,7 @@ Flutter Web
 
 Каталог:
 
-docs/19-decisions/
+docs/16-adr/
 
 ---
 

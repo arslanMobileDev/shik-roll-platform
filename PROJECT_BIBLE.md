@@ -334,7 +334,7 @@ PB-001 PROJECT_MANIFEST
 
 Каталог:
 
-docs/19-decisions/
+docs/16-adr/
 
 ---
 
@@ -440,9 +440,13 @@ Cache
 
 Redis
 
-Queues
+Background Jobs
 
 BullMQ
+
+Event Bus
+
+RabbitMQ
 
 Cloud
 

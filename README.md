@@ -265,9 +265,23 @@ PostgreSQL
 
 Prisma ORM
 
+---
+
+## Cache
+
 Redis
 
+---
+
+## Background Jobs
+
 BullMQ
+
+---
+
+## Event Bus
+
+RabbitMQ
 
 ---
 
