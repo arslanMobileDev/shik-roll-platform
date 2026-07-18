@@ -221,9 +221,31 @@ Follow a unified naming convention across Flutter and Figma.
 
 ---
 
+# Document Boundary
+
+UI-802 defines the visual foundations of the SHIK Platform interface:
+
+- design tokens;
+- typography;
+- colors;
+- spacing;
+- grids and breakpoints;
+- motion;
+- themes;
+- accessibility principles;
+- naming conventions.
+
+UI-803 Component Library defines the reusable Flutter components that implement these foundations.
+
+Component behavior, variants, public API, testing and release rules belong to UI-803.
+
+---
+
 # Related Documents
 
 UI-801 Frontend Overview
+
+UI-803 Component Library
 
 ARC-508 Technology Stack
 

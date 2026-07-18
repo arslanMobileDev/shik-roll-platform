@@ -182,6 +182,6 @@ DEV-1203 Git Workflow & Branching Strategy
 
 BE-902 Backend Coding Standards
 
-UI-803 Frontend Coding Standards
+UI-803 Component Library
 
 END OF DOCUMENT
