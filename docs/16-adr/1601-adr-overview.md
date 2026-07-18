@@ -108,7 +108,19 @@ Classification: Internal
 
 ---
 
+# Document Boundary
+
+ADR-1600 Architecture Decision Records Index is the canonical registry and navigation entry point for ADR documents.
+
+ADR-1601 Architecture Decision Records Overview explains the purpose, principles, lifecycle and structure of ADRs.
+
+Individual ADR documents record one concrete architecture decision each.
+
+---
+
 # Related Documents
+
+ADR-1600 Architecture Decision Records Index
 
 ARC-501 Architecture Vision
 
