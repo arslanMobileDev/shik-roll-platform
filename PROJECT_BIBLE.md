@@ -334,7 +334,7 @@ PB-001 PROJECT_MANIFEST
 
 Каталог:
 
-docs/19-decisions/
+docs/16-adr/
 
 ---
 
@@ -440,9 +440,13 @@ Cache
 
 Redis
 
-Queues
+Background Jobs
 
 BullMQ
+
+Event Bus
+
+RabbitMQ
 
 Cloud
 
@@ -456,9 +460,9 @@ Notifications
 
 Firebase Cloud Messaging
 
-Admin
+Back Office / Owner Dashboard
 
-Next.js
+Flutter Web
 
 ---
 
@@ -468,7 +472,7 @@ Next.js
 
 2. Design Before Development
 
-3. API First
+3. API-First
 
 4. Modular Architecture
 

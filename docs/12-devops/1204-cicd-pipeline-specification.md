@@ -40,7 +40,10 @@ Classification: Internal
 
 # Platform
 
+Current
+
 - GitHub Actions
+- Google Cloud Run
 
 Future
 
@@ -111,9 +114,19 @@ Build
 
 # Deployment Targets
 
+Environments
+
 - Development
 - Staging
 - Production
+
+Current Runtime
+
+- Google Cloud Run
+
+Future Runtime
+
+- Kubernetes
 
 ---
 
@@ -185,5 +198,7 @@ DEV-1203 Git Workflow & Branching Strategy
 SEC-1107 Secure Development Lifecycle
 
 ARC-508 Technology Stack
+
+ADR-1611 Cloud Run for MVP and Kubernetes Evolution
 
 END OF DOCUMENT

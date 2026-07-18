@@ -30,7 +30,7 @@ Classification: Internal
 
 # Principles
 
-- Event Driven
+- Event-Driven
 - Channel Agnostic
 - Provider Independent
 - Template Based
@@ -69,7 +69,7 @@ Business Event
 
 ↓
 
-Communication Center
+Communication Automation Center
 
 ↓
 
@@ -251,7 +251,9 @@ Each branch may configure
 
 PB-306 Communication Automation Center
 
-ARC-504 Event Driven Architecture
+ADR-006 Unified Communication Automation Center
+
+ARC-504 Event-Driven Architecture
 
 ARC-512 Background Jobs
 

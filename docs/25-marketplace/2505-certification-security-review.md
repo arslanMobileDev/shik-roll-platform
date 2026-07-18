@@ -374,7 +374,7 @@ MKT-2504 Third-Party Application Integration
 
 SDK-2405 Plugin Development Kit
 
-SEC-1104 Secure Software Development Lifecycle
+SEC-1104 API SECURITY
 
 CMP-1906 Audit & Compliance Controls
 

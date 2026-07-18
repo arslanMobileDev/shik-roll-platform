@@ -333,7 +333,7 @@ DATA-2304 Event Analytics & Real-Time Processing
 
 DATA-2305 Machine Learning Data Pipeline
 
-AI-1406 AI Analytics & Reporting
+AI-1406 AI WORKFLOWS & BUSINESS AUTOMATION
 
 OBS-2202 Metrics & Monitoring Standards
 

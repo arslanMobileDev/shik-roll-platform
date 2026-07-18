@@ -105,7 +105,7 @@ PROJECT MANIFEST определяет неизменные инженерные 
 
 ---
 
-## EP-006 API First
+## EP-006 API-First
 
 Все приложения работают только через Backend API.
 
@@ -129,7 +129,7 @@ Quick Resto, iiko, Poster, r_keeper, Stripe и другие рассматрив
 
 ---
 
-## EP-009 Cloud Native
+## EP-009 Cloud-Native
 
 Основной облачной платформой является Google Cloud Platform.
 
@@ -251,9 +251,13 @@ Cache
 
 Redis
 
-Queue
+Background Jobs
 
 BullMQ
+
+Event Bus
+
+RabbitMQ
 
 Cloud
 
@@ -271,9 +275,9 @@ Storage
 
 Google Cloud Storage
 
-Admin
+Back Office / Owner Dashboard
 
-Next.js
+Flutter Web
 
 ---
 
@@ -283,7 +287,7 @@ Next.js
 
 Каталог:
 
-docs/19-decisions/
+docs/16-adr/
 
 ---
 
@@ -304,5 +308,17 @@ docs/19-decisions/
 # Approval
 
 После получения статуса APPROVED данный документ считается обязательным для всех участников проекта.
+
+---
+
+# Related Documents
+
+- PB-002 — PROJECT BIBLE
+- PB-109 — TERMINOLOGY GLOSSARY
+- ARC-501 — SYSTEM OVERVIEW
+- ADR-1600 — ARCHITECTURE DECISION RECORDS INDEX
+- GOV-2707 — DOCUMENT REGISTRY
+
+---
 
 END OF DOCUMENT

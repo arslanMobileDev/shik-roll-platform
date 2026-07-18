@@ -16,6 +16,8 @@ Owner: Arslan Berslanov
 Solution Architect: OpenAI ChatGPT
 
 Decision Date: July 2026
+Last Updated: July 2026
+
 
 Classification: Internal
 ---
@@ -53,8 +55,8 @@ SHIK Platform включает множество клиентских прил�
 Основные варианты:
 
 - Code First
-- API First
-- Contract First
+- API-First
+- Contract-First
 - Database First
 
 Требования

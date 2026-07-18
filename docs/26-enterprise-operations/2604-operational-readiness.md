@@ -325,6 +325,6 @@ OBS-2206 Alerting & Incident Detection Strategy
 
 BCP-2005 Failover & Recovery Procedures
 
-DEV-1204 CI/CD Pipeline Standards
+DEV-1204 CI/CD PIPELINE SPECIFICATION
 
 END OF DOCUMENT

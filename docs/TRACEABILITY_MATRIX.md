@@ -12,6 +12,8 @@ Project: SHIK Platform
 Standard: IEEE 29148 (Adapted)
 
 Owner: Arslan Berslanov
+Last Updated: July 2026
+
 
 Classification: Internal
 ---
@@ -198,6 +200,18 @@ Using RTM allows the team to:
 - ensure complete test coverage;
 - improve AI-assisted development;
 - simplify maintenance.
+
+---
+
+---
+
+# Related Documents
+
+- PB-305 — PRODUCT REQUIREMENTS
+- PB-304 — BUSINESS CAPABILITIES
+- API-701 — API OVERVIEW
+- DB-601 — DATABASE OVERVIEW
+- QA-1301 — TESTING OVERVIEW
 
 ---
 

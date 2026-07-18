@@ -333,7 +333,7 @@ Signature Verification
 
 - Все сообщения проходят через очередь.
 - Шаблон обязателен для автоматических сообщений.
-- Канал определяется правилами Communication Center.
+- Канал определяется правилами Communication Automation Center.
 - Выполняется проверка пользовательских настроек.
 - Повторная отправка ограничена Retry Policy.
 - Все сообщения журналируются.
@@ -382,5 +382,7 @@ DB-614 Communication Schema
 ARC-513 Communication Architecture
 
 PB-306 Communication Automation Center
+
+ADR-006 Unified Communication Automation Center
 
 END OF DOCUMENT

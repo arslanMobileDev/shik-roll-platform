@@ -40,8 +40,8 @@ Classification: Internal
 
 # Integration Principles
 
-- API First
-- Event Driven
+- API-First
+- Event-Driven
 - Secure By Default
 - Version Controlled
 - Backward Compatible
@@ -370,9 +370,9 @@ SDK-2401 Platform SDK Overview
 
 SDK-2404 REST API Client SDK
 
-ADR-1601 REST API Architecture
+ADR-1601 ARCHITECTURE DECISION RECORDS OVERVIEW
 
-ADR-1610 API Versioning Strategy
+ADR-1610 AI-FIRST PLATFORM ARCHITECTURE
 
 SEC-1102 Identity & Access Management
 

@@ -396,6 +396,38 @@ Collect
 
 ---
 
+# Canonical Front Matter Status and Date Policy
+
+Architecture Decision Record
+
+- PROPOSED
+- ACCEPTED
+- SUPERSEDED
+- DEPRECATED
+- REJECTED
+
+Accepted ADR must contain:
+
+- Decision Date
+- Last Updated
+
+Governed specifications use:
+
+- DRAFT
+- REVIEW
+- APPROVED
+- DEPRECATED
+
+Navigation and legacy files use:
+
+- ACTIVE
+- DEPRECATED
+- RESERVED
+
+The canonical terminology and field definitions are maintained in PB-109 Terminology Glossary.
+
+---
+
 # Related Documents
 
 GOV-2701 Enterprise Architecture Governance Overview
@@ -404,7 +436,9 @@ GOV-2702 Architecture Review Board
 
 ADR-1600 Architecture Decision Records Index
 
-DEV-1207 Documentation Standards
+PB-109 Terminology Glossary
+
+DEV-1207 MONITORING, LOGGING & OBSERVABILITY
 
 CMP-1901 Governance, Risk & Compliance Overview
 

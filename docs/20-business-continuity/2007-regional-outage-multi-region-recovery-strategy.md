@@ -101,7 +101,8 @@ Each Region Contains
 - PostgreSQL Replica
 - Redis
 - RabbitMQ
-- MinIO
+- Object Storage Adapter
+- Google Cloud Storage for production in Google Cloud, or an approved S3-compatible provider for self-hosted deployment
 - Monitoring Stack
 
 ---
@@ -305,6 +306,8 @@ Planned Enhancements
 ---
 
 # Related Documents
+
+ADR-1612 Object Storage Provider Model
 
 BCP-2001 Business Continuity Overview
 

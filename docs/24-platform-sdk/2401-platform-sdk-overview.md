@@ -40,7 +40,7 @@ Classification: Internal
 
 # SDK Principles
 
-- API First
+- API-First
 - Developer Friendly
 - Strong Typing
 - Secure By Default
@@ -325,11 +325,11 @@ Measure
 
 # Related Documents
 
-ADR-1601 REST API Architecture
+ADR-1601 ARCHITECTURE DECISION RECORDS OVERVIEW
 
-ADR-1610 API Versioning Strategy
+ADR-1610 AI-FIRST PLATFORM ARCHITECTURE
 
-DEV-1203 Backend Development Standards
+DEV-1203 GIT WORKFLOW & BRANCHING STRATEGY
 
 AI-1402 AI Gateway Architecture
 

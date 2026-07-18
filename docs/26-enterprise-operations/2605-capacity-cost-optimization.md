@@ -398,6 +398,6 @@ DATA-2306 Reporting & Decision Support Strategy
 
 OBS-2202 Metrics & Monitoring Standards
 
-AI-1406 AI Analytics & Reporting
+AI-1406 AI WORKFLOWS & BUSINESS AUTOMATION
 
 END OF DOCUMENT

@@ -73,9 +73,9 @@ The platform follows several engineering principles.
 
 - Documentation First
 - Clean Architecture
-- API First
+- API-First
 - Modular Design
-- Cloud Native
+- Cloud-Native
 - Security by Design
 - Vendor Independence
 - Configuration First
@@ -265,19 +265,31 @@ PostgreSQL
 
 Prisma ORM
 
+---
+
+## Cache
+
 Redis
+
+---
+
+## Background Jobs
 
 BullMQ
 
 ---
 
+## Event Bus
+
+RabbitMQ
+
+---
+
 ## Frontend
 
-Next.js
+Flutter
 
-React
-
-Tailwind CSS
+Flutter Web
 
 ---
 

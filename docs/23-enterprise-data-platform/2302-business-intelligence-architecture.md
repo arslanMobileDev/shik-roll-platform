@@ -350,7 +350,7 @@ OBS-2202 Metrics & Monitoring Standards
 
 PERF-2104 Database Performance Optimization
 
-AI-1406 AI Analytics & Reporting
+AI-1406 AI WORKFLOWS & BUSINESS AUTOMATION
 
 CMP-1906 Audit & Compliance Controls
 

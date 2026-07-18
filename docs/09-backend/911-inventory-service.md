@@ -187,6 +187,6 @@ BE-909 Kitchen Service
 
 BE-906 Menu & Product Service
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 END OF DOCUMENT

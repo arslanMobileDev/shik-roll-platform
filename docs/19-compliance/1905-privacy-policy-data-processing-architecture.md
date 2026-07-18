@@ -71,7 +71,9 @@ Processing Layer
 Storage
 
 - PostgreSQL
-- MinIO
+- Provider-neutral Object Storage Port
+- Google Cloud Storage (Production in Google Cloud)
+- MinIO through the S3-Compatible Adapter (Local / Development or approved self-hosted deployment)
 - Audit Storage
 - Backup Storage
 
@@ -285,6 +287,8 @@ Annually
 ---
 
 # Related Documents
+
+ADR-1612 Object Storage Provider Model
 
 CMP-1901 Compliance Overview
 

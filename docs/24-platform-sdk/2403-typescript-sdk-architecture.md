@@ -41,7 +41,7 @@ Classification: Internal
 # Design Principles
 
 - TypeScript First
-- API First
+- API-First
 - Clean Architecture
 - Modular Design
 - Tree Shaking Friendly
@@ -431,12 +431,12 @@ Measure
 
 SDK-2401 Platform SDK Overview
 
-ADR-1601 REST API Architecture
+ADR-1601 ARCHITECTURE DECISION RECORDS OVERVIEW
 
-DEV-1201 TypeScript Development Standards
+DEV-1201 DEVOPS OVERVIEW
 
-DEV-1206 Frontend Development Standards
+DEV-1206 ENVIRONMENT CONFIGURATION & SECRETS MANAGEMENT
 
-DEV-1208 Mobile Architecture
+DEV-1208 DEPLOYMENT & RELEASE MANAGEMENT
 
 END OF DOCUMENT

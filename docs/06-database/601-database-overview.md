@@ -42,7 +42,10 @@ Cache
 
 Object Storage
 
-- S3 Compatible
+- Provider-neutral Object Storage Port
+- Google Cloud Storage (Production)
+- MinIO (Local / Development)
+- S3-compatible providers (Alternative)
 
 ---
 
@@ -55,8 +58,8 @@ Object Storage
 - Soft Delete
 - Audit Ready
 - Multi Branch Ready
-- Multi Tenant Ready
-- Event Driven Ready
+- Multi-Tenant Ready
+- Event-Driven Ready
 
 ---
 
@@ -226,6 +229,8 @@ Stored As
 ARC-505 Domain Model
 
 ARC-508 Technology Stack
+
+ADR-1612 Object Storage Provider Model
 
 PB-305 Product Requirements
 

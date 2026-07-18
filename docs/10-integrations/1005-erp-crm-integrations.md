@@ -58,7 +58,7 @@ Accounting
 - Scheduled Synchronization
 - File Import
 - File Export
-- Event Driven
+- Event-Driven
 
 ---
 
@@ -101,7 +101,7 @@ Database
 
 # Synchronization Modes
 
-- Real Time
+- Real-Time
 - Scheduled
 - Manual
 
@@ -191,7 +191,7 @@ Strategy
 
 BE-901 Backend Overview
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 API-701 API Overview
 

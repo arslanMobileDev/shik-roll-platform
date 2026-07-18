@@ -1,7 +1,7 @@
 ---
 Document ID: PB-401
 
-Document Name: SYSTEM OVERVIEW
+Document Name: PLATFORM OVERVIEW
 
 Book: Architecture
 
@@ -18,15 +18,19 @@ Owner: Arslan Berslanov
 Solution Architect: OpenAI ChatGPT
 
 Last Updated: July 2026
+Classification: Internal
+
 ---
 
-# SYSTEM OVERVIEW
+# PLATFORM OVERVIEW
 
 ---
 
 # Purpose
 
-SYSTEM OVERVIEW является главным архитектурным документом платформы.
+PLATFORM OVERVIEW является высокоуровневым обзором платформы SHIK Platform.
+
+Каноническим техническим обзором архитектуры является ARC-501 SYSTEM OVERVIEW.
 
 Документ описывает:
 
@@ -260,7 +264,7 @@ Flutter Desktop / Tablet
 
 ## Back Office
 
-Next.js
+Flutter Web
 
 Назначение:
 
@@ -282,7 +286,7 @@ Next.js
 
 ## Owner Dashboard
 
-Next.js
+Flutter Web
 
 Назначение:
 
@@ -373,11 +377,11 @@ Redis
 
 ---
 
-# Queue
+# Background Job Queue
 
-BullMQ
+BullMQ + Redis
 
-Используется:
+Используется для локальных фоновых заданий:
 
 - push;
 - email;
@@ -387,9 +391,33 @@ BullMQ
 
 ---
 
+# Event Bus
+
+RabbitMQ
+
+Используется для межмодульных, межсервисных и интеграционных событий в соответствии с ADR-1603.
+
+---
+
 # Storage
 
-Google Cloud Storage
+Application Contract
+
+- Provider-neutral Object Storage Port
+
+Production Provider
+
+- Google Cloud Storage via a dedicated GCS Adapter
+
+Local / Development Provider
+
+- MinIO via the S3-Compatible Adapter
+
+Alternative Providers
+
+- S3-compatible object storage via the S3 Adapter
+
+Бизнес-логика не должна зависеть от SDK конкретного storage provider.
 
 Используется для хранения:
 
@@ -398,6 +426,10 @@ Google Cloud Storage
 - баннеров;
 - документов;
 - файлов импорта.
+
+Architecture Decision
+
+- ADR-1612 Object Storage Provider Model
 
 ---
 
@@ -564,21 +596,31 @@ Analytics
 
 # Deployment
 
-Google Cloud Platform
+Current Stage
 
-Cloud Run
+- MVP
+- Early Production
 
-Cloud SQL
+Platform
 
-Cloud Storage
+- Google Cloud Platform
+- Cloud Run
+- Cloud SQL
+- Cloud Storage
+- Cloud Logging
+- Cloud Monitoring
+- Artifact Registry
+- Cloud Build
 
-Cloud Logging
+Future Evolution
 
-Cloud Monitoring
+- Kubernetes may be introduced only when the migration criteria defined in ADR-1611 are met.
 
-Artifact Registry
+Architecture Decision
 
-Cloud Build
+- ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+
+ADR-1612 Object Storage Provider Model
 
 ---
 
@@ -612,7 +654,7 @@ PROJECT_BIBLE
 
 README
 
-Architecture Book
+ARC-501 SYSTEM OVERVIEW
 
 Database Book
 
@@ -620,12 +662,22 @@ API Book
 
 Engineering Book
 
+ADR-1606 Flutter as Cross-Platform Framework
+
+ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+
 ---
 
 # Conclusion
 
-SYSTEM OVERVIEW является главным архитектурным документом платформы.
+PLATFORM OVERVIEW является высокоуровневым обзором платформы SHIK Platform.
 
-Все остальные архитектурные документы являются детализацией данного документа.
+Каноническим техническим обзором архитектуры является ARC-501 SYSTEM OVERVIEW.
+
+PB-401 не определяет техническую архитектуру и не заменяет ARC-501.
+
+Архитектурные документы детализируют ARC-501 и соответствующие принятые ADR.
+
+Продуктовые документы детализируют возможности и границы платформы, представленные в PB-401.
 
 END OF DOCUMENT

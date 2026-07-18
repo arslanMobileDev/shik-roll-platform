@@ -401,9 +401,9 @@ GOV-2703 Architecture Decision Records (ADR) Governance
 
 GOV-2704 Technology Lifecycle Management
 
-DEV-1203 Backend Development Standards
+DEV-1203 GIT WORKFLOW & BRANCHING STRATEGY
 
-SEC-1104 Secure Software Development Lifecycle
+SEC-1104 API SECURITY
 
 OPS-2606 Operational Excellence Framework
 

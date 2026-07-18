@@ -67,7 +67,7 @@ Classification: Internal
 # Integration Patterns
 
 - Request / Response
-- Event Driven
+- Event-Driven
 - Webhooks
 - Queue Processing
 - Scheduled Synchronization

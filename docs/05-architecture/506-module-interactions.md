@@ -30,8 +30,8 @@ Classification: Internal
 
 # Interaction Principles
 
-- API First
-- Event Driven
+- API-First
+- Event-Driven
 - Loose Coupling
 - No Shared Business Logic
 - No Direct Database Access
@@ -201,7 +201,7 @@ Notifications
 
 ↓
 
-Communication Center
+Communication Automation Center
 
 External Calls
 
@@ -237,7 +237,7 @@ ARC-502 Modular Architecture
 
 ARC-503 Microservices Strategy
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 ARC-505 Domain Model
 

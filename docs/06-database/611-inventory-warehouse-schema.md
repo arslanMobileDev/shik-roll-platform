@@ -269,7 +269,7 @@ DB-607 Menu & Product Schema
 
 DB-610 Kitchen & Production Schema
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 PB-305 Product Requirements
 

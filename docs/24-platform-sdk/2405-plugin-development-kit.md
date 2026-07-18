@@ -40,11 +40,11 @@ Classification: Internal
 
 # Plugin Principles
 
-- API First
+- API-First
 - Sandbox By Default
 - Least Privilege
 - Versioned Contracts
-- Event Driven
+- Event-Driven
 - Backward Compatibility
 
 ---
@@ -447,7 +447,7 @@ SDK-2401 Platform SDK Overview
 
 SDK-2404 REST API Client SDK
 
-ADR-1601 REST API Architecture
+ADR-1601 ARCHITECTURE DECISION RECORDS OVERVIEW
 
 AI-1402 AI Gateway Architecture
 

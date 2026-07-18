@@ -40,7 +40,7 @@ Classification: Internal
 
 # Design Principles
 
-- API First
+- API-First
 - OpenAPI Driven
 - Strong Typing
 - Modular Architecture
@@ -458,8 +458,8 @@ SDK-2402 Flutter SDK Architecture
 
 SDK-2403 TypeScript SDK Architecture
 
-ADR-1601 REST API Architecture
+ADR-1601 ARCHITECTURE DECISION RECORDS OVERVIEW
 
-ADR-1610 API Versioning Strategy
+ADR-1610 AI-FIRST PLATFORM ARCHITECTURE
 
 END OF DOCUMENT

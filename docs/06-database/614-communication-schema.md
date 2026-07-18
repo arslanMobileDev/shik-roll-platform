@@ -253,7 +253,7 @@ notification_preferences
 # Business Rules
 
 - Все сообщения проходят через очередь.
-- Канал выбирается по правилам Communication Center.
+- Канал выбирается по правилам Communication Automation Center.
 - Филиалы могут иметь собственные шаблоны.
 - Поддерживается несколько провайдеров одного канала.
 - При ошибке выполняется Retry Policy.
@@ -265,6 +265,8 @@ notification_preferences
 # Related Documents
 
 PB-306 Communication Automation Center
+
+ADR-006 Unified Communication Automation Center
 
 ARC-513 Communication Architecture
 

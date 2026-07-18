@@ -172,7 +172,7 @@ Required On Failure
 - Queue Update ≤ 100 ms
 - Status Update ≤ 100 ms
 - New Kitchen Order ≤ 2 sec
-- Timer Update Real Time
+- Timer Update Real-Time
 
 ---
 
@@ -184,6 +184,6 @@ DB-610 Kitchen & Production Schema
 
 BE-907 Order Service
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 END OF DOCUMENT

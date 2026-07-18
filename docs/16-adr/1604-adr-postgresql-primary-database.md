@@ -16,6 +16,8 @@ Owner: Arslan Berslanov
 Solution Architect: OpenAI ChatGPT
 
 Decision Date: July 2026
+Last Updated: July 2026
+
 
 Classification: Internal
 ---
@@ -273,6 +275,6 @@ SEC-1105 Database Security
 
 DEV-1205 Docker & Containerization
 
-ARC-505 Data Architecture
+ARC-505 DOMAIN MODEL
 
 END OF DOCUMENT

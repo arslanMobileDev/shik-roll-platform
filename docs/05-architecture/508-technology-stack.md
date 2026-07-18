@@ -70,6 +70,15 @@ API
 
 - REST
 
+Background Jobs
+
+- BullMQ
+- Redis
+
+Event Bus
+
+- RabbitMQ
+
 Future
 
 - GraphQL (Optional)
@@ -98,9 +107,26 @@ Future
 
 # Storage
 
-Object Storage
+Application Contract
 
-- S3 Compatible
+- Provider-neutral Object Storage Port
+
+Production
+
+- Google Cloud Storage
+- Dedicated GCS Adapter
+
+Local / Development
+
+- MinIO
+- S3-Compatible Adapter
+
+Alternative Providers
+
+- S3-compatible object storage
+- S3 Adapter
+
+Google Cloud Storage is not treated as an S3-compatible provider.
 
 Images
 
@@ -175,13 +201,17 @@ Containers
 
 - Docker
 
+Current Runtime
+
+- Google Cloud Run
+
 Orchestration
 
-- Kubernetes
+- Managed by Google Cloud Run
 
 Reverse Proxy
 
-- Nginx
+- Nginx (when required)
 
 Environment
 
@@ -201,7 +231,7 @@ Automation
 
 Deployment
 
-- Kubernetes
+- Google Cloud Run
 
 ---
 
@@ -262,8 +292,8 @@ Commit Convention
 
 # Architecture Rules
 
-- API First
-- Event Driven
+- API-First
+- Event-Driven
 - Modular Architecture
 - Clean Architecture
 - Repository Pattern
@@ -273,8 +303,8 @@ Commit Convention
 
 # Future Technologies
 
+- Kubernetes
 - Kafka
-- RabbitMQ
 - Elasticsearch
 - AI Recommendation Engine
 
@@ -287,6 +317,10 @@ ARC-501 System Overview
 ARC-503 Microservices Strategy
 
 ARC-507 Deployment Architecture
+
+ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+
+ADR-1612 Object Storage Provider Model
 
 ARC-509 Caching Strategy
 

@@ -502,7 +502,7 @@ API-706 Menu & Product API
 
 API-708 Payment API
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 PB-305 Product Requirements
 

@@ -50,10 +50,11 @@ Classification: Internal
 
 # ADR Lifecycle
 
-- Proposed
-- Accepted
-- Superseded
-- Deprecated
+- PROPOSED
+- ACCEPTED
+- SUPERSEDED
+- DEPRECATED
+- REJECTED
 
 ---
 
@@ -108,9 +109,39 @@ Classification: Internal
 
 ---
 
+# Canonical Status and Date Policy
+
+Accepted architecture decisions use:
+
+- Status: ACCEPTED
+- Decision Date
+- Last Updated
+
+Decision Date is immutable unless the original acceptance record was incorrect.
+
+Last Updated changes whenever the ADR document is edited.
+
+ADR index and overview documents are governance documents and may use Status: APPROVED because they do not represent an architecture decision.
+
+Navigation and legacy service files follow PB-109 Terminology Glossary and do not receive ADR identifiers.
+
+---
+
+# Document Boundary
+
+ADR-1600 Architecture Decision Records Index is the canonical registry and navigation entry point for ADR documents.
+
+ADR-1601 Architecture Decision Records Overview explains the purpose, principles, lifecycle and structure of ADRs.
+
+Individual ADR documents record one concrete architecture decision each.
+
+---
+
 # Related Documents
 
-ARC-501 Architecture Vision
+ADR-1600 Architecture Decision Records Index
+
+ARC-501 SYSTEM OVERVIEW
 
 DEV-1202 Repository Structure
 

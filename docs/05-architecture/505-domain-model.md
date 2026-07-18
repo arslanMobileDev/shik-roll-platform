@@ -260,8 +260,8 @@ Entities
 - Low Coupling
 - Rich Domain Model
 - Business First
-- Event Driven
-- API First
+- Event-Driven
+- API-First
 
 ---
 
@@ -271,7 +271,7 @@ ARC-501 System Overview
 
 ARC-502 Modular Architecture
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 DB-601 Database Overview
 

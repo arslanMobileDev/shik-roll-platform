@@ -16,6 +16,8 @@ Owner: Arslan Berslanov
 Solution Architect: OpenAI ChatGPT
 
 Decision Date: July 2026
+Last Updated: July 2026
+
 
 Classification: Internal
 ---
@@ -73,6 +75,14 @@ SHIK Platform состоит из большого количества неза
 Использовать **Event-Driven Architecture** с **RabbitMQ** как основной механизм взаимодействия между сервисами.
 
 REST API использовать только для синхронных пользовательских запросов.
+
+---
+
+# Scope of Decision
+
+RabbitMQ используется для межмодульных, межсервисных и интеграционных событий.
+
+BullMQ + Redis могут использоваться для локальных фоновых заданий, повторных попыток и плановых задач. Они не заменяют RabbitMQ как event bus.
 
 ---
 
@@ -235,7 +245,9 @@ Failed Messages
 
 # Related Documents
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
+
+ARC-512 Background Jobs
 
 BE-901 Backend Overview
 

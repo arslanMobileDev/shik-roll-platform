@@ -41,8 +41,8 @@ Classification: Internal
 # Customization Principles
 
 - Core Remains Untouched
-- API First
-- Event Driven
+- API-First
+- Event-Driven
 - Secure By Default
 - Configuration Over Code
 - Backward Compatibility
@@ -392,7 +392,7 @@ SDK-2404 REST API Client SDK
 
 SDK-2405 Plugin Development Kit
 
-ADR-1601 REST API Architecture
+ADR-1601 ARCHITECTURE DECISION RECORDS OVERVIEW
 
 AI-1402 AI Gateway Architecture
 

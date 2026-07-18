@@ -194,7 +194,7 @@ After Connection Restored
 
 - Safety First
 - One Tap Actions
-- Real Time Updates
+- Real-Time Updates
 - Minimal Driver Distraction
 - Fast Navigation
 - Offline Ready

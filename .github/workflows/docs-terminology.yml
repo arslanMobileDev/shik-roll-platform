@@ -1,0 +1,32 @@
+name: Documentation Terminology
+
+on:
+  pull_request:
+    paths:
+      - "**/*.md"
+      - "scripts/check-doc-terminology.py"
+      - ".github/workflows/docs-terminology.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "**/*.md"
+      - "scripts/check-doc-terminology.py"
+      - ".github/workflows/docs-terminology.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run read-only documentation validation
+        run: python3 scripts/check-doc-terminology.py

@@ -118,7 +118,7 @@ Tables
 # Business Rules
 
 - Все сообщения проходят через очередь.
-- Канал определяется правилами Communication Center.
+- Канал определяется правилами Communication Automation Center.
 - Пользовательские настройки обязательны к проверке.
 - Поддерживается несколько каналов для одного события.
 - При отказе канала применяется Retry Policy.
@@ -209,6 +209,8 @@ API-714 Communication API
 DB-614 Communication Schema
 
 PB-306 Communication Automation Center
+
+ADR-006 Unified Communication Automation Center
 
 ARC-513 Communication Architecture
 

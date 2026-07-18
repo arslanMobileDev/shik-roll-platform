@@ -168,7 +168,7 @@ SHIK Platform не зависит от одного картографическ
 
 ---
 
-# AI First Development
+# AI-First Development
 
 При разработке допускается использование AI-инструментов:
 

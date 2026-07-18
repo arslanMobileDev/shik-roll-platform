@@ -30,13 +30,36 @@ Classification: Internal
 
 # Deployment Model
 
-Cloud Native
+Cloud-Native
 
 Container Based
 
-API First
+API-First
 
 Horizontal Scaling Ready
+
+---
+
+# Deployment Stages
+
+## Current Stage — MVP and Early Production
+
+- Google Cloud Platform
+- Google Cloud Run
+- Managed Cloud Services
+
+## Target Evolution
+
+Kubernetes is not required for the current stage. It may be introduced when one or more migration criteria are confirmed:
+
+- Cloud Run limitations affect product requirements;
+- service mesh is required;
+- complex workload isolation is required;
+- multi-region orchestration is required;
+- the number of independently deployed services creates operational pressure;
+- a mature DevOps/SRE team is available.
+
+The decision is governed by ADR-1611.
 
 ---
 
@@ -239,6 +262,8 @@ Production
 ARC-501 System Overview
 
 ARC-508 Technology Stack
+
+ADR-1611 Cloud Run for MVP and Kubernetes Evolution
 
 ARC-509 Caching Strategy
 

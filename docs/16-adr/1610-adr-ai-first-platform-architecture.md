@@ -16,6 +16,8 @@ Owner: Arslan Berslanov
 Solution Architect: OpenAI ChatGPT
 
 Decision Date: July 2026
+Last Updated: July 2026
+
 
 Classification: Internal
 ---
@@ -134,10 +136,10 @@ Development
 # Architectural Principles
 
 - AI Provider Agnostic
-- API First
+- API-First
 - Prompt First
 - Human In Control
-- Event Driven
+- Event-Driven
 - Secure By Default
 - Observable
 - Auditable

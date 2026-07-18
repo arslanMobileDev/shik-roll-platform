@@ -274,7 +274,9 @@ Improve
 
 ADR-1600 Architecture Decision Records Index
 
-DEV-1201 TypeScript Development Standards
+GOV-2707 Document Registry
+
+DEV-1201 DEVOPS OVERVIEW
 
 SEC-1101 Security Overview
 

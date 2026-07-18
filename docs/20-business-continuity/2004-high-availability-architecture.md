@@ -158,16 +158,26 @@ Features
 
 # Object Storage
 
-Architecture
+Application Contract
 
-- MinIO Distributed Cluster
+- Provider-neutral Object Storage Port
+
+Production in Google Cloud
+
+- Google Cloud Storage
+- Provider-managed durability and recovery
+
+Approved Self-Hosted Deployment
+
+- S3-compatible provider
+- MinIO Distributed Cluster when MinIO is selected
 
 Features
 
 - Data Replication
-- Erasure Coding
 - High Durability
 - Automatic Recovery
+- Provider-specific recovery procedures
 
 ---
 
@@ -274,6 +284,8 @@ Measure
 ---
 
 # Related Documents
+
+ADR-1612 Object Storage Provider Model
 
 BCP-2001 Business Continuity Overview
 

@@ -246,7 +246,7 @@ Screens
 
 - Executive First
 - Data Driven
-- Real Time Updates
+- Real-Time Updates
 - Responsive
 - Drill Down Analytics
 - Minimal Clicks

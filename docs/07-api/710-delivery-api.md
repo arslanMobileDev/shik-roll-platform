@@ -324,7 +324,7 @@ DB-606 Restaurant & Branch Schema
 
 DB-608 Order Schema
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 PB-305 Product Requirements
 

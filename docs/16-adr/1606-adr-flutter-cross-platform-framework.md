@@ -16,6 +16,8 @@ Owner: Arslan Berslanov
 Solution Architect: OpenAI ChatGPT
 
 Decision Date: July 2026
+Last Updated: July 2026
+
 
 Classification: Internal
 ---
@@ -255,7 +257,7 @@ Mitigation
 
 UI-801 Frontend Overview
 
-UI-802 Flutter Architecture
+UI-802 DESIGN SYSTEM
 
 ARC-508 Technology Stack
 

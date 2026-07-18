@@ -343,7 +343,7 @@ SDK-2405 Plugin Development Kit
 
 SDK-2406 Extension Points & Customization
 
-ADR-1601 REST API Architecture
+ADR-1601 ARCHITECTURE DECISION RECORDS OVERVIEW
 
 SEC-1101 Security Overview
 

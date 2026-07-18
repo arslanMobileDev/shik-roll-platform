@@ -38,15 +38,23 @@ Classification: Internal
 
 ---
 
-# Queue Technology
+# Queue Technologies
 
-MVP
+## Background Jobs (MVP)
 
+- BullMQ
 - Redis
 
-Future
+Используются для локальных фоновых заданий, повторных попыток и плановых задач.
+
+## Event Bus
 
 - RabbitMQ
+
+Используется для межмодульных, межсервисных и интеграционных событий.
+
+## Future
+
 - Kafka
 
 ---
@@ -179,7 +187,7 @@ Concurrent Workers
 
 # Related Documents
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 ARC-507 Deployment Architecture
 

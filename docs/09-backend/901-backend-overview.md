@@ -47,7 +47,7 @@ Runtime
 # Architecture
 
 - Modular Monolith (Phase 1)
-- Event Driven Ready
+- Event-Driven Ready
 - Domain Driven Design
 - Clean Architecture
 - CQRS Ready
@@ -81,7 +81,8 @@ Runtime
 - PostgreSQL
 - Redis
 - RabbitMQ
-- MinIO
+- Google Cloud Storage (Production)
+- MinIO (Local / Development)
 - Elasticsearch (Future)
 
 ---
@@ -110,16 +111,18 @@ Asynchronous
 
 # Background Processing
 
-- Queue Workers
-- Scheduled Jobs
-- Event Handlers
+- BullMQ Workers
+- Redis-backed Scheduled Jobs
+- RabbitMQ Event Handlers
 
 ---
 
 # Storage
 
 - PostgreSQL
-- Object Storage
+- Provider-neutral Object Storage Port
+- GCS Adapter (Production)
+- S3-Compatible Adapter with MinIO (Local / Development)
 - Cache
 
 ---
@@ -153,6 +156,8 @@ Asynchronous
 # Related Documents
 
 ARC-508 Technology Stack
+
+ADR-1612 Object Storage Provider Model
 
 DB-601 Database Overview
 
