@@ -11,11 +11,25 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 GLOSSARY = ROOT / "docs/01-business/TERMINOLOGY_GLOSSARY.md"
+DOCUMENT_REGISTRY = (
+    ROOT
+    / "docs/27-enterprise-architecture-governance/2707-document-registry.md"
+)
 ID_RE = re.compile(r"^Document ID:\s*([A-Z][A-Z0-9]*-\d+)\s*$", re.MULTILINE)
 NAME_RE = re.compile(r"^Document Name:\s*(.+?)\s*$", re.MULTILINE)
 RELATED_HEADING_RE = re.compile(r"^#{1,6}\s+Related Documents\s*$", re.IGNORECASE)
 RELATED_ID_RE = re.compile(r"\b[A-Z][A-Z0-9]*-\d+\b")
 LINK_RE = re.compile(r"!?(?:\[[^\]]*\])\(([^)]+)\)")
+REGISTRY_ROW_RE = re.compile(
+    r"^\|\s*([A-Z][A-Z0-9]*-\d+)\s*"
+    r"\|\s*([^|]+?)\s*"
+    r"\|\s*([^|]+?)\s*"
+    r"\|\s*([^|]+?)\s*"
+    r"\|\s*([^|]+?)\s*"
+    r"\|\s*([^|]+?)\s*"
+    r"\|\s*`([^`]+)`\s*\|\s*$",
+    re.MULTILINE,
+)
 
 FORBIDDEN_TERMS = {
     "Communication Center": re.compile(r"\bCommunication Center\b", re.IGNORECASE),
@@ -33,6 +47,7 @@ CANONICAL_NAMES = {
     "ARC-501": "SYSTEM OVERVIEW",
     "PB-401": "PLATFORM OVERVIEW",
     "GOV-2703": "ARCHITECTURE DECISION RECORDS (ADR) GOVERNANCE",
+    "GOV-2707": "DOCUMENT REGISTRY",
 }
 
 
@@ -62,6 +77,15 @@ def local_link_target(source: Path, raw_target: str) -> Path | None:
     return (source.parent / unquote(target)).resolve()
 
 
+def front_matter_value(text: str, field: str) -> str:
+    pattern = re.compile(
+        rf"^{re.escape(field)}:\s*(.+?)\s*$",
+        re.MULTILINE,
+    )
+    match = pattern.search(text)
+    return match.group(1).strip() if match else ""
+
+
 def main() -> int:
     markdown_files = sorted(
         path for path in ROOT.rglob("*.md") if ".git" not in path.parts
@@ -69,6 +93,7 @@ def main() -> int:
     errors: list[str] = []
     documents: dict[str, Path] = {}
     names: dict[str, str] = {}
+    metadata: dict[str, tuple[str, str, str, str, str, str]] = {}
     texts: dict[Path, str] = {}
 
     for path in markdown_files:
@@ -88,6 +113,14 @@ def main() -> int:
         name = NAME_RE.search(text)
         if name:
             names[document_id] = name.group(1).strip()
+        metadata[document_id] = (
+            front_matter_value(text, "Document Name"),
+            front_matter_value(text, "Book") or "—",
+            front_matter_value(text, "Status"),
+            front_matter_value(text, "Version"),
+            front_matter_value(text, "Last Updated"),
+            path.relative_to(ROOT).as_posix(),
+        )
 
     for document_id, expected_name in CANONICAL_NAMES.items():
         actual_name = names.get(document_id)
@@ -97,6 +130,35 @@ def main() -> int:
             errors.append(
                 f"{document_id}: expected Document Name '{expected_name}', got '{actual_name}'"
             )
+
+    registry_text = texts.get(DOCUMENT_REGISTRY)
+    if registry_text is None:
+        errors.append(
+            f"missing Document Registry: {DOCUMENT_REGISTRY.relative_to(ROOT)}"
+        )
+        registry_rows: dict[str, tuple[str, str, str, str, str, str]] = {}
+    else:
+        registry_rows = {}
+        for row in REGISTRY_ROW_RE.findall(registry_text):
+            document_id = row[0]
+            registered_metadata = tuple(value.strip() for value in row[1:])
+            if document_id in registry_rows:
+                errors.append(
+                    f"Document Registry contains duplicate row for {document_id}"
+                )
+            registry_rows[document_id] = registered_metadata
+
+    for document_id, expected_metadata in sorted(metadata.items()):
+        registered_metadata = registry_rows.get(document_id)
+        if registered_metadata is None:
+            errors.append(f"Document Registry is missing {document_id}")
+        elif registered_metadata != expected_metadata:
+            errors.append(
+                f"Document Registry metadata mismatch for {document_id}: "
+                f"expected {expected_metadata}, got {registered_metadata}"
+            )
+    for document_id in sorted(set(registry_rows) - set(metadata)):
+        errors.append(f"Document Registry contains unknown {document_id}")
 
     for path, text in texts.items():
         if path != GLOSSARY:
@@ -137,7 +199,8 @@ def main() -> int:
         "Documentation validation passed: "
         f"{len(markdown_files)} Markdown files, "
         f"{len(documents)} unique Document IDs, "
-        f"{related_count} Related Documents references."
+        f"{related_count} Related Documents references, "
+        f"{len(registry_rows)} Document Registry rows."
     )
     return 0
 

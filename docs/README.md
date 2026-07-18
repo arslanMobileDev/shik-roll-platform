@@ -19,6 +19,7 @@ Classification: Internal
 - [PB-002 Project Bible](../PROJECT_BIBLE.md)
 - [RTM-001 Requirements Traceability Matrix](TRACEABILITY_MATRIX.md)
 - [PB-109 Terminology Glossary](01-business/TERMINOLOGY_GLOSSARY.md)
+- [GOV-2707 Document Registry](27-enterprise-architecture-governance/2707-document-registry.md)
 - [Handbook Entry Point](00-handbook/README.md)
 
 ---
@@ -103,6 +104,7 @@ README, SUMMARY, legacy redirect и reserved placeholder файлы являют
 - Front Matter;
 - Related Documents;
 - ADR-1600 для архитектурных решений;
+- GOV-2707 для общего реестра управляемых документов;
 - RTM-001 для требований;
 - отсутствие конфликта с каноническими entry points;
 - соответствие статусам и датам из PB-109 Terminology Glossary.
