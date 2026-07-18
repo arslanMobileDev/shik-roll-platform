@@ -2,9 +2,10 @@
 Document ID: ADR-006
 Document Name: Unified Communication Automation Center
 Version: 1.0.0
-Status: APPROVED
+Status: ACCEPTED
 Project: SHIK Platform
 Owner: Arslan Berslanov
+Decision Date: July 2026
 Last Updated: July 2026
 Classification: Internal
 ---

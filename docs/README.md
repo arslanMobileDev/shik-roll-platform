@@ -104,6 +104,7 @@ README, SUMMARY, legacy redirect и reserved placeholder файлы являют
 - Related Documents;
 - ADR-1600 для архитектурных решений;
 - RTM-001 для требований;
-- отсутствие конфликта с каноническими entry points.
+- отсутствие конфликта с каноническими entry points;
+- соответствие статусам и датам из PB-109 Terminology Glossary.
 
 END OF DOCUMENT

@@ -196,6 +196,52 @@ Related Documents должны использовать существующий
 
 ---
 
+# Status and Date Fields
+
+## Governed Documents
+
+Allowed statuses:
+
+- DRAFT
+- REVIEW
+- APPROVED
+- DEPRECATED
+
+Required date field:
+
+- Last Updated
+
+## Architecture Decision Records
+
+Allowed statuses:
+
+- PROPOSED
+- ACCEPTED
+- SUPERSEDED
+- DEPRECATED
+- REJECTED
+
+Required date fields for an accepted ADR:
+
+- Decision Date
+- Last Updated
+
+Decision Date records when the decision was accepted.
+
+Last Updated records the most recent documentation change and does not change the original decision date.
+
+## Navigation and Service Files
+
+Allowed statuses:
+
+- ACTIVE
+- DEPRECATED
+- RESERVED
+
+README, SUMMARY, legacy redirect and reserved placeholder files use Document Type and do not receive Document ID.
+
+---
+
 # Alias Rules
 
 Допустимый алиас:
