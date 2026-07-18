@@ -105,7 +105,7 @@ PROJECT MANIFEST определяет неизменные инженерные 
 
 ---
 
-## EP-006 API First
+## EP-006 API-First
 
 Все приложения работают только через Backend API.
 
@@ -129,7 +129,7 @@ Quick Resto, iiko, Poster, r_keeper, Stripe и другие рассматрив
 
 ---
 
-## EP-009 Cloud Native
+## EP-009 Cloud-Native
 
 Основной облачной платформой является Google Cloud Platform.
 

@@ -468,7 +468,7 @@ Next.js
 
 2. Design Before Development
 
-3. API First
+3. API-First
 
 4. Modular Architecture
 
