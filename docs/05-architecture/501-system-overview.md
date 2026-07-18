@@ -32,6 +32,8 @@ Classification: Internal
 
 Документ определяет общую архитектуру SHIK Platform, основные модули, принципы взаимодействия и границы системы.
 
+ARC-501 является каноническим техническим обзором архитектуры. Высокоуровневый обзор платформы представлен в PB-401 SYSTEM OVERVIEW.
+
 ---
 
 # Vision
@@ -180,6 +182,8 @@ ARC-502 Modular Architecture
 ARC-503 Microservices
 
 ARC-504 Event Driven Architecture
+
+PB-401 Platform Overview
 
 PB-305 Product Requirements
 

@@ -26,7 +26,9 @@ Last Updated: July 2026
 
 # Purpose
 
-SYSTEM OVERVIEW является главным архитектурным документом платформы.
+SYSTEM OVERVIEW является высокоуровневым обзором платформы SHIK Platform.
+
+Каноническим техническим обзором архитектуры является ARC-501 SYSTEM OVERVIEW.
 
 Документ описывает:
 
@@ -612,7 +614,7 @@ PROJECT_BIBLE
 
 README
 
-Architecture Book
+ARC-501 SYSTEM OVERVIEW
 
 Database Book
 
@@ -624,7 +626,9 @@ Engineering Book
 
 # Conclusion
 
-SYSTEM OVERVIEW является главным архитектурным документом платформы.
+SYSTEM OVERVIEW является высокоуровневым обзором платформы SHIK Platform.
+
+Каноническим техническим обзором архитектуры является ARC-501 SYSTEM OVERVIEW.
 
 Все остальные архитектурные документы являются детализацией данного документа.
 
