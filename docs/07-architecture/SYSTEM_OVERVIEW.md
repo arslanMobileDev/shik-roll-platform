@@ -262,7 +262,7 @@ Flutter Desktop / Tablet
 
 ## Back Office
 
-Next.js
+Flutter Web
 
 Назначение:
 
@@ -284,7 +284,7 @@ Next.js
 
 ## Owner Dashboard
 
-Next.js
+Flutter Web
 
 Назначение:
 
@@ -628,7 +628,9 @@ Engineering Book
 
 SYSTEM OVERVIEW является высокоуровневым обзором платформы SHIK Platform.
 
-Каноническим техническим обзором архитектуры является ARC-501 SYSTEM OVERVIEW.
+Каноническим техническим обзором архитектуры является ARC-501 SYSTEM OVERVIEW
+
+ADR-1606 Flutter as Cross-Platform Framework.
 
 Все остальные архитектурные документы являются детализацией данного документа.
 
