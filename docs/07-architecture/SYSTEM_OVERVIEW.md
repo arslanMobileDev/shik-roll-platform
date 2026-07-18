@@ -638,6 +638,8 @@ API Book
 
 Engineering Book
 
+ADR-1606 Flutter as Cross-Platform Framework
+
 ADR-1611 Cloud Run for MVP and Kubernetes Evolution
 
 ---
@@ -646,9 +648,7 @@ ADR-1611 Cloud Run for MVP and Kubernetes Evolution
 
 SYSTEM OVERVIEW является высокоуровневым обзором платформы SHIK Platform.
 
-Каноническим техническим обзором архитектуры является ARC-501 SYSTEM OVERVIEW
-
-ADR-1606 Flutter as Cross-Platform Framework.
+Каноническим техническим обзором архитектуры является ARC-501 SYSTEM OVERVIEW.
 
 Все остальные архитектурные документы являются детализацией данного документа.
 
