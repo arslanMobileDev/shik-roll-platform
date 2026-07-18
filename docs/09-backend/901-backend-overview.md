@@ -47,7 +47,7 @@ Runtime
 # Architecture
 
 - Modular Monolith (Phase 1)
-- Event Driven Ready
+- Event-Driven Ready
 - Domain Driven Design
 - Clean Architecture
 - CQRS Ready

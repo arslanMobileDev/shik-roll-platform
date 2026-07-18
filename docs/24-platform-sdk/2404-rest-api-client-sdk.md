@@ -40,7 +40,7 @@ Classification: Internal
 
 # Design Principles
 
-- API First
+- API-First
 - OpenAPI Driven
 - Strong Typing
 - Modular Architecture

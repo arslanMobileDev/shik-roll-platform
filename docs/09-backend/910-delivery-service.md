@@ -179,7 +179,7 @@ Required On Failure
 - Courier Assignment ≤ 300 ms
 - ETA Calculation ≤ 1 sec
 - Location Update ≤ 100 ms
-- Tracking Refresh Real Time
+- Tracking Refresh Real-Time
 
 ---
 
@@ -191,6 +191,6 @@ DB-608 Order Schema
 
 BE-909 Kitchen Service
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 END OF DOCUMENT

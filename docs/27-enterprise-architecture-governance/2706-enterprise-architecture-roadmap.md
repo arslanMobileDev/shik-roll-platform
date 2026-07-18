@@ -44,7 +44,7 @@ Classification: Internal
 - Architecture First
 - Incremental Evolution
 - Security By Design
-- Cloud Native
+- Cloud-Native
 - AI Ready
 
 ---

@@ -289,7 +289,7 @@ ARC-501 System Overview
 
 ARC-503 Microservices
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 PB-305 Product Requirements
 

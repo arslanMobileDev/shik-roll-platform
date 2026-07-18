@@ -40,8 +40,8 @@ Classification: Internal
 
 # Integration Principles
 
-- API First
-- Event Driven
+- API-First
+- Event-Driven
 - Secure By Default
 - Version Controlled
 - Backward Compatible

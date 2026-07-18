@@ -292,8 +292,8 @@ Commit Convention
 
 # Architecture Rules
 
-- API First
-- Event Driven
+- API-First
+- Event-Driven
 - Modular Architecture
 - Clean Architecture
 - Repository Pattern

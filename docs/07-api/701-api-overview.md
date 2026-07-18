@@ -34,7 +34,7 @@ Classification: Internal
 - JSON
 - HTTPS Only
 - Stateless
-- API First
+- API-First
 
 ---
 

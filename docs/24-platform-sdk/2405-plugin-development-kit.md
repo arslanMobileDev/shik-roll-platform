@@ -40,11 +40,11 @@ Classification: Internal
 
 # Plugin Principles
 
-- API First
+- API-First
 - Sandbox By Default
 - Least Privilege
 - Versioned Contracts
-- Event Driven
+- Event-Driven
 - Backward Compatibility
 
 ---

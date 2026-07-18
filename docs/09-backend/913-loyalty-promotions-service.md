@@ -182,6 +182,6 @@ DB-613 Loyalty & Promotions Schema
 
 BE-907 Order Service
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 END OF DOCUMENT

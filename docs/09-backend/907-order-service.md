@@ -210,6 +210,6 @@ BE-906 Menu & Product Service
 
 BE-908 Payment Service
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 END OF DOCUMENT

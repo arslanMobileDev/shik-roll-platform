@@ -30,11 +30,11 @@ Classification: Internal
 
 # Deployment Model
 
-Cloud Native
+Cloud-Native
 
 Container Based
 
-API First
+API-First
 
 Horizontal Scaling Ready
 

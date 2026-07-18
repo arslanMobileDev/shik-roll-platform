@@ -184,7 +184,7 @@ Screens
 # UX Principles
 
 - Zero Distractions
-- Real Time Updates
+- Real-Time Updates
 - One Tap Actions
 - Maximum Visibility
 - High Performance

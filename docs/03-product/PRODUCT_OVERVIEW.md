@@ -280,9 +280,9 @@ Database
 При проектировании каждого нового модуля соблюдаются следующие принципы.
 
 - Configuration First
-- API First
+- API-First
 - Mobile First
-- Cloud Native
+- Cloud-Native
 - Security by Design
 - Modular Architecture
 - Vendor Independence

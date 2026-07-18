@@ -1,7 +1,7 @@
 ---
 Document ID: ARC-504
 
-Document Name: EVENT DRIVEN ARCHITECTURE
+Document Name: EVENT-DRIVEN ARCHITECTURE
 
 Book: Architecture
 
@@ -15,14 +15,14 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Architecture Style: Event Driven
+Architecture Style: Event-Driven
 
 Last Updated: July 2026
 
 Classification: Internal
 ---
 
-# EVENT DRIVEN ARCHITECTURE
+# EVENT-DRIVEN ARCHITECTURE
 
 ## Purpose
 
@@ -34,7 +34,7 @@ Classification: Internal
 
 - Business First
 - Loose Coupling
-- Event Driven
+- Event-Driven
 - Asynchronous Processing
 - Idempotency
 - Auditability

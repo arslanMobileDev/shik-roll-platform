@@ -222,8 +222,8 @@ Forbidden
 - Loose Coupling
 - High Cohesion
 - Independent Deployment Ready
-- API First
-- Event Driven
+- API-First
+- Event-Driven
 
 ---
 
@@ -244,6 +244,6 @@ ARC-501 System Overview
 
 ARC-502 Modular Architecture
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 END OF DOCUMENT

@@ -136,10 +136,10 @@ Development
 # Architectural Principles
 
 - AI Provider Agnostic
-- API First
+- API-First
 - Prompt First
 - Human In Control
-- Event Driven
+- Event-Driven
 - Secure By Default
 - Observable
 - Auditable

@@ -41,7 +41,7 @@ Classification: Internal
 # Design Principles
 
 - TypeScript First
-- API First
+- API-First
 - Clean Architecture
 - Modular Design
 - Tree Shaking Friendly

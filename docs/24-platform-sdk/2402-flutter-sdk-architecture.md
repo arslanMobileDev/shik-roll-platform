@@ -44,7 +44,7 @@ Classification: Internal
 - SOLID
 - Dependency Injection
 - Repository Pattern
-- API First
+- API-First
 - Testability
 
 ---

@@ -245,7 +245,7 @@ Failed Messages
 
 # Related Documents
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 ARC-512 Background Jobs
 

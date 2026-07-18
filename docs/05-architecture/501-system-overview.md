@@ -44,16 +44,16 @@ SHIK Platform — облачная модульная Restaurant Operating Syste
 
 # Architecture Principles
 
-- Cloud Native
-- API First
+- Cloud-Native
+- API-First
 - Modular Architecture
-- Event Driven
+- Event-Driven
 - Mobile First
 - Offline Ready
 - Security by Design
 - Configuration over Code
 - Multi Branch
-- Multi Tenant Ready
+- Multi-Tenant Ready
 
 ---
 
@@ -181,7 +181,7 @@ ARC-502 Modular Architecture
 
 ARC-503 Microservices
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 PB-401 Platform Overview
 

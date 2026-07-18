@@ -31,7 +31,7 @@ Classification: Internal
 # Objectives
 
 - Business Automation
-- Event Driven Automation
+- Event-Driven Automation
 - AI Assisted Decisions
 - Human Approval
 - Operational Efficiency

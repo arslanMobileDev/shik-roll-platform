@@ -354,7 +354,7 @@ Loyalty Update
 
 ---
 
-## API First
+## API-First
 
 Все приложения работают через единый Backend API.
 

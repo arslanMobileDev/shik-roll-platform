@@ -41,8 +41,8 @@ Classification: Internal
 # Customization Principles
 
 - Core Remains Untouched
-- API First
-- Event Driven
+- API-First
+- Event-Driven
 - Secure By Default
 - Configuration Over Code
 - Backward Compatibility

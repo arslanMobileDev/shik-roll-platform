@@ -330,7 +330,7 @@ DB-610 Kitchen & Production Schema
 
 API-707 Order API
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 PB-305 Product Requirements
 

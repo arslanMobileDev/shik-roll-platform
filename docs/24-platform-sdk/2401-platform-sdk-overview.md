@@ -40,7 +40,7 @@ Classification: Internal
 
 # SDK Principles
 
-- API First
+- API-First
 - Developer Friendly
 - Strong Typing
 - Secure By Default

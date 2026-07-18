@@ -58,8 +58,8 @@ Object Storage
 - Soft Delete
 - Audit Ready
 - Multi Branch Ready
-- Multi Tenant Ready
-- Event Driven Ready
+- Multi-Tenant Ready
+- Event-Driven Ready
 
 ---
 

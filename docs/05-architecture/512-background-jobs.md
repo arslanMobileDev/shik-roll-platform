@@ -187,7 +187,7 @@ Concurrent Workers
 
 # Related Documents
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 ARC-507 Deployment Architecture
 

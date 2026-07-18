@@ -42,7 +42,7 @@ Classification: Internal
 
 - Simplicity First
 - Clean Code
-- API First
+- API-First
 - Security by Design
 - Test First Mindset
 - Documentation First

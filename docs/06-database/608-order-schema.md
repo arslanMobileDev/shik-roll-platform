@@ -319,6 +319,6 @@ PB-305 Product Requirements
 
 DB-607 Menu & Product Schema
 
-ARC-504 Event Driven Architecture
+ARC-504 Event-Driven Architecture
 
 END OF DOCUMENT

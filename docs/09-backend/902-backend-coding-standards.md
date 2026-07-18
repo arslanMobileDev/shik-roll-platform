@@ -44,7 +44,7 @@ Classification: Internal
 - SOLID
 - Dependency Injection
 - Modular Structure
-- Event Driven Ready
+- Event-Driven Ready
 
 ---
 

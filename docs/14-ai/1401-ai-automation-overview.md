@@ -30,7 +30,7 @@ Classification: Internal
 
 # Objectives
 
-- AI First
+- AI-First
 - Business Automation
 - Intelligent Assistance
 - Human Oversight
