@@ -46,6 +46,7 @@ Classification: Internal
 - Docker
 - Docker Compose
 - GitHub Actions
+- Google Cloud Run
 - Nginx
 - PostgreSQL
 - Redis
@@ -125,5 +126,7 @@ SEC-1106 Infrastructure Security
 BE-901 Backend Overview
 
 ARC-508 Technology Stack
+
+ADR-1611 Cloud Run for MVP and Kubernetes Evolution
 
 END OF DOCUMENT

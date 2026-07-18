@@ -93,7 +93,7 @@ Examples
 - Redis
 - RabbitMQ
 - Docker
-- Kubernetes
+- Google Cloud Run
 
 ---
 
@@ -103,6 +103,10 @@ Definition
 
 - Limited Production Usage
 - Controlled Evaluation
+
+Examples
+
+- Kubernetes
 
 Requirements
 
@@ -167,7 +171,8 @@ Messaging
 Infrastructure
 
 - Docker
-- Kubernetes
+- Google Cloud Run
+- Kubernetes (Trial)
 
 Observability
 
@@ -409,6 +414,8 @@ GOV-2701 Enterprise Architecture Governance Overview
 GOV-2702 Architecture Review Board
 
 GOV-2703 Architecture Decision Records (ADR) Governance
+
+ADR-1611 Cloud Run for MVP and Kubernetes Evolution
 
 DEV-1201 TypeScript Development Standards
 

@@ -574,21 +574,29 @@ Analytics
 
 # Deployment
 
-Google Cloud Platform
+Current Stage
 
-Cloud Run
+- MVP
+- Early Production
 
-Cloud SQL
+Platform
 
-Cloud Storage
+- Google Cloud Platform
+- Cloud Run
+- Cloud SQL
+- Cloud Storage
+- Cloud Logging
+- Cloud Monitoring
+- Artifact Registry
+- Cloud Build
 
-Cloud Logging
+Future Evolution
 
-Cloud Monitoring
+- Kubernetes may be introduced only when the migration criteria defined in ADR-1611 are met.
 
-Artifact Registry
+Architecture Decision
 
-Cloud Build
+- ADR-1611 Cloud Run for MVP and Kubernetes Evolution
 
 ---
 
@@ -629,6 +637,8 @@ Database Book
 API Book
 
 Engineering Book
+
+ADR-1611 Cloud Run for MVP and Kubernetes Evolution
 
 ---
 

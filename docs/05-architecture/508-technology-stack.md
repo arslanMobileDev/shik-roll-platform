@@ -184,13 +184,17 @@ Containers
 
 - Docker
 
+Current Runtime
+
+- Google Cloud Run
+
 Orchestration
 
-- Kubernetes
+- Managed by Google Cloud Run
 
 Reverse Proxy
 
-- Nginx
+- Nginx (when required)
 
 Environment
 
@@ -210,7 +214,7 @@ Automation
 
 Deployment
 
-- Kubernetes
+- Google Cloud Run
 
 ---
 
@@ -282,6 +286,7 @@ Commit Convention
 
 # Future Technologies
 
+- Kubernetes
 - Kafka
 - Elasticsearch
 - AI Recommendation Engine
@@ -295,6 +300,8 @@ ARC-501 System Overview
 ARC-503 Microservices Strategy
 
 ARC-507 Deployment Architecture
+
+ADR-1611 Cloud Run for MVP and Kubernetes Evolution
 
 ARC-509 Caching Strategy
 
