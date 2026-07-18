@@ -107,4 +107,16 @@ README, SUMMARY, legacy redirect и reserved placeholder файлы являют
 - отсутствие конфликта с каноническими entry points;
 - соответствие статусам и датам из PB-109 Terminology Glossary.
 
+---
+
+# Documentation Validation
+
+Read-only проверка терминологии, Document ID, Related Documents и локальных Markdown-ссылок:
+
+```bash
+python3 scripts/check-doc-terminology.py
+```
+
+Проверка не изменяет файлы и используется в GitHub Actions для pull requests, затрагивающих документацию.
+
 END OF DOCUMENT

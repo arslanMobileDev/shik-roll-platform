@@ -154,6 +154,6 @@ GOV-2701 Enterprise Architecture Governance Overview
 
 GOV-2702 Architecture Review Board
 
-GOV-2703 Architecture Decision Records Governance
+GOV-2703 Architecture Decision Records (ADR) Governance
 
 END OF DOCUMENT
