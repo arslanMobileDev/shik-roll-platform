@@ -70,6 +70,15 @@ API
 
 - REST
 
+Background Jobs
+
+- BullMQ
+- Redis
+
+Event Bus
+
+- RabbitMQ
+
 Future
 
 - GraphQL (Optional)
@@ -274,7 +283,6 @@ Commit Convention
 # Future Technologies
 
 - Kafka
-- RabbitMQ
 - Elasticsearch
 - AI Recommendation Engine
 

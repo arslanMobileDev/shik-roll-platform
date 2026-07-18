@@ -110,9 +110,9 @@ Asynchronous
 
 # Background Processing
 
-- Queue Workers
-- Scheduled Jobs
-- Event Handlers
+- BullMQ Workers
+- Redis-backed Scheduled Jobs
+- RabbitMQ Event Handlers
 
 ---
 

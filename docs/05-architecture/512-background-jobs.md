@@ -38,15 +38,23 @@ Classification: Internal
 
 ---
 
-# Queue Technology
+# Queue Technologies
 
-MVP
+## Background Jobs (MVP)
 
+- BullMQ
 - Redis
 
-Future
+Используются для локальных фоновых заданий, повторных попыток и плановых задач.
+
+## Event Bus
 
 - RabbitMQ
+
+Используется для межмодульных, межсервисных и интеграционных событий.
+
+## Future
+
 - Kafka
 
 ---
