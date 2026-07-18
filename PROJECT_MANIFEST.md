@@ -305,4 +305,16 @@ docs/19-decisions/
 
 После получения статуса APPROVED данный документ считается обязательным для всех участников проекта.
 
+---
+
+# Related Documents
+
+- PB-002 — PROJECT BIBLE
+- PB-109 — TERMINOLOGY GLOSSARY
+- ARC-501 — SYSTEM OVERVIEW
+- ADR-1600 — ARCHITECTURE DECISION RECORDS INDEX
+- GOV-2707 — DOCUMENT REGISTRY
+
+---
+
 END OF DOCUMENT

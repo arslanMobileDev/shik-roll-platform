@@ -21,6 +21,10 @@ Classification: Internal
 - [PB-109 Terminology Glossary](01-business/TERMINOLOGY_GLOSSARY.md)
 - [GOV-2707 Document Registry](27-enterprise-architecture-governance/2707-document-registry.md)
 - [Handbook Entry Point](00-handbook/README.md)
+- [Documentation Summary](SUMMARY.md)
+- [Decision Summary](../DECISIONS.md)
+- [Contribution Guide](../CONTRIBUTING.md)
+- [Changelog](../CHANGELOG.md)
 
 ---
 
@@ -39,7 +43,7 @@ Classification: Internal
 | Integrations | [Integration Overview](10-integrations/1001-integration-overview.md) |
 | Security | [SEC-1101 Security Overview](11-security/1101-security-overview.md) |
 | DevOps | [DEV-1201 DevOps Overview](12-devops/1201-devops-overview.md) |
-| Testing | [TEST-1301 Testing Overview](13-testing/1301-testing-overview.md) |
+| Testing | [QA-1301 Testing Overview](13-testing/1301-testing-overview.md) |
 | AI & Automation | [AI-1401 AI & Automation Overview](14-ai/1401-ai-automation-overview.md) |
 | Operations | [OPS-1501 Operations Overview](15-operations/1501-operations-overview.md) |
 | Architecture Decision Records | [ADR-1600 ADR Index](16-adr/1600-adr-index.md) |
@@ -83,6 +87,8 @@ Classification: Internal
 ---
 
 # Navigation Document Policy
+
+Центральный навигационный слой обязателен и состоит из `docs/README.md`, `docs/SUMMARY.md` и GOV-2707 Document Registry. README внутри отдельных книг является опциональным, если книга уже представлена в центральной навигации.
 
 README, SUMMARY, legacy redirect и reserved placeholder файлы являются навигационными или служебными артефактами.
 
