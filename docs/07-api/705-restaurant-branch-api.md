@@ -248,7 +248,7 @@ Purpose
 
 Purpose
 
-Получить настройки Communication Center.
+Получить настройки Communication Automation Center.
 
 ---
 
@@ -256,7 +256,7 @@ Purpose
 
 Purpose
 
-Изменить настройки Communication Center.
+Изменить настройки Communication Automation Center.
 
 ---
 

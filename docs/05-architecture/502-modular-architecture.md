@@ -253,7 +253,7 @@ Domain Events
 
 ↓
 
-Communication Center
+Communication Automation Center
 
 ↓
 

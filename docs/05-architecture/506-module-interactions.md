@@ -201,7 +201,7 @@ Notifications
 
 ↓
 
-Communication Center
+Communication Automation Center
 
 External Calls
 

@@ -132,7 +132,7 @@ Review this decision when:
 
 # Related Documents
 
-PB-401 System Overview
+PB-401 Platform Overview
 
 ARC-507 Deployment Architecture
 

@@ -16,7 +16,7 @@ Classification: Internal
 
 Высокоуровневый обзор платформы:
 
-- PB-401 System Overview
+- PB-401 Platform Overview
 - docs/07-architecture/SYSTEM_OVERVIEW.md
 
 Architecture Decision Records:

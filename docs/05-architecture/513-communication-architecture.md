@@ -69,7 +69,7 @@ Business Event
 
 ↓
 
-Communication Center
+Communication Automation Center
 
 ↓
 

@@ -32,7 +32,7 @@ Classification: Internal
 | Architecture | [ARC-501 System Overview](05-architecture/501-system-overview.md) |
 | Database | [DB-601 Database Overview](06-database/601-database-overview.md) |
 | API Specification | [API-701 API Overview](07-api/701-api-overview.md) |
-| Platform Overview | [PB-401 System Overview](07-architecture/SYSTEM_OVERVIEW.md) |
+| Platform Overview | [PB-401 Platform Overview](07-architecture/SYSTEM_OVERVIEW.md) |
 | Frontend Specification | [UI-801 Frontend Overview](08-frontend/801-frontend-overview.md) |
 | Backend Specification | [BE-901 Backend Overview](09-backend/901-backend-overview.md) |
 | Integrations | [Integration Overview](10-integrations/1001-integration-overview.md) |
@@ -59,7 +59,7 @@ Classification: Internal
 # Canonical Architecture Entry Points
 
 - [ARC-501 System Overview](05-architecture/501-system-overview.md) — канонический технический обзор.
-- [PB-401 System Overview](07-architecture/SYSTEM_OVERVIEW.md) — высокоуровневый обзор платформы.
+- [PB-401 Platform Overview](07-architecture/SYSTEM_OVERVIEW.md) — высокоуровневый обзор платформы.
 - [ADR-1600 Architecture Decision Records Index](16-adr/1600-adr-index.md) — реестр решений.
 - [ARC-508 Technology Stack](05-architecture/508-technology-stack.md) — согласованный стек.
 - [ADR-1611 Cloud Run for MVP and Kubernetes Evolution](16-adr/1611-adr-cloud-run-mvp-kubernetes-evolution.md).

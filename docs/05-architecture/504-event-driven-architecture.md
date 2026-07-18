@@ -201,16 +201,16 @@ Possible Subscribers
 - Kitchen Module
 - Payment Module
 - Delivery Module
-- Communication Center
+- Communication Automation Center
 - Analytics
 - Audit
 - Integration Layer
 
 ---
 
-# Communication Center Integration
+# Communication Automation Center Integration
 
-Communication Center подписывается на события:
+Communication Automation Center подписывается на события:
 
 - OrderCreated
 - OrderConfirmed

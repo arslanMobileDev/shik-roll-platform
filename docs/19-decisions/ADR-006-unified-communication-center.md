@@ -6,7 +6,7 @@ Last Updated: July 2026
 Classification: Internal
 ---
 
-# LEGACY REDIRECT — UNIFIED COMMUNICATION CENTER
+# LEGACY REDIRECT — UNIFIED COMMUNICATION AUTOMATION CENTER
 
 Этот файл не является Architecture Decision Record и не имеет Document ID.
 

@@ -1,7 +1,7 @@
 ---
 Document ID: PB-401
 
-Document Name: SYSTEM OVERVIEW
+Document Name: PLATFORM OVERVIEW
 
 Book: Architecture
 
@@ -22,13 +22,13 @@ Classification: Internal
 
 ---
 
-# SYSTEM OVERVIEW
+# PLATFORM OVERVIEW
 
 ---
 
 # Purpose
 
-SYSTEM OVERVIEW является высокоуровневым обзором платформы SHIK Platform.
+PLATFORM OVERVIEW является высокоуровневым обзором платформы SHIK Platform.
 
 Каноническим техническим обзором архитектуры является ARC-501 SYSTEM OVERVIEW.
 
@@ -670,7 +670,7 @@ ADR-1611 Cloud Run for MVP and Kubernetes Evolution
 
 # Conclusion
 
-SYSTEM OVERVIEW является высокоуровневым обзором платформы SHIK Platform.
+PLATFORM OVERVIEW является высокоуровневым обзором платформы SHIK Platform.
 
 Каноническим техническим обзором архитектуры является ARC-501 SYSTEM OVERVIEW.
 
