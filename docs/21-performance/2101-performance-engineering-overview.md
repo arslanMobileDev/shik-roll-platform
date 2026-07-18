@@ -72,7 +72,7 @@ Infrastructure
 - PostgreSQL
 - Redis
 - RabbitMQ
-- MinIO
+- Object Storage Provider through the Object Storage Port
 - Nginx
 - Docker
 
@@ -226,6 +226,8 @@ Frequency
 ---
 
 # Related Documents
+
+ADR-1612 Object Storage Provider Model
 
 DEV-1207 Monitoring, Logging & Observability
 

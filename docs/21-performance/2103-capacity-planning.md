@@ -113,7 +113,7 @@ Compute
 Storage
 
 - PostgreSQL
-- MinIO
+- Object Storage (GCS production; MinIO local/development or approved self-hosted)
 - Backups
 - Logs
 
@@ -309,6 +309,8 @@ Measure
 ---
 
 # Related Documents
+
+ADR-1612 Object Storage Provider Model
 
 PERF-2101 Performance Engineering Overview
 

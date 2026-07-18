@@ -200,18 +200,28 @@ Support
 
 ---
 
-# MinIO Scaling
+# Object Storage Scaling
 
-Architecture
+Application Contract
 
-- Distributed Cluster
+- Provider-neutral Object Storage Port
 
-Features
+Production in Google Cloud
 
-- Horizontal Storage Scaling
-- Erasure Coding
-- Object Replication
+- Google Cloud Storage managed scaling
 
+Approved Self-Hosted Deployment
+
+- S3-compatible provider
+- MinIO Distributed Cluster when MinIO is selected
+
+Validation
+
+- Capacity
+- Throughput
+- Error Rate
+- Provider Quotas
+- Adapter Contract Compatibility
 ---
 
 # AI Gateway Scaling
@@ -312,6 +322,8 @@ Quarterly
 ---
 
 # Related Documents
+
+ADR-1612 Object Storage Provider Model
 
 PERF-2101 Performance Engineering Overview
 

@@ -120,7 +120,9 @@ Event Streaming
 
 Object Storage
 
-- MinIO
+- Provider-neutral Object Storage Port
+- Google Cloud Storage (Production in Google Cloud)
+- MinIO (Local / Development or approved self-hosted deployment)
 
 Data Warehouse
 
@@ -323,6 +325,8 @@ Frequency
 ---
 
 # Related Documents
+
+ADR-1612 Object Storage Provider Model
 
 PERF-2104 Database Performance Optimization
 

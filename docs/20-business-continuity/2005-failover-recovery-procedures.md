@@ -151,27 +151,38 @@ Validation
 
 ---
 
-# MinIO Recovery
+# Object Storage Recovery
 
 Symptoms
 
 - Object Storage Unavailable
-- Node Failure
+- Provider or adapter failure
+- Data integrity validation required
+
+Provider Selection
+
+- Google Cloud Storage for production in Google Cloud
+- MinIO for local, development or approved self-hosted deployments
+- Approved S3-compatible provider for alternative deployments
 
 Procedure
 
-1. Verify Cluster Health
-2. Restore Failed Node
-3. Validate Data Integrity
-4. Resume Uploads
-5. Resume Downloads
+1. Identify the active provider and adapter.
+2. Verify provider health and credentials.
+3. Restore provider-specific connectivity or failed infrastructure.
+4. Validate data integrity.
+5. Resume uploads.
+6. Resume downloads.
 
 Validation
 
-- Buckets Accessible
-- Files Available
-- Replication Healthy
+- Object Storage Available
+- Adapter Health Confirmed
+- Data Integrity Confirmed
+- Uploads Operational
+- Downloads Operational
 
+Provider-specific runbooks must conform to ADR-1612.
 ---
 
 # Backend Recovery
@@ -298,6 +309,8 @@ Log
 ---
 
 # Related Documents
+
+ADR-1612 Object Storage Provider Model
 
 BCP-2003 Disaster Recovery Strategy
 
