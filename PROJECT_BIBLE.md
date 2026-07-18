@@ -456,9 +456,9 @@ Notifications
 
 Firebase Cloud Messaging
 
-Admin
+Back Office / Owner Dashboard
 
-Next.js
+Flutter Web
 
 ---
 

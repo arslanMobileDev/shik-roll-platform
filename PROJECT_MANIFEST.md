@@ -271,9 +271,9 @@ Storage
 
 Google Cloud Storage
 
-Admin
+Back Office / Owner Dashboard
 
-Next.js
+Flutter Web
 
 ---
 

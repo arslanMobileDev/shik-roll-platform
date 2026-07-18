@@ -273,11 +273,9 @@ BullMQ
 
 ## Frontend
 
-Next.js
+Flutter
 
-React
-
-Tailwind CSS
+Flutter Web
 
 ---
 
