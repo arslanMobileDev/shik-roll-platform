@@ -5,7 +5,7 @@ Document Name: DOCUMENT REGISTRY
 
 Book: Enterprise Architecture Governance
 
-Version: 1.2.0
+Version: 1.3.0
 
 Status: APPROVED
 
@@ -107,15 +107,15 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | ARC-501 | SYSTEM OVERVIEW | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/501-system-overview.md` |
 | ARC-502 | MODULAR ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/502-modular-architecture.md` |
 | ARC-503 | MICROSERVICES STRATEGY | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/503-microservices.md` |
-| ARC-504 | EVENT-DRIVEN ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/504-event-driven-architecture.md` |
+| ARC-504 | EVENT-DRIVEN ARCHITECTURE | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/05-architecture/504-event-driven-architecture.md` |
 | ARC-505 | DOMAIN MODEL | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/505-domain-model.md` |
 | ARC-506 | MODULE INTERACTIONS | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/506-module-interactions.md` |
 | ARC-507 | DEPLOYMENT ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/507-deployment-architecture.md` |
 | ARC-508 | TECHNOLOGY STACK | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/508-technology-stack.md` |
-| ARC-509 | CACHING STRATEGY | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/509-caching-strategy.md` |
+| ARC-509 | CACHING STRATEGY | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/05-architecture/509-caching-strategy.md` |
 | ARC-510 | FILE STORAGE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/510-file-storage.md` |
 | ARC-511 | SEARCH ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/511-search-architecture.md` |
-| ARC-512 | BACKGROUND JOBS | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/512-background-jobs.md` |
+| ARC-512 | BACKGROUND JOBS | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/05-architecture/512-background-jobs.md` |
 | ARC-513 | COMMUNICATION ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/513-communication-architecture.md` |
 | ARC-514 | SECURITY ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/514-security-architecture.md` |
 | ARC-515 | HIGH AVAILABILITY & DISASTER RECOVERY | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/515-high-availability.md` |
@@ -131,7 +131,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | BE-903 | AUTHENTICATION SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/903-authentication-service.md` |
 | BE-904 | CUSTOMER SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/904-customer-service.md` |
 | BE-905 | RESTAURANT & BRANCH SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/905-restaurant-branch-service.md` |
-| BE-906 | MENU & PRODUCT SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/906-menu-product-service.md` |
+| BE-906 | MENU & PRODUCT SERVICE | Backend Specification | APPROVED | 1.1.0 | July 2026 | `docs/09-backend/906-menu-product-service.md` |
 | BE-907 | ORDER SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/907-order-service.md` |
 | BE-908 | PAYMENT SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/908-payment-service.md` |
 | BE-909 | KITCHEN SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/909-kitchen-service.md` |
@@ -190,7 +190,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | GOV-2704 | TECHNOLOGY LIFECYCLE MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2704-technology-lifecycle-management.md` |
 | GOV-2705 | TECHNICAL DEBT MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2705-technical-debt-management.md` |
 | GOV-2706 | ENTERPRISE ARCHITECTURE ROADMAP | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2706-enterprise-architecture-roadmap.md` |
-| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.2.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
+| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.3.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
 | INT-1001 | INTEGRATION OVERVIEW | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1001-integration-overview.md` |
 | INT-1002 | PAYMENT GATEWAY INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1002-payment-gateway-integrations.md` |
 | INT-1003 | MAPS & GEOLOCATION INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1003-maps-geolocation-integrations.md` |

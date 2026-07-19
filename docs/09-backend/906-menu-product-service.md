@@ -5,7 +5,7 @@ Document Name: MENU & PRODUCT SERVICE
 
 Book: Backend Specification
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -31,9 +31,13 @@ Classification: Internal
 # Responsibilities
 
 - Menu Management
+- Catalog Import
+- Draft, Preview, Publish and Unpublish Lifecycle
 - Category Management
+- Category and Product Ordering
 - Product Management
 - Product Images
+- Product Merchandising Flags
 - Product Pricing
 - Modifier Management
 - Allergen Management
@@ -48,9 +52,13 @@ Classification: Internal
 # Public API
 
 - Menus
+- Catalog Imports
+- Draft Preview
 - Categories
+- Ordering
 - Products
 - Product Images
+- Product Status and Merchandising
 - Prices
 - Modifiers
 - Allergens
@@ -68,6 +76,8 @@ Classification: Internal
 - Order Service
 - Kitchen Service
 - Audit Service
+- Object Storage Port
+- Redis Cache
 
 ---
 
@@ -76,6 +86,8 @@ Classification: Internal
 Tables
 
 - menus
+- menu_versions
+- catalog_import_jobs
 - menu_categories
 - products
 - product_images
@@ -96,9 +108,13 @@ Tables
 # Events Published
 
 - MenuCreated
+- CatalogImported
 - MenuPublished
+- MenuUnpublished
 - ProductCreated
 - ProductUpdated
+- ProductStatusChanged
+- ProductMediaChanged
 - ProductDeleted
 - ProductPriceChanged
 - ProductAvailabilityChanged
@@ -117,8 +133,16 @@ Tables
 # Business Rules
 
 - Меню публикуется без перезапуска системы.
+- Импорт JSON или CSV сначала проходит валидацию, а затем применяется в режиме upsert.
+- Повторный импорт сопоставляет продукты по стабильному `source_key` и сохраняет внутренний UUID.
+- Draft и Preview не доступны через публичный клиентский каталог.
+- Publish создает версию меню; Unpublish снимает текущую версию с публичной выдачи.
 - Один продукт принадлежит одной категории.
 - Один продукт может иметь несколько изображений.
+- Изображения сохраняются через Object Storage Port; замена сохраняет позицию в галерее, а удаление выполняется безопасно.
+- У продукта может быть только одно активное основное изображение.
+- Popular, New и Featured являются независимыми ручными признаками.
+- Hidden исключает продукт из публичного каталога, а Stop List временно ограничивает его доступность по филиалу.
 - Один продукт может иметь несколько модификаторов.
 - Один продукт может иметь несколько аллергенов.
 - Один продукт может иметь одну халяльную маркировку.
@@ -135,13 +159,20 @@ Tables
 - Audit Logging
 - Soft Delete
 - Input Validation
+- Import File Validation
+- Media Type and Size Validation
 
 ---
 
 # Background Jobs
 
 - Menu Cache Refresh
+- Catalog Import Validation
+- Catalog Import Upsert
+- Published Menu Cache Warmup
 - Product Search Index Update
+- Image Optimization and Thumbnail Generation
+- Deleted Image Cleanup
 - Stop List Synchronization
 - Recommendation Recalculation
 
@@ -156,6 +187,9 @@ Tables
 - INVALID_PRICE
 - PRODUCT_UNAVAILABLE
 - STOP_LIST_ACTIVE
+- CATALOG_IMPORT_FAILED
+- INVALID_PRODUCT_STATUS_TRANSITION
+- IMAGE_STORAGE_ERROR
 - ACCESS_DENIED
 
 ---
@@ -174,6 +208,12 @@ Tables
 API-706 Menu & Product API
 
 DB-607 Menu & Product Schema
+
+ARC-504 Event-Driven Architecture
+
+ARC-509 Caching Strategy
+
+ARC-512 Background Jobs
 
 BE-905 Restaurant & Branch Service
 

@@ -30,6 +30,10 @@ Classification: Internal
 - Back Office UX now defines import, Draft, Preview, Publish and catalog media workflows.
 - Menu API now defines repeatable `source_key` imports, lifecycle, ordering, merchandising and safe media endpoints.
 - Menu schema now defines import jobs, publication versions, stable source keys and Object Storage metadata.
+- BE-906, ARC-504, ARC-509 and ARC-512 updated to version 1.1.0.
+- Backend processing now covers repeatable catalog imports, publication lifecycle, catalog events and media operations.
+- Public caching is isolated from Draft and Preview data and switches only after successful publication.
+- Background jobs now define catalog import, cache warmup and safe deleted-image cleanup behavior.
 
 ---
 
