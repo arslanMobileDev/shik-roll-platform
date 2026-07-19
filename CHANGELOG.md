@@ -37,6 +37,9 @@ Classification: Internal
 - QA-1303, QA-1304, QA-1305, QA-1307 and SEC-1104 updated to version 1.1.0.
 - Catalog acceptance coverage now includes import idempotency, Draft isolation, publication, media lifecycle and branch-scoped availability.
 - Catalog administration security now covers privileged publication, import validation, media validation and Object Storage data protection.
+- UI-802, UI-803 and UI-810 updated to version 1.1.0.
+- Claude Design handoff now includes catalog screens, lifecycle states, media states and representative menu data coverage.
+- The Flutter component contract now includes reusable catalog administration components and their required test states.
 
 ---
 

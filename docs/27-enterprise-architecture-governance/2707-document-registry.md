@@ -5,7 +5,7 @@ Document Name: DOCUMENT REGISTRY
 
 Book: Enterprise Architecture Governance
 
-Version: 1.4.0
+Version: 1.5.0
 
 Status: APPROVED
 
@@ -190,7 +190,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | GOV-2704 | TECHNOLOGY LIFECYCLE MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2704-technology-lifecycle-management.md` |
 | GOV-2705 | TECHNICAL DEBT MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2705-technical-debt-management.md` |
 | GOV-2706 | ENTERPRISE ARCHITECTURE ROADMAP | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2706-enterprise-architecture-roadmap.md` |
-| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.4.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
+| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.5.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
 | INT-1001 | INTEGRATION OVERVIEW | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1001-integration-overview.md` |
 | INT-1002 | PAYMENT GATEWAY INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1002-payment-gateway-integrations.md` |
 | INT-1003 | MAPS & GEOLOCATION INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1003-maps-geolocation-integrations.md` |
@@ -277,15 +277,15 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | SEC-1107 | SECURE DEVELOPMENT LIFECYCLE (SSDLC) | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1107-secure-development-lifecycle.md` |
 | SEC-1108 | INCIDENT RESPONSE & DISASTER RECOVERY | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1108-incident-response-disaster-recovery.md` |
 | UI-801 | FRONTEND OVERVIEW | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/801-frontend-overview.md` |
-| UI-802 | DESIGN SYSTEM | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/802-design-system.md` |
-| UI-803 | COMPONENT LIBRARY | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/803-component-library.md` |
+| UI-802 | DESIGN SYSTEM | Frontend Specification | APPROVED | 1.1.0 | July 2026 | `docs/08-frontend/802-design-system.md` |
+| UI-803 | COMPONENT LIBRARY | Frontend Specification | APPROVED | 1.1.0 | July 2026 | `docs/08-frontend/803-component-library.md` |
 | UI-804 | CUSTOMER MOBILE APP UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/804-customer-mobile-app-ux.md` |
 | UI-805 | BACK OFFICE UX | Frontend Specification | APPROVED | 1.1.0 | July 2026 | `docs/08-frontend/805-back-office-ux.md` |
 | UI-806 | POS UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/806-pos-ux.md` |
 | UI-807 | KITCHEN DISPLAY SYSTEM UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/807-kitchen-display-system-ux.md` |
 | UI-808 | COURIER MOBILE APP UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/808-courier-mobile-app-ux.md` |
 | UI-809 | OWNER DASHBOARD UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/809-owner-dashboard-ux.md` |
-| UI-810 | DESIGN HANDOFF SPECIFICATION | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/810-design-handoff-specification.md` |
+| UI-810 | DESIGN HANDOFF SPECIFICATION | Frontend Specification | APPROVED | 1.1.0 | July 2026 | `docs/08-frontend/810-design-handoff-specification.md` |
 
 ---
 
