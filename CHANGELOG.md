@@ -15,7 +15,17 @@ Classification: Internal
 
 ## Unreleased
 
-Изменения после версии 1.0.0 пока не зафиксированы.
+### Added
+
+- Product Book requirements for pre-launch catalog preparation through Back Office.
+- UJ-013 Prepare and Publish Catalog.
+- CAP-006 Product Catalog Management.
+
+### Changed
+
+- PB-301, PB-303, PB-304 and PB-305 updated to version 1.1.0.
+- Menu and product requirements now define Draft, Preview, Published and Hidden behavior.
+- MVP catalog management now includes image replacement, safe deletion, sorting, Stop List and manual Popular, New and Featured flags.
 
 ---
 

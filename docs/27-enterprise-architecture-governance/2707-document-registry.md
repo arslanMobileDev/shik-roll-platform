@@ -5,7 +5,7 @@ Document Name: DOCUMENT REGISTRY
 
 Book: Enterprise Architecture Governance
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -190,7 +190,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | GOV-2704 | TECHNOLOGY LIFECYCLE MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2704-technology-lifecycle-management.md` |
 | GOV-2705 | TECHNICAL DEBT MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2705-technical-debt-management.md` |
 | GOV-2706 | ENTERPRISE ARCHITECTURE ROADMAP | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2706-enterprise-architecture-roadmap.md` |
-| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
+| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.1.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
 | INT-1001 | INTEGRATION OVERVIEW | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1001-integration-overview.md` |
 | INT-1002 | PAYMENT GATEWAY INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1002-payment-gateway-integrations.md` |
 | INT-1003 | MAPS & GEOLOCATION INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1003-maps-geolocation-integrations.md` |
@@ -234,11 +234,11 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | PB-108 | BUSINESS RULES | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/BUSINESS_RULES.md` |
 | PB-109 | TERMINOLOGY GLOSSARY | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/TERMINOLOGY_GLOSSARY.md` |
 | PB-300 | PRODUCT PRINCIPLES | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/PRODUCT_PRINCIPLES.md` |
-| PB-301 | PRODUCT OVERVIEW | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/PRODUCT_OVERVIEW.md` |
+| PB-301 | PRODUCT OVERVIEW | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/PRODUCT_OVERVIEW.md` |
 | PB-302 | USER PERSONAS | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/USER_PERSONAS.md` |
-| PB-303 | USER JOURNEYS | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/USER_JOURNEYS.md` |
-| PB-304 | BUSINESS CAPABILITIES | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/BUSINESS_CAPABILITIES.md` |
-| PB-305 | PRODUCT REQUIREMENTS | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/PRODUCT_REQUIREMENTS.md` |
+| PB-303 | USER JOURNEYS | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/USER_JOURNEYS.md` |
+| PB-304 | BUSINESS CAPABILITIES | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/BUSINESS_CAPABILITIES.md` |
+| PB-305 | PRODUCT REQUIREMENTS | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/PRODUCT_REQUIREMENTS.md` |
 | PB-306 | COMMUNICATION AUTOMATION CENTER | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/306-communication-automation-center.md` |
 | PB-401 | PLATFORM OVERVIEW | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/07-architecture/SYSTEM_OVERVIEW.md` |
 | PERF-2101 | PERFORMANCE ENGINEERING OVERVIEW | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2101-performance-engineering-overview.md` |
