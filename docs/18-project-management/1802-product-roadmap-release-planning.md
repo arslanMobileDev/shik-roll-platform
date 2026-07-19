@@ -5,7 +5,7 @@ Document Name: PRODUCT ROADMAP & RELEASE PLANNING
 
 Book: Project Management & Delivery
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -143,6 +143,72 @@ Examples
 
 ---
 
+# SHIK Platform MVP Delivery Sequence
+
+## Product Book Gate
+
+Required before Product Owner review:
+
+- product scope and business capabilities documented;
+- roles and user journeys documented;
+- architecture, database and API specifications traceable;
+- MVP catalog preparation workflow documented;
+- documentation validator and final audit passed.
+
+Required before Claude Design:
+
+- Product Owner confirms menu structure, prices and operational processes;
+- unresolved business questions are recorded and decided;
+- Product Book is accepted as the requirements source of truth;
+- brand assets and representative menu content are available;
+- UI-810 Design Handoff Specification is satisfied.
+
+## Design Gate
+
+Required before development preparation:
+
+- Design System and UI Kit approved;
+- required application screens and states designed;
+- interactive prototypes cover critical journeys;
+- accessibility and responsive behavior specified;
+- screens trace to Product Requirements, API endpoints and database entities.
+
+## Claude Code Gate
+
+Required before AI-assisted implementation:
+
+- approved design handoff is available;
+- monorepo and module boundaries are confirmed;
+- API contracts and database schemas are stable for the selected module;
+- coding, testing, security and CI/CD rules are configured;
+- implementation prompt identifies scope, acceptance criteria and prohibited changes.
+
+## MVP Development Order
+
+1. Authentication and authorization
+2. Database foundation
+3. Menu and catalog management
+4. Orders and payments
+5. Kitchen workflows
+6. Back Office
+7. Customer App
+8. Delivery and supporting modules
+
+Each major module must pass review and its applicable quality gates before the next dependent module is considered stable.
+
+## Pre-launch Catalog Milestone
+
+Before App Store and Google Play publication:
+
+- categories and products are imported or entered through Back Office;
+- descriptions, prices, weights and images are verified;
+- ordering, Popular, New and Featured flags are configured;
+- branch availability and Stop List are configured;
+- Draft catalog is reviewed in Preview;
+- the approved catalog version is published and verified in the release candidate.
+
+---
+
 # Dependency Management
 
 Track
@@ -213,5 +279,9 @@ PM-1801 Project Management Overview
 ENG-1707 Production Readiness Checklist
 
 DEV-1208 Deployment & Release Management
+
+UI-810 Design Handoff Specification
+
+PB-305 Product Requirements
 
 END OF DOCUMENT

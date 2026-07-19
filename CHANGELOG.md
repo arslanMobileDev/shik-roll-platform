@@ -40,6 +40,9 @@ Classification: Internal
 - UI-802, UI-803 and UI-810 updated to version 1.1.0.
 - Claude Design handoff now includes catalog screens, lifecycle states, media states and representative menu data coverage.
 - The Flutter component contract now includes reusable catalog administration components and their required test states.
+- PM-1801 and PM-1802 updated to version 1.1.0.
+- The project lifecycle now defines explicit Product Book, Claude Design and Claude Code entry gates.
+- MVP planning now includes module review checkpoints and a pre-launch catalog readiness milestone.
 
 ---
 

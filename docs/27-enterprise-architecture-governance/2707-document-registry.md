@@ -5,7 +5,7 @@ Document Name: DOCUMENT REGISTRY
 
 Book: Enterprise Architecture Governance
 
-Version: 1.5.0
+Version: 1.6.0
 
 Status: APPROVED
 
@@ -190,7 +190,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | GOV-2704 | TECHNOLOGY LIFECYCLE MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2704-technology-lifecycle-management.md` |
 | GOV-2705 | TECHNICAL DEBT MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2705-technical-debt-management.md` |
 | GOV-2706 | ENTERPRISE ARCHITECTURE ROADMAP | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2706-enterprise-architecture-roadmap.md` |
-| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.5.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
+| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.6.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
 | INT-1001 | INTEGRATION OVERVIEW | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1001-integration-overview.md` |
 | INT-1002 | PAYMENT GATEWAY INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1002-payment-gateway-integrations.md` |
 | INT-1003 | MAPS & GEOLOCATION INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1003-maps-geolocation-integrations.md` |
@@ -248,8 +248,8 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | PERF-2105 | CACHING STRATEGY | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2105-caching-strategy.md` |
 | PERF-2106 | CDN & CONTENT DELIVERY STRATEGY | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2106-cdn-content-delivery-strategy.md` |
 | PERF-2107 | LOAD BALANCING & TRAFFIC DISTRIBUTION | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2107-load-balancing-traffic-distribution.md` |
-| PM-1801 | PROJECT MANAGEMENT OVERVIEW | Project Management & Delivery | APPROVED | 1.0.0 | July 2026 | `docs/18-project-management/1801-project-management-overview.md` |
-| PM-1802 | PRODUCT ROADMAP & RELEASE PLANNING | Project Management & Delivery | APPROVED | 1.0.0 | July 2026 | `docs/18-project-management/1802-product-roadmap-release-planning.md` |
+| PM-1801 | PROJECT MANAGEMENT OVERVIEW | Project Management & Delivery | APPROVED | 1.1.0 | July 2026 | `docs/18-project-management/1801-project-management-overview.md` |
+| PM-1802 | PRODUCT ROADMAP & RELEASE PLANNING | Project Management & Delivery | APPROVED | 1.1.0 | July 2026 | `docs/18-project-management/1802-product-roadmap-release-planning.md` |
 | PM-1803 | BACKLOG & SPRINT MANAGEMENT | Project Management & Delivery | APPROVED | 1.0.0 | July 2026 | `docs/18-project-management/1803-backlog-sprint-management.md` |
 | PM-1804 | RISK & CHANGE MANAGEMENT | Project Management & Delivery | APPROVED | 1.0.0 | July 2026 | `docs/18-project-management/1804-risk-change-management.md` |
 | PM-1805 | PROJECT GOVERNANCE & DELIVERY METRICS | Project Management & Delivery | APPROVED | 1.0.0 | July 2026 | `docs/18-project-management/1805-project-governance-delivery-metrics.md` |

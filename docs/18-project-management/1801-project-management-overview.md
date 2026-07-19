@@ -5,7 +5,7 @@ Document Name: PROJECT MANAGEMENT OVERVIEW
 
 Book: Project Management & Delivery
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -51,14 +51,43 @@ Classification: Internal
 
 # Project Lifecycle
 
-- Discovery
-- Planning
-- Design
-- Development
-- Testing
-- Release
-- Operations
-- Continuous Improvement
+0. Environment Preparation
+1. Product Book Draft
+2. Product Owner Review
+3. Product Book Finalization
+4. Product and Interface Design
+5. Development Preparation
+6. MVP Development
+7. Testing and Stabilization
+8. Pre-launch Data Preparation
+9. Publication and Production Launch
+10. Operations and Continuous Improvement
+
+The next phase starts only when the current phase exit criteria are satisfied. Design does not replace Product Book decisions, and development does not start from unapproved design artifacts.
+
+---
+
+# Phase Ownership
+
+Product Owner
+
+- business model, menu, prices and operational process decisions;
+- approval of Product Book and release scope;
+- acceptance of design and production readiness.
+
+Design Authority
+
+- Design System, UI Kit, screens and interactive prototypes;
+- traceability to approved product requirements;
+- developer-ready handoff.
+
+Engineering
+
+- architecture-conformant implementation;
+- automated tests, security controls and CI/CD;
+- deployment and operational readiness.
+
+AI-assisted tools may prepare artifacts inside an approved phase but do not approve business or architecture decisions on behalf of the Product Owner.
 
 ---
 
