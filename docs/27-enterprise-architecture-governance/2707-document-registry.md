@@ -5,7 +5,7 @@ Document Name: DOCUMENT REGISTRY
 
 Book: Enterprise Architecture Governance
 
-Version: 1.3.0
+Version: 1.4.0
 
 Status: APPROVED
 
@@ -190,7 +190,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | GOV-2704 | TECHNOLOGY LIFECYCLE MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2704-technology-lifecycle-management.md` |
 | GOV-2705 | TECHNICAL DEBT MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2705-technical-debt-management.md` |
 | GOV-2706 | ENTERPRISE ARCHITECTURE ROADMAP | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2706-enterprise-architecture-roadmap.md` |
-| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.3.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
+| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.4.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
 | INT-1001 | INTEGRATION OVERVIEW | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1001-integration-overview.md` |
 | INT-1002 | PAYMENT GATEWAY INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1002-payment-gateway-integrations.md` |
 | INT-1003 | MAPS & GEOLOCATION INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1003-maps-geolocation-integrations.md` |
@@ -255,11 +255,11 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | PM-1805 | PROJECT GOVERNANCE & DELIVERY METRICS | Project Management & Delivery | APPROVED | 1.0.0 | July 2026 | `docs/18-project-management/1805-project-governance-delivery-metrics.md` |
 | QA-1301 | TESTING OVERVIEW | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1301-testing-overview.md` |
 | QA-1302 | UNIT TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1302-unit-testing-specification.md` |
-| QA-1303 | INTEGRATION TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1303-integration-testing-specification.md` |
-| QA-1304 | API TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1304-api-testing-specification.md` |
-| QA-1305 | END-TO-END (E2E) TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1305-e2e-testing-specification.md` |
+| QA-1303 | INTEGRATION TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.1.0 | July 2026 | `docs/13-testing/1303-integration-testing-specification.md` |
+| QA-1304 | API TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.1.0 | July 2026 | `docs/13-testing/1304-api-testing-specification.md` |
+| QA-1305 | END-TO-END (E2E) TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.1.0 | July 2026 | `docs/13-testing/1305-e2e-testing-specification.md` |
 | QA-1306 | PERFORMANCE & LOAD TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1306-performance-load-testing-specification.md` |
-| QA-1307 | SECURITY TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1307-security-testing-specification.md` |
+| QA-1307 | SECURITY TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.1.0 | July 2026 | `docs/13-testing/1307-security-testing-specification.md` |
 | QA-1308 | TEST AUTOMATION & QUALITY GATES | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1308-test-automation-quality-gates.md` |
 | RTM-001 | REQUIREMENTS TRACEABILITY MATRIX | — | APPROVED | 1.0.0 | July 2026 | `docs/TRACEABILITY_MATRIX.md` |
 | SDK-2401 | PLATFORM SDK OVERVIEW | Platform SDK | APPROVED | 1.0.0 | July 2026 | `docs/24-platform-sdk/2401-platform-sdk-overview.md` |
@@ -271,7 +271,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | SEC-1101 | SECURITY OVERVIEW | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1101-security-overview.md` |
 | SEC-1102 | IDENTITY & ACCESS MANAGEMENT | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1102-identity-access-management.md` |
 | SEC-1103 | AUTHENTICATION & SESSION SECURITY | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1103-authentication-session-security.md` |
-| SEC-1104 | API SECURITY | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1104-api-security.md` |
+| SEC-1104 | API SECURITY | Security Specification | APPROVED | 1.1.0 | July 2026 | `docs/11-security/1104-api-security.md` |
 | SEC-1105 | DATABASE SECURITY | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1105-database-security.md` |
 | SEC-1106 | INFRASTRUCTURE SECURITY | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1106-infrastructure-security.md` |
 | SEC-1107 | SECURE DEVELOPMENT LIFECYCLE (SSDLC) | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1107-secure-development-lifecycle.md` |

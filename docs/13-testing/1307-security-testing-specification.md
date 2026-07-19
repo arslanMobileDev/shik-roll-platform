@@ -5,7 +5,7 @@ Document Name: SECURITY TESTING SPECIFICATION
 
 Book: Testing & Quality Assurance
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -49,6 +49,8 @@ Test
 - Integrations
 - Mobile Applications
 - Web Applications
+- Catalog Import and Media Upload
+- Object Storage Access
 
 ---
 
@@ -108,6 +110,12 @@ Test
 - SSRF
 - IDOR
 - Mass Assignment
+- Malformed JSON and CSV Import
+- File Type and Size Bypass
+- Product Image IDOR
+- Unauthorized Publish and Unpublish
+- Cross-Branch Stop List Access
+- Object Key and Storage Metadata Disclosure
 
 ---
 
@@ -161,6 +169,9 @@ Include
 - No High Vulnerabilities
 - Security Gates Passed
 - Compliance Requirements Met
+- Catalog administration requires explicit RBAC permissions
+- Uploaded media cannot execute active content
+- Draft and private media cannot be accessed through public catalog endpoints
 
 ---
 
@@ -169,6 +180,10 @@ Include
 SEC-1101 Security Overview
 
 SEC-1107 Secure Development Lifecycle
+
+SEC-1104 API Security
+
+API-706 Menu & Product API
 
 DEV-1204 CI/CD Pipeline Specification
 

@@ -34,6 +34,9 @@ Classification: Internal
 - Backend processing now covers repeatable catalog imports, publication lifecycle, catalog events and media operations.
 - Public caching is isolated from Draft and Preview data and switches only after successful publication.
 - Background jobs now define catalog import, cache warmup and safe deleted-image cleanup behavior.
+- QA-1303, QA-1304, QA-1305, QA-1307 and SEC-1104 updated to version 1.1.0.
+- Catalog acceptance coverage now includes import idempotency, Draft isolation, publication, media lifecycle and branch-scoped availability.
+- Catalog administration security now covers privileged publication, import validation, media validation and Object Storage data protection.
 
 ---
 
