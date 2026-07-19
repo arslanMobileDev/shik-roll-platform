@@ -26,6 +26,10 @@ Classification: Internal
 - PB-301, PB-303, PB-304 and PB-305 updated to version 1.1.0.
 - Menu and product requirements now define Draft, Preview, Published and Hidden behavior.
 - MVP catalog management now includes image replacement, safe deletion, sorting, Stop List and manual Popular, New and Featured flags.
+- UI-805, API-706 and DB-607 updated to version 1.1.0.
+- Back Office UX now defines import, Draft, Preview, Publish and catalog media workflows.
+- Menu API now defines repeatable `source_key` imports, lifecycle, ordering, merchandising and safe media endpoints.
+- Menu schema now defines import jobs, publication versions, stable source keys and Object Storage metadata.
 
 ---
 
