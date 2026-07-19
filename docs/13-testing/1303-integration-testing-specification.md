@@ -5,7 +5,7 @@ Document Name: INTEGRATION TESTING SPECIFICATION
 
 Book: Testing & Quality Assurance
 
-Version: 1.0.0
+Version: 1.2.0
 
 Status: APPROVED
 
@@ -48,6 +48,7 @@ Test
 - Queue Processing
 - Cache
 - Authentication
+- Object Storage Port
 
 ---
 
@@ -83,6 +84,10 @@ Use
 - Delivery Workflow
 - Loyalty Processing
 - Communication Events
+- Catalog Import Validation and Upsert
+- Draft Preview and Menu Publication
+- Product Image Upload, Replacement and Cleanup
+- Published Catalog Cache Refresh
 
 ---
 
@@ -117,6 +122,8 @@ Validate
 - Events
 - Queue Messages
 - Cache Updates
+- Object Storage Metadata and Object State
+- Stable UUID After Repeated `menu_id + source_key` Import and Category Move
 
 ---
 
@@ -157,6 +164,12 @@ Include
 QA-1301 Testing Overview
 
 QA-1302 Unit Testing Specification
+
+API-706 Menu & Product API
+
+DB-607 Menu & Product Schema
+
+BE-906 Menu & Product Service
 
 DEV-1204 CI/CD Pipeline Specification
 

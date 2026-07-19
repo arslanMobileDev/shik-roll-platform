@@ -5,7 +5,7 @@ Document Name: BACK OFFICE UX
 
 Book: Frontend Specification
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -81,12 +81,47 @@ Screens
 
 Screens
 
+- Catalog Import
+- Import Job Details
 - Menus
+- Draft Catalog
+- Catalog Preview
 - Categories
+- Category Ordering
 - Products
+- Product Editor
+- Media Gallery
 - Modifiers
 - Prices
+- Branch Availability
 - Stop List
+- Publish History
+
+Catalog Workflow
+
+1. Импортировать JSON или CSV либо создать каталог вручную.
+2. Проверить результаты валидации и ошибки импорта.
+3. Редактировать категории и блюда в статусе Draft.
+4. Открыть Preview без публикации изменений клиентам.
+5. Опубликовать подготовленную версию каталога или снять ее с публикации.
+
+Product Editor Actions
+
+- Изменить название, описание, состав, вес и цену.
+- Установить статус Draft, Published или Hidden.
+- Включить или выключить признаки Popular, New и Featured.
+- Загрузить, заменить и безопасно удалить изображение.
+- Выбрать основное изображение и изменить порядок галереи.
+- Изменить порядок блюда внутри категории.
+- Управлять доступностью и Stop List отдельно для каждого филиала.
+
+UX Safeguards
+
+- Импорт до применения показывает количество валидных и ошибочных записей.
+- Повторный импорт использует стабильный `source_key` и не создает дубли блюд.
+- Удаление используемого изображения требует подтверждения и выполняется безопасно.
+- Preview явно показывает, что Draft-изменения еще не видны клиентам.
+- Publish и Unpublish требуют подтверждения и создают запись в истории публикаций.
 
 ---
 

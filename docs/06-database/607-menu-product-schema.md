@@ -5,7 +5,7 @@ Document Name: MENU & PRODUCT SCHEMA
 
 Book: Database
 
-Version: 1.0.0
+Version: 1.2.0
 
 Status: APPROVED
 
@@ -33,6 +33,8 @@ Classification: Internal
 # Tables
 
 - menus
+- menu_versions
+- catalog_import_jobs
 - menu_categories
 - products
 - product_images
@@ -58,9 +60,79 @@ Columns
 - branch_id
 - name
 - status
+- current_version
+- draft_updated_at
 - published_at
+- unpublished_at
 - created_at
 - updated_at
+
+Status Values
+
+- DRAFT
+- PUBLISHED
+- UNPUBLISHED
+
+---
+
+# menu_versions
+
+Columns
+
+- id
+- menu_id
+- version_number
+- snapshot
+- published_by
+- published_at
+
+Constraints
+
+- unique menu_id + version_number
+
+Data Types
+
+- snapshot: JSONB
+
+---
+
+# catalog_import_jobs
+
+Columns
+
+- id
+- menu_id
+- branch_id
+- source_format
+- source_file_name
+- mode
+- status
+- total_records
+- valid_records
+- invalid_records
+- validation_errors
+- created_by
+- created_at
+- completed_at
+
+Source Format Values
+
+- JSON
+- CSV
+
+Mode Values
+
+- VALIDATE
+- UPSERT
+
+Status Values
+
+- PENDING
+- VALIDATING
+- READY
+- PROCESSING
+- COMPLETED
+- FAILED
 
 ---
 
@@ -77,6 +149,10 @@ Columns
 - sort_order
 - is_active
 
+Constraints
+
+- unique id + menu_id
+
 ---
 
 # products
@@ -84,7 +160,9 @@ Columns
 Columns
 
 - id
+- menu_id
 - category_id
+- source_key
 - sku
 - name
 - slug
@@ -93,16 +171,36 @@ Columns
 - calories
 - halal_label_id
 - preparation_time
+- status
+- sort_order
+- is_popular
+- is_new
 - is_featured
-- is_active
+- published_at
+- hidden_at
+- archived_at
 - created_at
 - updated_at
+
+Status Values
+
+- DRAFT
+- PUBLISHED
+- HIDDEN
+- ARCHIVED
 
 Indexes
 
 - sku
 - slug
 - category_id
+- source_key
+- menu_id + source_key
+
+Constraints
+
+- unique menu_id + source_key
+- category_id + menu_id references menu_categories id + menu_id
 
 ---
 
@@ -112,9 +210,37 @@ Columns
 
 - id
 - product_id
+- provider
+- object_key
 - image_url
+- mime_type
+- size_bytes
+- width
+- height
+- processing_status
+- status
 - sort_order
 - is_primary
+- deleted_at
+- created_at
+- updated_at
+
+Processing Status Values
+
+- PENDING
+- PROCESSING
+- READY
+- FAILED
+
+Status Values
+
+- ACTIVE
+- DELETED
+
+Constraints
+
+- unique provider + object_key
+- one active primary image per product
 
 ---
 
@@ -257,6 +383,22 @@ menus
 
 ↓
 
+menu_versions
+
+---
+
+menus
+
+↓
+
+catalog_import_jobs
+
+---
+
+menus
+
+↓
+
 menu_categories
 
 ↓
@@ -308,7 +450,17 @@ branch_product_availability
 # Business Rules
 
 - Один продукт принадлежит одной категории.
+- `source_key` является стабильным внешним ключом импорта внутри одного меню и не заменяет внутренний UUID продукта.
+- Повторный импорт обновляет продукт по `menu_id + source_key` и не создает дубликат.
+- Перенос продукта между категориями одного меню сохраняет `source_key` и внутренний UUID.
+- `products.status` является единственным полем жизненного цикла продукта; отдельное `products.is_active` не используется.
+- Product lifecycle использует статусы Draft, Published и Hidden.
+- Публикация создает неизменяемый snapshot в `menu_versions`.
 - Один продукт может иметь несколько изображений.
+- Метаданные изображения хранятся в PostgreSQL, а файл — через provider-agnostic Object Storage Port.
+- Удаление изображения выполняется мягко; очистка объекта может завершаться асинхронно.
+- У продукта может быть только одно активное основное изображение.
+- Popular, New и Featured являются независимыми ручными признаками.
 - Один продукт может иметь несколько модификаторов.
 - Один продукт может иметь несколько аллергенов.
 - Один продукт может иметь одну халяльную маркировку.

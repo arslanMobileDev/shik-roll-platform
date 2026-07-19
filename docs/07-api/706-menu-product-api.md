@@ -5,7 +5,7 @@ Document Name: MENU & PRODUCT API
 
 Book: API Specification
 
-Version: 1.0.0
+Version: 1.2.0
 
 Status: APPROVED
 
@@ -93,6 +93,57 @@ menu.publish
 
 ---
 
+## POST /menus/{id}/unpublish
+
+Purpose
+
+Снять опубликованную версию меню с публикации.
+
+Permission
+
+menu.publish
+
+---
+
+## POST /menus/{id}/imports
+
+Purpose
+
+Проверить или импортировать каталог из JSON или CSV.
+
+Request
+
+- format: JSON | CSV
+- branch_id
+- source_file
+- mode: VALIDATE | UPSERT
+
+Response
+
+- import_job_id
+- status
+- valid_records
+- invalid_records
+- errors
+
+---
+
+## GET /menus/{id}/imports/{jobId}
+
+Purpose
+
+Получить статус и результаты задания импорта.
+
+---
+
+## GET /menus/{id}/preview
+
+Purpose
+
+Получить Draft-версию меню для предпросмотра без публикации.
+
+---
+
 ## DELETE /menus/{id}
 
 Purpose
@@ -135,6 +186,22 @@ Purpose
 
 ---
 
+## PATCH /categories/order
+
+Purpose
+
+Изменить порядок категорий в меню.
+
+---
+
+## PATCH /categories/{id}/products/order
+
+Purpose
+
+Изменить порядок продуктов внутри категории.
+
+---
+
 # Product Endpoints
 
 ## GET /products
@@ -160,6 +227,14 @@ Purpose
 
 ---
 
+## GET /products/{id}/preview
+
+Purpose
+
+Получить Draft-представление продукта для Back Office.
+
+---
+
 ## POST /products
 
 Purpose
@@ -181,6 +256,32 @@ Purpose
 Permission
 
 product.update
+
+---
+
+## PATCH /products/{id}/status
+
+Purpose
+
+Изменить жизненный цикл продукта.
+
+Request
+
+- status: DRAFT | PUBLISHED | HIDDEN
+
+---
+
+## PATCH /products/{id}/merchandising
+
+Purpose
+
+Изменить ручные признаки продвижения продукта.
+
+Request
+
+- is_popular
+- is_new
+- is_featured
 
 ---
 
@@ -238,7 +339,28 @@ Request
 
 Purpose
 
-Загрузить изображение.
+Загрузить изображение через Object Storage Port.
+
+---
+
+## PUT /products/{id}/images/{imageId}
+
+Purpose
+
+Заменить файл изображения с сохранением позиции в галерее.
+
+---
+
+## PATCH /products/{id}/images/{imageId}
+
+Purpose
+
+Изменить основное изображение или порядок в галерее.
+
+Request
+
+- is_primary
+- sort_order
 
 ---
 
@@ -246,7 +368,7 @@ Purpose
 
 Purpose
 
-Удалить изображение.
+Безопасно пометить изображение удаленным и запустить асинхронную очистку Object Storage.
 
 ---
 
@@ -331,6 +453,11 @@ Request
 - INVALID_PRICE
 - STOP_LIST_ACTIVE
 - VALIDATION_ERROR
+- CATALOG_IMPORT_FAILED
+- CATALOG_IMPORT_FORMAT_UNSUPPORTED
+- INVALID_PRODUCT_STATUS_TRANSITION
+- IMAGE_IN_USE
+- IMAGE_STORAGE_ERROR
 
 ---
 
@@ -346,6 +473,14 @@ Request
 # Business Rules
 
 - Меню публикуется без обновления приложения.
+- Импорт выполняется повторяемо: `menu_id + source_key` используется для upsert, а внутренний UUID не меняется.
+- Перенос продукта между категориями одного меню не меняет `source_key` или внутренний UUID.
+- Product lifecycle использует статусы Draft, Published, Hidden и Archived; DELETE переводит продукт в Archived.
+- Отдельное поле `products.is_active` не используется.
+- Preview возвращает Draft-данные, не доступные клиентскому каталогу.
+- Stop List управляет временной доступностью опубликованного продукта по филиалу и не заменяет Hidden.
+- Popular, New и Featured являются независимыми ручными признаками.
+- Медиа сохраняются через provider-agnostic Object Storage Port.
 - Цена может отличаться по филиалам.
 - Stop List работает отдельно для каждого филиала.
 - Один продукт может иметь несколько модификаторов.

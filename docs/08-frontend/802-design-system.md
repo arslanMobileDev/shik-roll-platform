@@ -5,7 +5,7 @@ Document Name: DESIGN SYSTEM
 
 Book: Frontend Specification
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -64,6 +64,23 @@ Neutral
 - Gray 700
 - Gray 800
 - Gray 900
+
+---
+
+## Catalog Semantic Tokens
+
+Claude Design must define token values for:
+
+- Draft status
+- Published status
+- Hidden status
+- Stop List status
+- Import success, warning and failure
+- Image placeholder and image processing state
+- Preview mode indicator
+- Destructive media action
+
+Semantic tokens must not embed fixed colors directly in screen specifications and must support Light, Dark and High Contrast themes.
 
 ---
 
@@ -176,6 +193,11 @@ Desktop
 - Loading
 - Error
 - Success
+- Draft
+- Published
+- Hidden
+- Processing
+- Partially Valid
 
 ---
 

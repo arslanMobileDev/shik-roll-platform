@@ -5,7 +5,7 @@ Document Name: CACHING STRATEGY
 
 Book: Architecture
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -49,6 +49,7 @@ Primary Cache
 
 ## Menu
 
+- Published Catalog Version
 - Categories
 - Products
 - Prices
@@ -113,6 +114,9 @@ Triggered By
 
 - Product Updated
 - Menu Published
+- Menu Unpublished
+- Product Status Changed
+- Product Media Changed
 - Price Changed
 - Stop List Updated
 - Branch Updated
@@ -133,6 +137,17 @@ Database First
 Invalidate Cache
 
 Refresh Cache
+
+---
+
+# Catalog Cache Boundaries
+
+- Публичный кеш содержит только Published-версию каталога.
+- Draft и Preview не записываются в публичный клиентский кеш.
+- Завершение импорта обновляет Draft и само по себе не изменяет опубликованный кеш.
+- Publish атомарно переключает активную версию и инициирует прогрев кеша.
+- Unpublish удаляет публичную версию из кеша.
+- Изменения статуса, цены, медиа, доступности и Stop List инвалидируют только затронутые ключи опубликованного каталога.
 
 ---
 

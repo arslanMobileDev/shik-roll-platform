@@ -5,7 +5,7 @@ Document Name: API TESTING SPECIFICATION
 
 Book: Testing & Quality Assurance
 
-Version: 1.0.0
+Version: 1.2.0
 
 Status: APPROVED
 
@@ -108,6 +108,24 @@ Verify
 
 ---
 
+# Menu Catalog API Scenarios
+
+Validate
+
+- JSON and CSV import validation without applying changes
+- Repeatable upsert by `menu_id + source_key` without duplicate products or changed internal UUID
+- Category move without changed `source_key` or internal UUID
+- Import job status and row-level validation errors
+- Draft, Published and Hidden status transitions
+- Preview isolation from the public catalog
+- Publish and Unpublish behavior
+- Category and product ordering
+- Popular, New and Featured flags
+- Branch availability and Stop List isolation
+- Image upload, replacement, primary selection, ordering and safe deletion
+
+---
+
 # Error Handling
 
 Validate
@@ -143,6 +161,10 @@ Verify
 - SQL Injection Protection
 - XSS Protection
 - Idempotency
+- File Type and Size Validation
+- Unauthorized Catalog Publication
+- Cross-Branch Catalog Access
+- Product and Image IDOR
 
 ---
 
@@ -173,6 +195,8 @@ Include
 QA-1301 Testing Overview
 
 API-701 API Overview
+
+API-706 Menu & Product API
 
 SEC-1104 API Security
 

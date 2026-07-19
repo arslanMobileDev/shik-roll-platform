@@ -5,7 +5,7 @@ Document Name: BACKGROUND JOBS
 
 Book: Architecture
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -87,6 +87,21 @@ Classification: Internal
 
 ---
 
+## Catalog
+
+- Catalog Import Validation
+- Catalog Import Upsert
+- Published Menu Cache Warmup
+- Product Search Index Update
+
+Rules
+
+- Импорт должен быть идемпотентным по стабильному `source_key`.
+- Ошибки отдельных строк сохраняются в задании импорта и не теряются при повторной обработке.
+- Прогрев публичного кеша запускается только после успешной публикации версии меню.
+
+---
+
 ## Analytics
 
 - KPI Calculation
@@ -124,7 +139,12 @@ Classification: Internal
 
 - Image Optimization
 - Thumbnail Generation
-- File Cleanup
+- Deleted Image Cleanup
+
+Rules
+
+- Очистка выполняется только для изображения, помеченного удаленным в PostgreSQL.
+- Повторный запуск очистки не должен приводить к ошибке или удалению активного объекта.
 
 ---
 

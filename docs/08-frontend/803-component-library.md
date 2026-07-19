@@ -5,7 +5,7 @@ Document Name: COMPONENT LIBRARY
 
 Book: Frontend Specification
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -165,6 +165,19 @@ UI-803 Component Library определяет:
 - Payment Status
 - Kitchen Ticket
 - Delivery Status
+- Catalog Status Badge
+- Product Media Gallery
+- Product Media Uploader
+- Category Sortable List
+- Product Sortable List
+- Catalog Import Panel
+- Import Validation Summary
+- Catalog Preview Banner
+- Publish Confirmation Dialog
+- Branch Availability Control
+- Stop List Control
+
+Catalog components must remain business-logic independent. Status transitions, import processing, publication and storage operations are supplied through typed callbacks and state models.
 
 ---
 
@@ -297,6 +310,15 @@ UI-803 Component Library определяет:
 - theme tests;
 - localization tests;
 - interaction tests.
+
+Catalog components additionally require tests for:
+
+- Draft, Published, Hidden and Stop List states;
+- empty, uploading, processing, failed and completed media states;
+- partial import validation results;
+- keyboard-accessible ordering;
+- destructive confirmation flows;
+- long product names, missing images and variable price formats.
 
 Критические компоненты заказа, оплаты, кухни и доставки должны иметь тесты всех поддерживаемых состояний.
 

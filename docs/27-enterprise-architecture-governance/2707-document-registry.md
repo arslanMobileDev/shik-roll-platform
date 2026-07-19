@@ -5,7 +5,7 @@ Document Name: DOCUMENT REGISTRY
 
 Book: Enterprise Architecture Governance
 
-Version: 1.0.0
+Version: 1.7.0
 
 Status: APPROVED
 
@@ -94,7 +94,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | API-703 | AUTHENTICATION API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/703-authentication-api.md` |
 | API-704 | CUSTOMER API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/704-customer-api.md` |
 | API-705 | RESTAURANT & BRANCH API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/705-restaurant-branch-api.md` |
-| API-706 | MENU & PRODUCT API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/706-menu-product-api.md` |
+| API-706 | MENU & PRODUCT API | API Specification | APPROVED | 1.2.0 | July 2026 | `docs/07-api/706-menu-product-api.md` |
 | API-707 | ORDER API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/707-order-api.md` |
 | API-708 | PAYMENT API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/708-payment-api.md` |
 | API-709 | KITCHEN API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/709-kitchen-api.md` |
@@ -107,15 +107,15 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | ARC-501 | SYSTEM OVERVIEW | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/501-system-overview.md` |
 | ARC-502 | MODULAR ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/502-modular-architecture.md` |
 | ARC-503 | MICROSERVICES STRATEGY | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/503-microservices.md` |
-| ARC-504 | EVENT-DRIVEN ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/504-event-driven-architecture.md` |
+| ARC-504 | EVENT-DRIVEN ARCHITECTURE | Architecture | APPROVED | 1.2.0 | July 2026 | `docs/05-architecture/504-event-driven-architecture.md` |
 | ARC-505 | DOMAIN MODEL | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/505-domain-model.md` |
 | ARC-506 | MODULE INTERACTIONS | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/506-module-interactions.md` |
 | ARC-507 | DEPLOYMENT ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/507-deployment-architecture.md` |
 | ARC-508 | TECHNOLOGY STACK | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/508-technology-stack.md` |
-| ARC-509 | CACHING STRATEGY | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/509-caching-strategy.md` |
+| ARC-509 | CACHING STRATEGY | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/05-architecture/509-caching-strategy.md` |
 | ARC-510 | FILE STORAGE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/510-file-storage.md` |
 | ARC-511 | SEARCH ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/511-search-architecture.md` |
-| ARC-512 | BACKGROUND JOBS | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/512-background-jobs.md` |
+| ARC-512 | BACKGROUND JOBS | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/05-architecture/512-background-jobs.md` |
 | ARC-513 | COMMUNICATION ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/513-communication-architecture.md` |
 | ARC-514 | SECURITY ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/514-security-architecture.md` |
 | ARC-515 | HIGH AVAILABILITY & DISASTER RECOVERY | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/515-high-availability.md` |
@@ -131,7 +131,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | BE-903 | AUTHENTICATION SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/903-authentication-service.md` |
 | BE-904 | CUSTOMER SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/904-customer-service.md` |
 | BE-905 | RESTAURANT & BRANCH SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/905-restaurant-branch-service.md` |
-| BE-906 | MENU & PRODUCT SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/906-menu-product-service.md` |
+| BE-906 | MENU & PRODUCT SERVICE | Backend Specification | APPROVED | 1.2.0 | July 2026 | `docs/09-backend/906-menu-product-service.md` |
 | BE-907 | ORDER SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/907-order-service.md` |
 | BE-908 | PAYMENT SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/908-payment-service.md` |
 | BE-909 | KITCHEN SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/909-kitchen-service.md` |
@@ -160,7 +160,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | DB-604 | IDENTITY SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/604-identity-schema.md` |
 | DB-605 | CUSTOMER SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/605-customer-schema.md` |
 | DB-606 | RESTAURANT & BRANCH SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/606-restaurant-branch-schema.md` |
-| DB-607 | MENU & PRODUCT SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/607-menu-product-schema.md` |
+| DB-607 | MENU & PRODUCT SCHEMA | Database | APPROVED | 1.2.0 | July 2026 | `docs/06-database/607-menu-product-schema.md` |
 | DB-608 | ORDER SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/608-order-schema.md` |
 | DB-609 | PAYMENT SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/609-payment-schema.md` |
 | DB-610 | KITCHEN & PRODUCTION SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/610-kitchen-production-schema.md` |
@@ -190,7 +190,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | GOV-2704 | TECHNOLOGY LIFECYCLE MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2704-technology-lifecycle-management.md` |
 | GOV-2705 | TECHNICAL DEBT MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2705-technical-debt-management.md` |
 | GOV-2706 | ENTERPRISE ARCHITECTURE ROADMAP | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2706-enterprise-architecture-roadmap.md` |
-| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
+| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.7.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
 | INT-1001 | INTEGRATION OVERVIEW | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1001-integration-overview.md` |
 | INT-1002 | PAYMENT GATEWAY INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1002-payment-gateway-integrations.md` |
 | INT-1003 | MAPS & GEOLOCATION INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1003-maps-geolocation-integrations.md` |
@@ -234,11 +234,11 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | PB-108 | BUSINESS RULES | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/BUSINESS_RULES.md` |
 | PB-109 | TERMINOLOGY GLOSSARY | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/TERMINOLOGY_GLOSSARY.md` |
 | PB-300 | PRODUCT PRINCIPLES | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/PRODUCT_PRINCIPLES.md` |
-| PB-301 | PRODUCT OVERVIEW | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/PRODUCT_OVERVIEW.md` |
+| PB-301 | PRODUCT OVERVIEW | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/PRODUCT_OVERVIEW.md` |
 | PB-302 | USER PERSONAS | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/USER_PERSONAS.md` |
-| PB-303 | USER JOURNEYS | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/USER_JOURNEYS.md` |
-| PB-304 | BUSINESS CAPABILITIES | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/BUSINESS_CAPABILITIES.md` |
-| PB-305 | PRODUCT REQUIREMENTS | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/PRODUCT_REQUIREMENTS.md` |
+| PB-303 | USER JOURNEYS | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/USER_JOURNEYS.md` |
+| PB-304 | BUSINESS CAPABILITIES | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/BUSINESS_CAPABILITIES.md` |
+| PB-305 | PRODUCT REQUIREMENTS | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/PRODUCT_REQUIREMENTS.md` |
 | PB-306 | COMMUNICATION AUTOMATION CENTER | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/306-communication-automation-center.md` |
 | PB-401 | PLATFORM OVERVIEW | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/07-architecture/SYSTEM_OVERVIEW.md` |
 | PERF-2101 | PERFORMANCE ENGINEERING OVERVIEW | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2101-performance-engineering-overview.md` |
@@ -248,18 +248,18 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | PERF-2105 | CACHING STRATEGY | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2105-caching-strategy.md` |
 | PERF-2106 | CDN & CONTENT DELIVERY STRATEGY | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2106-cdn-content-delivery-strategy.md` |
 | PERF-2107 | LOAD BALANCING & TRAFFIC DISTRIBUTION | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2107-load-balancing-traffic-distribution.md` |
-| PM-1801 | PROJECT MANAGEMENT OVERVIEW | Project Management & Delivery | APPROVED | 1.0.0 | July 2026 | `docs/18-project-management/1801-project-management-overview.md` |
-| PM-1802 | PRODUCT ROADMAP & RELEASE PLANNING | Project Management & Delivery | APPROVED | 1.0.0 | July 2026 | `docs/18-project-management/1802-product-roadmap-release-planning.md` |
+| PM-1801 | PROJECT MANAGEMENT OVERVIEW | Project Management & Delivery | APPROVED | 1.1.0 | July 2026 | `docs/18-project-management/1801-project-management-overview.md` |
+| PM-1802 | PRODUCT ROADMAP & RELEASE PLANNING | Project Management & Delivery | APPROVED | 1.1.0 | July 2026 | `docs/18-project-management/1802-product-roadmap-release-planning.md` |
 | PM-1803 | BACKLOG & SPRINT MANAGEMENT | Project Management & Delivery | APPROVED | 1.0.0 | July 2026 | `docs/18-project-management/1803-backlog-sprint-management.md` |
 | PM-1804 | RISK & CHANGE MANAGEMENT | Project Management & Delivery | APPROVED | 1.0.0 | July 2026 | `docs/18-project-management/1804-risk-change-management.md` |
 | PM-1805 | PROJECT GOVERNANCE & DELIVERY METRICS | Project Management & Delivery | APPROVED | 1.0.0 | July 2026 | `docs/18-project-management/1805-project-governance-delivery-metrics.md` |
 | QA-1301 | TESTING OVERVIEW | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1301-testing-overview.md` |
 | QA-1302 | UNIT TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1302-unit-testing-specification.md` |
-| QA-1303 | INTEGRATION TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1303-integration-testing-specification.md` |
-| QA-1304 | API TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1304-api-testing-specification.md` |
-| QA-1305 | END-TO-END (E2E) TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1305-e2e-testing-specification.md` |
+| QA-1303 | INTEGRATION TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.2.0 | July 2026 | `docs/13-testing/1303-integration-testing-specification.md` |
+| QA-1304 | API TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.2.0 | July 2026 | `docs/13-testing/1304-api-testing-specification.md` |
+| QA-1305 | END-TO-END (E2E) TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.1.0 | July 2026 | `docs/13-testing/1305-e2e-testing-specification.md` |
 | QA-1306 | PERFORMANCE & LOAD TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1306-performance-load-testing-specification.md` |
-| QA-1307 | SECURITY TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1307-security-testing-specification.md` |
+| QA-1307 | SECURITY TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.1.0 | July 2026 | `docs/13-testing/1307-security-testing-specification.md` |
 | QA-1308 | TEST AUTOMATION & QUALITY GATES | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1308-test-automation-quality-gates.md` |
 | RTM-001 | REQUIREMENTS TRACEABILITY MATRIX | — | APPROVED | 1.0.0 | July 2026 | `docs/TRACEABILITY_MATRIX.md` |
 | SDK-2401 | PLATFORM SDK OVERVIEW | Platform SDK | APPROVED | 1.0.0 | July 2026 | `docs/24-platform-sdk/2401-platform-sdk-overview.md` |
@@ -271,21 +271,21 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | SEC-1101 | SECURITY OVERVIEW | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1101-security-overview.md` |
 | SEC-1102 | IDENTITY & ACCESS MANAGEMENT | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1102-identity-access-management.md` |
 | SEC-1103 | AUTHENTICATION & SESSION SECURITY | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1103-authentication-session-security.md` |
-| SEC-1104 | API SECURITY | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1104-api-security.md` |
+| SEC-1104 | API SECURITY | Security Specification | APPROVED | 1.1.0 | July 2026 | `docs/11-security/1104-api-security.md` |
 | SEC-1105 | DATABASE SECURITY | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1105-database-security.md` |
 | SEC-1106 | INFRASTRUCTURE SECURITY | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1106-infrastructure-security.md` |
 | SEC-1107 | SECURE DEVELOPMENT LIFECYCLE (SSDLC) | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1107-secure-development-lifecycle.md` |
 | SEC-1108 | INCIDENT RESPONSE & DISASTER RECOVERY | Security Specification | APPROVED | 1.0.0 | July 2026 | `docs/11-security/1108-incident-response-disaster-recovery.md` |
 | UI-801 | FRONTEND OVERVIEW | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/801-frontend-overview.md` |
-| UI-802 | DESIGN SYSTEM | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/802-design-system.md` |
-| UI-803 | COMPONENT LIBRARY | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/803-component-library.md` |
+| UI-802 | DESIGN SYSTEM | Frontend Specification | APPROVED | 1.1.0 | July 2026 | `docs/08-frontend/802-design-system.md` |
+| UI-803 | COMPONENT LIBRARY | Frontend Specification | APPROVED | 1.1.0 | July 2026 | `docs/08-frontend/803-component-library.md` |
 | UI-804 | CUSTOMER MOBILE APP UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/804-customer-mobile-app-ux.md` |
-| UI-805 | BACK OFFICE UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/805-back-office-ux.md` |
+| UI-805 | BACK OFFICE UX | Frontend Specification | APPROVED | 1.1.0 | July 2026 | `docs/08-frontend/805-back-office-ux.md` |
 | UI-806 | POS UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/806-pos-ux.md` |
 | UI-807 | KITCHEN DISPLAY SYSTEM UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/807-kitchen-display-system-ux.md` |
 | UI-808 | COURIER MOBILE APP UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/808-courier-mobile-app-ux.md` |
 | UI-809 | OWNER DASHBOARD UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/809-owner-dashboard-ux.md` |
-| UI-810 | DESIGN HANDOFF SPECIFICATION | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/810-design-handoff-specification.md` |
+| UI-810 | DESIGN HANDOFF SPECIFICATION | Frontend Specification | APPROVED | 1.1.0 | July 2026 | `docs/08-frontend/810-design-handoff-specification.md` |
 
 ---
 

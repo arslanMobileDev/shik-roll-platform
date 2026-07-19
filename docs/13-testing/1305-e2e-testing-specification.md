@@ -5,7 +5,7 @@ Document Name: END-TO-END (E2E) TESTING SPECIFICATION
 
 Book: Testing & Quality Assurance
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -66,7 +66,7 @@ Infrastructure
 - PostgreSQL
 - Redis
 - RabbitMQ
-- MinIO
+- Object Storage Adapter (MinIO in isolated tests)
 
 ---
 
@@ -82,6 +82,12 @@ Infrastructure
 - Refund Order
 - Employee Login
 - Report Generation
+- Import Menu Catalog
+- Prepare Draft Catalog
+- Preview and Publish Catalog
+- Verify Published Catalog in Customer App
+- Hide Product and Apply Branch Stop List
+- Replace Product Image
 
 ---
 
@@ -154,6 +160,11 @@ Include
 - No Critical Defects
 - No Data Corruption
 - Performance Within SLA
+- Draft changes are not visible in Customer App before Publish
+- Published categories, products, prices and images match Back Office Preview
+- Repeated import does not create duplicate products
+- Hidden and Stop List behavior remains distinct
+- Product image replacement does not leave a broken public image
 
 ---
 
@@ -162,6 +173,10 @@ Include
 QA-1301 Testing Overview
 
 UI-804 Customer Mobile App UX
+
+UI-805 Back Office UX
+
+PB-305 Product Requirements
 
 DEV-1204 CI/CD Pipeline Specification
 

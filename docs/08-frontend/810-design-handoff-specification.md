@@ -5,7 +5,7 @@ Document Name: DESIGN HANDOFF SPECIFICATION
 
 Book: Frontend Specification
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -133,6 +133,49 @@ Formats
 
 ---
 
+# Catalog Design Package
+
+Claude Design delivery for the MVP catalog must include:
+
+- Catalog Import
+- Import Validation Results
+- Draft Catalog
+- Catalog Preview
+- Category Ordering
+- Product Ordering
+- Product Editor
+- Product Media Gallery
+- Image Upload and Replacement
+- Branch Availability
+- Stop List
+- Publish and Unpublish Confirmation
+- Publish History
+
+Required states:
+
+- Empty catalog
+- Draft
+- Published
+- Hidden product
+- Branch Stop List
+- Import validating, partially valid, failed and completed
+- Image empty, uploading, processing, failed and ready
+- Preview mode
+- Publish success and failure
+
+Required data coverage:
+
+- real menu names, descriptions, weights and prices supplied by the Product Owner;
+- long and short product names;
+- missing and replacement images;
+- products with Popular, New and Featured combinations;
+- unavailable products and branch-specific Stop List;
+- category and product ordering.
+
+The design package specifies presentation and interaction only. API behavior remains governed by API-706, and product rules remain governed by PB-305.
+
+---
+
 # Developer Handoff
 
 Required
@@ -188,6 +231,9 @@ Every delivery includes
 - Все элементы имеют Accessibility Specification.
 - Все ресурсы готовы к разработке Flutter.
 - Все изменения проходят дизайн-ревью.
+- Catalog screens cover every required lifecycle, import and media state.
+- Catalog Preview is visually distinguishable from the public Customer App state.
+- Back Office catalog operations are usable with keyboard navigation on Flutter Web.
 
 ---
 
@@ -200,5 +246,9 @@ UI-803 Component Library
 PB-305 Product Requirements
 
 API-701 API Overview
+
+API-706 Menu & Product API
+
+UI-805 Back Office UX
 
 END OF DOCUMENT
