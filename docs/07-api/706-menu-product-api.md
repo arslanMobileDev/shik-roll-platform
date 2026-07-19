@@ -5,7 +5,7 @@ Document Name: MENU & PRODUCT API
 
 Book: API Specification
 
-Version: 1.1.0
+Version: 1.2.0
 
 Status: APPROVED
 
@@ -473,8 +473,10 @@ Request
 # Business Rules
 
 - Меню публикуется без обновления приложения.
-- Импорт выполняется повторяемо: `source_key` используется для upsert, а внутренний UUID не меняется.
-- Product lifecycle использует статусы Draft, Published и Hidden.
+- Импорт выполняется повторяемо: `menu_id + source_key` используется для upsert, а внутренний UUID не меняется.
+- Перенос продукта между категориями одного меню не меняет `source_key` или внутренний UUID.
+- Product lifecycle использует статусы Draft, Published, Hidden и Archived; DELETE переводит продукт в Archived.
+- Отдельное поле `products.is_active` не используется.
 - Preview возвращает Draft-данные, не доступные клиентскому каталогу.
 - Stop List управляет временной доступностью опубликованного продукта по филиалу и не заменяет Hidden.
 - Popular, New и Featured являются независимыми ручными признаками.

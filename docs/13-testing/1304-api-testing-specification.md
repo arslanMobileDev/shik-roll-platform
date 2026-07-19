@@ -5,7 +5,7 @@ Document Name: API TESTING SPECIFICATION
 
 Book: Testing & Quality Assurance
 
-Version: 1.1.0
+Version: 1.2.0
 
 Status: APPROVED
 
@@ -113,7 +113,8 @@ Verify
 Validate
 
 - JSON and CSV import validation without applying changes
-- Repeatable upsert by `source_key` without duplicate products or changed internal UUID
+- Repeatable upsert by `menu_id + source_key` without duplicate products or changed internal UUID
+- Category move without changed `source_key` or internal UUID
 - Import job status and row-level validation errors
 - Draft, Published and Hidden status transitions
 - Preview isolation from the public catalog

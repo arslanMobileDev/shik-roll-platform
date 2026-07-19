@@ -5,7 +5,7 @@ Document Name: MENU & PRODUCT SCHEMA
 
 Book: Database
 
-Version: 1.1.0
+Version: 1.2.0
 
 Status: APPROVED
 
@@ -90,6 +90,10 @@ Constraints
 
 - unique menu_id + version_number
 
+Data Types
+
+- snapshot: JSONB
+
 ---
 
 # catalog_import_jobs
@@ -110,6 +114,16 @@ Columns
 - created_by
 - created_at
 - completed_at
+
+Source Format Values
+
+- JSON
+- CSV
+
+Mode Values
+
+- VALIDATE
+- UPSERT
 
 Status Values
 
@@ -135,6 +149,10 @@ Columns
 - sort_order
 - is_active
 
+Constraints
+
+- unique id + menu_id
+
 ---
 
 # products
@@ -142,6 +160,7 @@ Columns
 Columns
 
 - id
+- menu_id
 - category_id
 - source_key
 - sku
@@ -157,11 +176,18 @@ Columns
 - is_popular
 - is_new
 - is_featured
-- is_active
 - published_at
 - hidden_at
+- archived_at
 - created_at
 - updated_at
+
+Status Values
+
+- DRAFT
+- PUBLISHED
+- HIDDEN
+- ARCHIVED
 
 Indexes
 
@@ -169,10 +195,12 @@ Indexes
 - slug
 - category_id
 - source_key
+- menu_id + source_key
 
 Constraints
 
-- unique category_id + source_key
+- unique menu_id + source_key
+- category_id + menu_id references menu_categories id + menu_id
 
 ---
 
@@ -196,6 +224,18 @@ Columns
 - deleted_at
 - created_at
 - updated_at
+
+Processing Status Values
+
+- PENDING
+- PROCESSING
+- READY
+- FAILED
+
+Status Values
+
+- ACTIVE
+- DELETED
 
 Constraints
 
@@ -410,8 +450,10 @@ branch_product_availability
 # Business Rules
 
 - Один продукт принадлежит одной категории.
-- `source_key` является стабильным внешним ключом импорта и не заменяет внутренний UUID продукта.
-- Повторный импорт обновляет продукт по `category_id + source_key` и не создает дубликат.
+- `source_key` является стабильным внешним ключом импорта внутри одного меню и не заменяет внутренний UUID продукта.
+- Повторный импорт обновляет продукт по `menu_id + source_key` и не создает дубликат.
+- Перенос продукта между категориями одного меню сохраняет `source_key` и внутренний UUID.
+- `products.status` является единственным полем жизненного цикла продукта; отдельное `products.is_active` не используется.
 - Product lifecycle использует статусы Draft, Published и Hidden.
 - Публикация создает неизменяемый snapshot в `menu_versions`.
 - Один продукт может иметь несколько изображений.

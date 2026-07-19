@@ -5,7 +5,7 @@ Document Name: DOCUMENT REGISTRY
 
 Book: Enterprise Architecture Governance
 
-Version: 1.6.0
+Version: 1.7.0
 
 Status: APPROVED
 
@@ -94,7 +94,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | API-703 | AUTHENTICATION API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/703-authentication-api.md` |
 | API-704 | CUSTOMER API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/704-customer-api.md` |
 | API-705 | RESTAURANT & BRANCH API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/705-restaurant-branch-api.md` |
-| API-706 | MENU & PRODUCT API | API Specification | APPROVED | 1.1.0 | July 2026 | `docs/07-api/706-menu-product-api.md` |
+| API-706 | MENU & PRODUCT API | API Specification | APPROVED | 1.2.0 | July 2026 | `docs/07-api/706-menu-product-api.md` |
 | API-707 | ORDER API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/707-order-api.md` |
 | API-708 | PAYMENT API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/708-payment-api.md` |
 | API-709 | KITCHEN API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/709-kitchen-api.md` |
@@ -107,7 +107,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | ARC-501 | SYSTEM OVERVIEW | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/501-system-overview.md` |
 | ARC-502 | MODULAR ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/502-modular-architecture.md` |
 | ARC-503 | MICROSERVICES STRATEGY | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/503-microservices.md` |
-| ARC-504 | EVENT-DRIVEN ARCHITECTURE | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/05-architecture/504-event-driven-architecture.md` |
+| ARC-504 | EVENT-DRIVEN ARCHITECTURE | Architecture | APPROVED | 1.2.0 | July 2026 | `docs/05-architecture/504-event-driven-architecture.md` |
 | ARC-505 | DOMAIN MODEL | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/505-domain-model.md` |
 | ARC-506 | MODULE INTERACTIONS | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/506-module-interactions.md` |
 | ARC-507 | DEPLOYMENT ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/507-deployment-architecture.md` |
@@ -131,7 +131,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | BE-903 | AUTHENTICATION SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/903-authentication-service.md` |
 | BE-904 | CUSTOMER SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/904-customer-service.md` |
 | BE-905 | RESTAURANT & BRANCH SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/905-restaurant-branch-service.md` |
-| BE-906 | MENU & PRODUCT SERVICE | Backend Specification | APPROVED | 1.1.0 | July 2026 | `docs/09-backend/906-menu-product-service.md` |
+| BE-906 | MENU & PRODUCT SERVICE | Backend Specification | APPROVED | 1.2.0 | July 2026 | `docs/09-backend/906-menu-product-service.md` |
 | BE-907 | ORDER SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/907-order-service.md` |
 | BE-908 | PAYMENT SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/908-payment-service.md` |
 | BE-909 | KITCHEN SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/909-kitchen-service.md` |
@@ -160,7 +160,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | DB-604 | IDENTITY SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/604-identity-schema.md` |
 | DB-605 | CUSTOMER SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/605-customer-schema.md` |
 | DB-606 | RESTAURANT & BRANCH SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/606-restaurant-branch-schema.md` |
-| DB-607 | MENU & PRODUCT SCHEMA | Database | APPROVED | 1.1.0 | July 2026 | `docs/06-database/607-menu-product-schema.md` |
+| DB-607 | MENU & PRODUCT SCHEMA | Database | APPROVED | 1.2.0 | July 2026 | `docs/06-database/607-menu-product-schema.md` |
 | DB-608 | ORDER SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/608-order-schema.md` |
 | DB-609 | PAYMENT SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/609-payment-schema.md` |
 | DB-610 | KITCHEN & PRODUCTION SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/610-kitchen-production-schema.md` |
@@ -190,7 +190,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | GOV-2704 | TECHNOLOGY LIFECYCLE MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2704-technology-lifecycle-management.md` |
 | GOV-2705 | TECHNICAL DEBT MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2705-technical-debt-management.md` |
 | GOV-2706 | ENTERPRISE ARCHITECTURE ROADMAP | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2706-enterprise-architecture-roadmap.md` |
-| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.6.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
+| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.7.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
 | INT-1001 | INTEGRATION OVERVIEW | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1001-integration-overview.md` |
 | INT-1002 | PAYMENT GATEWAY INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1002-payment-gateway-integrations.md` |
 | INT-1003 | MAPS & GEOLOCATION INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1003-maps-geolocation-integrations.md` |
@@ -255,8 +255,8 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | PM-1805 | PROJECT GOVERNANCE & DELIVERY METRICS | Project Management & Delivery | APPROVED | 1.0.0 | July 2026 | `docs/18-project-management/1805-project-governance-delivery-metrics.md` |
 | QA-1301 | TESTING OVERVIEW | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1301-testing-overview.md` |
 | QA-1302 | UNIT TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1302-unit-testing-specification.md` |
-| QA-1303 | INTEGRATION TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.1.0 | July 2026 | `docs/13-testing/1303-integration-testing-specification.md` |
-| QA-1304 | API TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.1.0 | July 2026 | `docs/13-testing/1304-api-testing-specification.md` |
+| QA-1303 | INTEGRATION TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.2.0 | July 2026 | `docs/13-testing/1303-integration-testing-specification.md` |
+| QA-1304 | API TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.2.0 | July 2026 | `docs/13-testing/1304-api-testing-specification.md` |
 | QA-1305 | END-TO-END (E2E) TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.1.0 | July 2026 | `docs/13-testing/1305-e2e-testing-specification.md` |
 | QA-1306 | PERFORMANCE & LOAD TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.0.0 | July 2026 | `docs/13-testing/1306-performance-load-testing-specification.md` |
 | QA-1307 | SECURITY TESTING SPECIFICATION | Testing & Quality Assurance | APPROVED | 1.1.0 | July 2026 | `docs/13-testing/1307-security-testing-specification.md` |

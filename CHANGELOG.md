@@ -43,6 +43,10 @@ Classification: Internal
 - PM-1801 and PM-1802 updated to version 1.1.0.
 - The project lifecycle now defines explicit Product Book, Claude Design and Claude Code entry gates.
 - MVP planning now includes module review checkpoints and a pre-launch catalog readiness milestone.
+- API-706, DB-607, BE-906, ARC-504, QA-1303 and QA-1304 updated to version 1.2.0.
+- Catalog import identity is now scoped by `menu_id + source_key`, preserving product UUID when a category changes.
+- Product, media and import lifecycle values are explicit, and the legacy product `is_active` ambiguity is removed.
+- RabbitMQ remains the current event bus; only its topology evolution is listed as future work.
 
 ---
 

@@ -5,7 +5,7 @@ Document Name: EVENT-DRIVEN ARCHITECTURE
 
 Book: Architecture
 
-Version: 1.1.0
+Version: 1.2.0
 
 Status: APPROVED
 
@@ -266,7 +266,7 @@ Communication Automation Center подписывается на события:
 Phase 2
 
 - Kafka
-- RabbitMQ
+- RabbitMQ topology evolution
 - Event Store
 - Event Replay
 - CQRS

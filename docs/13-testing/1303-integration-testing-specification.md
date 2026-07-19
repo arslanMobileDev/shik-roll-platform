@@ -5,7 +5,7 @@ Document Name: INTEGRATION TESTING SPECIFICATION
 
 Book: Testing & Quality Assurance
 
-Version: 1.1.0
+Version: 1.2.0
 
 Status: APPROVED
 
@@ -123,7 +123,7 @@ Validate
 - Queue Messages
 - Cache Updates
 - Object Storage Metadata and Object State
-- Stable UUID After Repeated `source_key` Import
+- Stable UUID After Repeated `menu_id + source_key` Import and Category Move
 
 ---
 
