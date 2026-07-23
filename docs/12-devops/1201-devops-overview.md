@@ -5,7 +5,7 @@ Document Name: DEVOPS OVERVIEW
 
 Book: DevOps & Infrastructure
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -46,17 +46,19 @@ Classification: Internal
 - Docker
 - Docker Compose
 - GitHub Actions
-- Google Cloud Run
+- GitHub Container Registry (GHCR)
+- Beget Cloud VPS
+- Ubuntu LTS
 - Nginx
-- PostgreSQL
+- Beget PostgreSQL DBaaS
 - Redis
 - RabbitMQ
-- Google Cloud Storage (Production)
+- Beget S3 (Staging / Production)
 - MinIO (Local / Development)
 
 Future
 
-- Kubernetes
+- Beget Managed Kubernetes
 - Terraform
 - ArgoCD
 
@@ -128,7 +130,7 @@ BE-901 Backend Overview
 
 ARC-508 Technology Stack
 
-ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 ADR-1612 Object Storage Provider Model
 
