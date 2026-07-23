@@ -17,6 +17,7 @@ Classification: Internal
 
 ### Added
 
+- CMP-1908 defining Russian personal-data, separate-consent, public-offer and production-release requirements.
 - ADR-1613 selecting Beget Cloud VPS, Beget PostgreSQL DBaaS and Beget S3 for MVP and early production.
 - Product Book requirements for pre-launch catalog preparation through Back Office.
 - UJ-013 Prepare and Publish Catalog.
@@ -24,6 +25,9 @@ Classification: Internal
 
 ### Changed
 
+- Product requirements, Customer App UX, Back Office UX, Customer and Order APIs, database schemas and backend services now support versioned legal documents, separate consent evidence and immutable public-offer snapshots.
+- Firebase Authentication is now a candidate gated by legal, privacy and architecture review before Russian production use.
+- Production launch is blocked until operator, Roskomnadzor, legal-text, external-provider and privacy-disclosure requirements are verified.
 - Product, architecture, database, backend, compliance, performance, data-platform and business-continuity documents synchronized on Beget S3 for staging and production.
 - The S3-Compatible Adapter is the current production adapter; MinIO remains local and GCS remains an optional future adapter.
 - Recovery copies containing personal data are constrained to legally approved Russian regions unless separately reviewed.
