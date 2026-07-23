@@ -5,7 +5,7 @@ Document Name: ORDER SCHEMA
 
 Book: Database
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -99,6 +99,10 @@ Columns
 - tip_total
 - total
 - currency
+- offer_document_id
+- offer_version
+- offer_content_hash
+- offer_accepted_at
 - estimated_ready_at
 - completed_at
 - cancelled_at
@@ -310,6 +314,8 @@ order_audit
 - Заказ поддерживает промокоды.
 - Заказ поддерживает чаевые.
 - Заказ является источником данных для Analytics.
+- Заказ сохраняет неизменяемую версию и content hash принятой публичной оферты.
+- Юридический snapshot заказа не изменяется при публикации новой версии оферты.
 
 ---
 
@@ -320,5 +326,7 @@ PB-305 Product Requirements
 DB-607 Menu & Product Schema
 
 ARC-504 Event-Driven Architecture
+
+CMP-1908 Russian Personal Data & Consumer Legal Requirements
 
 END OF DOCUMENT
