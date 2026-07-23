@@ -5,7 +5,7 @@ Document Name: ARCHITECTURE DECISION RECORDS INDEX
 
 Book: Enterprise Architecture Decision Records
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -98,8 +98,9 @@ APPROVED означает, что индекс утвержден как дей�
 | ADR-1608 | Clean Architecture and Modular Monolith Ready | ACCEPTED | docs/16-adr/1608-adr-clean-architecture-modular-monolith.md |
 | ADR-1609 | API-First and Contract-First Development | ACCEPTED | docs/16-adr/1609-adr-api-first-contract-first-development.md |
 | ADR-1610 | AI-First Platform Architecture | ACCEPTED | docs/16-adr/1610-adr-ai-first-platform-architecture.md |
-| ADR-1611 | Cloud Run for MVP and Kubernetes Evolution | ACCEPTED | docs/16-adr/1611-adr-cloud-run-mvp-kubernetes-evolution.md |
+| ADR-1611 | Cloud Run for MVP and Kubernetes Evolution | SUPERSEDED | docs/16-adr/1611-adr-cloud-run-mvp-kubernetes-evolution.md |
 | ADR-1612 | Object Storage Provider Model | ACCEPTED | docs/16-adr/1612-adr-object-storage-provider-model.md |
+| ADR-1613 | Beget Cloud for MVP and Infrastructure Evolution | ACCEPTED | docs/16-adr/1613-adr-beget-cloud-mvp-deployment.md |
 
 ---
 
