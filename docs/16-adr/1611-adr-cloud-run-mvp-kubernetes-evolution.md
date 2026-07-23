@@ -5,9 +5,9 @@ Document Name: ADR — CLOUD RUN FOR MVP AND KUBERNETES EVOLUTION
 
 Book: Enterprise Architecture Decision Records
 
-Version: 1.0.0
+Version: 1.1.0
 
-Status: ACCEPTED
+Status: SUPERSEDED
 
 Project: SHIK Platform
 
@@ -26,7 +26,9 @@ Classification: Internal
 
 ## Status
 
-Accepted
+Superseded by ADR-1613 Beget Cloud for MVP and Infrastructure Evolution.
+
+This document is retained as the historical record of the former Cloud Run decision.
 
 ---
 
@@ -131,6 +133,8 @@ Review this decision when:
 ---
 
 # Related Documents
+
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 PB-401 Platform Overview
 
