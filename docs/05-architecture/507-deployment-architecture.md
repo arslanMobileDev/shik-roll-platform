@@ -5,7 +5,7 @@ Document Name: DEPLOYMENT ARCHITECTURE
 
 Book: Architecture
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -44,22 +44,31 @@ Horizontal Scaling Ready
 
 ## Current Stage — MVP and Early Production
 
-- Google Cloud Platform
-- Google Cloud Run
-- Managed Cloud Services
+- Beget Cloud in a Russian region
+- Beget Cloud VPS
+- Ubuntu LTS
+- Docker containers
+- Docker Compose
+- Nginx
+- Beget PostgreSQL DBaaS
+- Beget S3
+- GitHub Container Registry (GHCR)
+- GitHub Actions
+
+Staging and production are isolated environments.
 
 ## Target Evolution
 
-Kubernetes is not required for the current stage. It may be introduced when one or more migration criteria are confirmed:
+Beget Managed Kubernetes is not required for the current stage. It may be introduced when one or more migration criteria are confirmed:
 
-- Cloud Run limitations affect product requirements;
-- service mesh is required;
-- complex workload isolation is required;
-- multi-region orchestration is required;
-- the number of independently deployed services creates operational pressure;
-- a mature DevOps/SRE team is available.
+- Docker Compose no longer meets availability or deployment requirements;
+- independent service scaling creates material operational pressure;
+- multi-node orchestration is required;
+- workload isolation requirements increase;
+- zero-downtime deployment cannot be achieved reliably with the current model;
+- a mature DevOps/SRE operating model is available.
 
-The decision is governed by ADR-1611.
+The decision is governed by ADR-1613.
 
 ---
 
@@ -263,7 +272,7 @@ ARC-501 System Overview
 
 ARC-508 Technology Stack
 
-ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 ARC-509 Caching Strategy
 
