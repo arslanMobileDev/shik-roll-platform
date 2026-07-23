@@ -5,7 +5,7 @@ Document Name: HIGH AVAILABILITY ARCHITECTURE
 
 Book: Business Continuity & Disaster Recovery
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -162,10 +162,10 @@ Application Contract
 
 - Provider-neutral Object Storage Port
 
-Production in Google Cloud
+Staging / Production
 
-- Google Cloud Storage
-- Provider-managed durability and recovery
+- Beget S3 through the S3-Compatible Adapter
+- Provider-managed durability supplemented by independently verified backups
 
 Approved Self-Hosted Deployment
 
@@ -286,6 +286,8 @@ Measure
 # Related Documents
 
 ADR-1612 Object Storage Provider Model
+
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 BCP-2001 Business Continuity Overview
 
