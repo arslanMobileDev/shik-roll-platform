@@ -293,23 +293,27 @@ Flutter Web
 
 ---
 
-## Cloud
+## Infrastructure
 
-Google Cloud Platform
+Beget Cloud VPS
 
-Cloud Run
+Docker Compose
 
-Cloud SQL
+Nginx
 
-Cloud Storage
+Beget PostgreSQL DBaaS
 
-Cloud Logging
+Beget S3
 
-Cloud Monitoring
+GitHub Container Registry (GHCR)
 
-Artifact Registry
+GitHub Actions
 
-Cloud Build
+Prometheus
+
+Grafana
+
+Loki
 
 ---
 
