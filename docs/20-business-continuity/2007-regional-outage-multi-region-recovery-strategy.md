@@ -5,7 +5,7 @@ Document Name: REGIONAL OUTAGE & MULTI-REGION RECOVERY STRATEGY
 
 Book: Business Continuity & Disaster Recovery
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -102,7 +102,7 @@ Each Region Contains
 - Redis
 - RabbitMQ
 - Object Storage Adapter
-- Google Cloud Storage for production in Google Cloud, or an approved S3-compatible provider for self-hosted deployment
+- Beget S3 through the S3-Compatible Adapter for current production, or an approved provider adapter for an alternative deployment
 - Monitoring Stack
 
 ---
@@ -132,7 +132,8 @@ Database
 
 Object Storage
 
-- Cross-Region Replication
+- Cross-Region Replication only between legally approved Russian regions
+- Provider and adapter contract validation
 
 Configuration
 
@@ -141,7 +142,7 @@ Configuration
 
 Backups
 
-- Cross-Region Backup Storage
+- Cross-Region Backup Storage only in a legally approved Russian region
 
 ---
 
@@ -308,6 +309,8 @@ Planned Enhancements
 # Related Documents
 
 ADR-1612 Object Storage Provider Model
+
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 BCP-2001 Business Continuity Overview
 
