@@ -5,7 +5,7 @@ Document Name: BACK OFFICE UX
 
 Book: Frontend Specification
 
-Version: 1.1.0
+Version: 1.2.0
 
 Status: APPROVED
 
@@ -228,7 +228,53 @@ Screens
 - Maps
 - Communication
 - Users
+- Legal Documents
+- Privacy & Consents
 - System
+
+---
+
+# Legal & Compliance
+
+Screens
+
+- Legal Document Registry
+- Public Offer Editor
+- Privacy Policy Editor
+- Personal Data Consent Editor
+- Marketing Consent Editor
+- Version Preview
+- Publication Schedule
+- Acceptance Evidence Search
+- Data Subject Request Queue
+
+Workflow
+
+Draft
+
+↓
+
+Legal Review
+
+↓
+
+Approved
+
+↓
+
+Published
+
+↓
+
+Superseded
+
+Rules
+
+- Published versions are immutable.
+- Documents used by orders or consent records cannot be deleted.
+- Publishing requires an authorized legal or owner role.
+- All publication and evidence-access actions are audited.
+- Personal-data exports require least privilege and explicit reason capture.
 
 ---
 
@@ -282,5 +328,7 @@ UI-802 Design System
 UI-803 Component Library
 
 PB-305 Product Requirements
+
+CMP-1908 Russian Personal Data & Consumer Legal Requirements
 
 END OF DOCUMENT
