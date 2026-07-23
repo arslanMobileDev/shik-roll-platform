@@ -5,7 +5,7 @@ Document Name: PROJECT BIBLE
 
 Book: Foundation
 
-Version: 2.1.0
+Version: 2.2.0
 
 Status: APPROVED
 
@@ -470,7 +470,7 @@ GitHub Container Registry (GHCR)
 
 Authentication
 
-Firebase Authentication
+Firebase Authentication (Candidate; production use requires CMP-1908 compliance gate and a separate architecture decision)
 
 Notifications
 
