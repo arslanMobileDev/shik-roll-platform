@@ -5,7 +5,7 @@ Document Name: DATABASE OVERVIEW
 
 Book: Database
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -43,9 +43,9 @@ Cache
 Object Storage
 
 - Provider-neutral Object Storage Port
-- Google Cloud Storage (Production)
-- MinIO (Local / Development)
-- S3-compatible providers (Alternative)
+- Beget S3 through the S3-Compatible Adapter (Staging / Production)
+- MinIO through the S3-Compatible Adapter (Local / Development)
+- approved provider adapter (Alternative)
 
 ---
 
@@ -231,6 +231,8 @@ ARC-505 Domain Model
 ARC-508 Technology Stack
 
 ADR-1612 Object Storage Provider Model
+
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 PB-305 Product Requirements
 
