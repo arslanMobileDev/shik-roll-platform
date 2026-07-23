@@ -5,7 +5,7 @@ Document Name: ORDER API
 
 Book: API Specification
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -205,6 +205,10 @@ Request
 - comment
 - tip_amount
 - loyalty_points
+- accepted_offer_version
+- accepted_offer_hash
+
+The backend must validate the currently published offer and must not trust client-provided legal content.
 
 Response
 
@@ -505,5 +509,7 @@ API-708 Payment API
 ARC-504 Event-Driven Architecture
 
 PB-305 Product Requirements
+
+CMP-1908 Russian Personal Data & Consumer Legal Requirements
 
 END OF DOCUMENT
