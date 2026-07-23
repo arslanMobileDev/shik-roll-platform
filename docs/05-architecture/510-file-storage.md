@@ -5,7 +5,7 @@ Document Name: FILE STORAGE
 
 Book: Architecture
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -48,21 +48,20 @@ Object Storage Provider
 
 # Provider Model
 
-## Production in Google Cloud
+## Staging / Production
 
-- Google Cloud Storage
-- Dedicated GCS Adapter
+- Beget S3
+- S3-Compatible Adapter
 
 ## Local / Development
 
 - MinIO
 - S3-Compatible Adapter
 
-## Alternative S3-Compatible Providers
+## Alternative Providers
 
-- AWS S3
-- Cloudflare R2
-- DigitalOcean Spaces
+- Approved S3-compatible object storage through the S3-Compatible Adapter
+- Google Cloud Storage through a dedicated GCS Adapter only after a separate architecture decision
 
 Google Cloud Storage is not treated as an S3-compatible provider and must use a separate adapter.
 
@@ -193,6 +192,8 @@ ARC-507 Deployment Architecture
 ARC-508 Technology Stack
 
 ADR-1612 Object Storage Provider Model
+
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 ARC-511 Search Architecture
 
