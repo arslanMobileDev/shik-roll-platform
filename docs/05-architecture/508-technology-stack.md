@@ -5,7 +5,7 @@ Document Name: TECHNOLOGY STACK
 
 Book: Architecture
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -113,8 +113,8 @@ Application Contract
 
 Production
 
-- Google Cloud Storage
-- Dedicated GCS Adapter
+- Beget S3
+- S3-Compatible Adapter
 
 Local / Development
 
@@ -123,8 +123,9 @@ Local / Development
 
 Alternative Providers
 
-- S3-compatible object storage
-- S3 Adapter
+- Approved S3-compatible object storage
+- S3-Compatible Adapter
+- Google Cloud Storage through a dedicated GCS Adapter after a separate architecture decision
 
 Google Cloud Storage is not treated as an S3-compatible provider.
 
@@ -197,25 +198,34 @@ Architecture
 
 # Infrastructure
 
+Provider
+
+- Beget Cloud in a Russian region
+
 Containers
 
 - Docker
 
 Current Runtime
 
-- Google Cloud Run
+- Beget Cloud VPS
+- Ubuntu LTS
 
 Orchestration
 
-- Managed by Google Cloud Run
+- Docker Compose
 
 Reverse Proxy
 
-- Nginx (when required)
+- Nginx
+
+Managed Database
+
+- Beget PostgreSQL DBaaS
 
 Environment
 
-- Docker Compose (Development)
+- Docker Compose (Development, Staging and Production)
 
 ---
 
@@ -229,9 +239,14 @@ Automation
 
 - GitHub Actions
 
+Container Registry
+
+- GitHub Container Registry (GHCR)
+
 Deployment
 
-- Google Cloud Run
+- Beget Cloud VPS
+- Docker Compose
 
 ---
 
@@ -303,7 +318,7 @@ Commit Convention
 
 # Future Technologies
 
-- Kubernetes
+- Beget Managed Kubernetes
 - Kafka
 - Elasticsearch
 - AI Recommendation Engine
@@ -318,7 +333,7 @@ ARC-503 Microservices Strategy
 
 ARC-507 Deployment Architecture
 
-ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 ADR-1612 Object Storage Provider Model
 
