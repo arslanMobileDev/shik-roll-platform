@@ -5,7 +5,7 @@ Document Name: CUSTOMER API
 
 Book: API Specification
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -237,7 +237,6 @@ JWT
 Request
 
 - language
-- marketing_enabled
 - favorite_branch_id
 
 ---
@@ -271,7 +270,6 @@ Request
 - sms_enabled
 - whatsapp_enabled
 - telegram_enabled
-- marketing_enabled
 
 ---
 
@@ -299,6 +297,81 @@ JWT
 
 ---
 
+## GET /customers/me/consents
+
+Purpose
+
+Получить действующие согласия и историю их изменений.
+
+Authentication
+
+JWT
+
+---
+
+## POST /customers/me/consents
+
+Purpose
+
+Зафиксировать отдельное согласие.
+
+Authentication
+
+JWT
+
+Request
+
+- purpose
+- legal_document_version
+- legal_document_hash
+- granted
+- source
+
+Rules
+
+- personal_data and marketing purposes are separate records;
+- marketing consent defaults to false;
+- the server validates the published legal-document version.
+
+---
+
+## POST /customers/me/consents/{purpose}/withdraw
+
+Purpose
+
+Отозвать согласие, если его отзыв допускается применимым основанием обработки.
+
+Authentication
+
+JWT
+
+---
+
+## POST /customers/me/data-requests
+
+Purpose
+
+Создать запрос субъекта персональных данных.
+
+Authentication
+
+JWT
+
+Request
+
+- request_type
+- comment
+
+Supported Types
+
+- Access
+- Correction
+- Export
+- Deletion
+- Consent Withdrawal
+
+---
+
 # Error Codes
 
 - CUSTOMER_NOT_FOUND
@@ -307,6 +380,9 @@ JWT
 - DEVICE_NOT_FOUND
 - VALIDATION_ERROR
 - ACCESS_DENIED
+- CONSENT_VERSION_INVALID
+- CONSENT_REQUIRED
+- DATA_REQUEST_ALREADY_OPEN
 
 ---
 
@@ -327,5 +403,7 @@ API-703 Authentication API
 DB-605 Customer Schema
 
 PB-305 Product Requirements
+
+CMP-1908 Russian Personal Data & Consumer Legal Requirements
 
 END OF DOCUMENT
