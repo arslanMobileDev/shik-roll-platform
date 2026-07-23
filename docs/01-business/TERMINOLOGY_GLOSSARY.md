@@ -5,7 +5,7 @@ Document Name: TERMINOLOGY GLOSSARY
 
 Book: Business
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -118,17 +118,21 @@ RabbitMQ Event Bus и BullMQ Background Job Queue не являются взаи
 
 # Deployment
 
-## Google Cloud Run
+## Beget Cloud VPS
 
-Каноническое полное имя production runtime для MVP и early production.
+Каноническое имя production runtime для MVP и early production.
 
-После первого полного упоминания в одном разделе допускается Cloud Run.
+Приложения развертываются в Docker-контейнерах через Docker Compose и публикуются через Nginx.
 
-## Kubernetes
+## GitHub Container Registry
 
-Future evolution option по критериям ADR-1611.
+Каноническое имя реестра production-образов. После первого полного упоминания допускается GHCR.
 
-Kubernetes не должен называться текущим production runtime без нового принятого ADR.
+## Beget Managed Kubernetes
+
+Future evolution option по критериям ADR-1613.
+
+Beget Managed Kubernetes не должен называться текущим production runtime без нового принятого ADR.
 
 ---
 
@@ -138,11 +142,13 @@ Kubernetes не должен называться текущим production runt
 
 Каноническое имя внутреннего provider-neutral контракта приложения.
 
+## Beget S3
+
+Production provider для staging и production через S3-Compatible Adapter.
+
 ## Google Cloud Storage
 
-Production provider в Google Cloud.
-
-После первого полного упоминания допускается GCS.
+Не является текущим production provider. Допускается только как отдельный будущий GCS Adapter после архитектурного решения.
 
 ## S3-Compatible Adapter
 
