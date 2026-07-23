@@ -5,7 +5,7 @@ Document Name: BACKEND OVERVIEW
 
 Book: Backend Specification
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -81,7 +81,7 @@ Runtime
 - PostgreSQL
 - Redis
 - RabbitMQ
-- Google Cloud Storage (Production)
+- Beget S3 (Staging / Production)
 - MinIO (Local / Development)
 - Elasticsearch (Future)
 
@@ -121,7 +121,7 @@ Asynchronous
 
 - PostgreSQL
 - Provider-neutral Object Storage Port
-- GCS Adapter (Production)
+- S3-Compatible Adapter with Beget S3 (Staging / Production)
 - S3-Compatible Adapter with MinIO (Local / Development)
 - Cache
 
@@ -158,6 +158,8 @@ Asynchronous
 ARC-508 Technology Stack
 
 ADR-1612 Object Storage Provider Model
+
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 DB-601 Database Overview
 
