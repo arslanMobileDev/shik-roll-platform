@@ -5,7 +5,7 @@ Document Name: ORDER SERVICE
 
 Book: Backend Specification
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -140,6 +140,9 @@ Tables
 - Все события публикуются через Event Bus.
 - После подтверждения заказа изменение состава запрещено, если это не разрешено бизнес-правилами.
 - Заказ является источником данных для Analytics.
+- Перед созданием заказа сервер проверяет действующую версию публичной оферты.
+- Заказ сохраняет неизменяемые version, content hash и timestamp принятой оферты.
+- Клиентские данные оферты не считаются доверенным источником.
 
 ---
 
@@ -211,5 +214,7 @@ BE-906 Menu & Product Service
 BE-908 Payment Service
 
 ARC-504 Event-Driven Architecture
+
+CMP-1908 Russian Personal Data & Consumer Legal Requirements
 
 END OF DOCUMENT
