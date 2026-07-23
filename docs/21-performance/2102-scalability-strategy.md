@@ -5,7 +5,7 @@ Document Name: SCALABILITY STRATEGY
 
 Book: Performance Engineering
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -91,7 +91,7 @@ Applicable To
 - PostgreSQL
 - Redis
 - RabbitMQ
-- Active Object Storage Provider (self-hosted providers only; GCS scaling is managed)
+- Active Object Storage Provider (Beget S3 scaling is provider-managed; self-hosted providers require capacity planning)
 
 Guidelines
 
@@ -206,9 +206,10 @@ Application Contract
 
 - Provider-neutral Object Storage Port
 
-Production in Google Cloud
+Staging / Production
 
-- Google Cloud Storage managed scaling
+- Beget S3 provider-managed scaling
+- Provider quota and throughput monitoring
 
 Approved Self-Hosted Deployment
 
@@ -324,6 +325,8 @@ Quarterly
 # Related Documents
 
 ADR-1612 Object Storage Provider Model
+
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 PERF-2101 Performance Engineering Overview
 
