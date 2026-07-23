@@ -5,7 +5,7 @@ Document Name: PRIVACY POLICY & DATA PROCESSING ARCHITECTURE
 
 Book: Compliance & Legal
 
-Version: 1.1.0
+Version: 1.2.0
 
 Status: APPROVED
 
@@ -141,6 +141,12 @@ Support
 - Consent History
 - Consent Withdrawal
 - Consent Versioning
+- Separate Personal Data Consent Document
+- Separate Optional Marketing Consent
+- Immutable Consent Evidence
+- Purpose, Version, Content Hash, Timestamp, Source, IP and User-Agent Evidence
+
+Personal-data consent must not be embedded into the public offer, registration terms or marketing consent.
 
 ---
 
@@ -161,6 +167,17 @@ Requirements
 - Audit Logging
 - Secure Delivery
 - Response Within Legal Deadlines
+
+---
+
+# Russian Data Localization
+
+Requirements
+
+- Primary collection, recording, systematization, accumulation, storage, clarification and extraction of Russian citizens' personal data use databases located in Russia.
+- Production PostgreSQL, Object Storage, logs and backups containing personal data remain in an approved Russian region.
+- Every external processor and integration is documented in the data-flow inventory.
+- Transfers outside the approved Russian contour require separate legal, privacy, security and architecture review.
 
 ---
 
@@ -291,6 +308,8 @@ Annually
 ADR-1612 Object Storage Provider Model
 
 ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
+
+CMP-1908 Russian Personal Data & Consumer Legal Requirements
 
 CMP-1901 Compliance Overview
 
