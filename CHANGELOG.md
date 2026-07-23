@@ -24,6 +24,9 @@ Classification: Internal
 
 ### Changed
 
+- Product, architecture, database, backend, compliance, performance, data-platform and business-continuity documents synchronized on Beget S3 for staging and production.
+- The S3-Compatible Adapter is the current production adapter; MinIO remains local and GCS remains an optional future adapter.
+- Recovery copies containing personal data are constrained to legally approved Russian regions unless separately reviewed.
 - Deployment documentation synchronized on Beget Cloud VPS, Docker Compose, Nginx, Beget PostgreSQL DBaaS and GitHub Container Registry.
 - Project foundation, terminology, platform overview, DevOps and technology lifecycle documents now reference ADR-1613 as the current infrastructure decision.
 - ADR-1611 superseded by ADR-1613 after the production infrastructure provider changed from Google Cloud to Beget Cloud.
