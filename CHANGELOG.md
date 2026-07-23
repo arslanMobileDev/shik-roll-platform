@@ -17,12 +17,16 @@ Classification: Internal
 
 ### Added
 
+- ADR-1613 selecting Beget Cloud VPS, Beget PostgreSQL DBaaS and Beget S3 for MVP and early production.
 - Product Book requirements for pre-launch catalog preparation through Back Office.
 - UJ-013 Prepare and Publish Catalog.
 - CAP-006 Product Catalog Management.
 
 ### Changed
 
+- ADR-1611 superseded by ADR-1613 after the production infrastructure provider changed from Google Cloud to Beget Cloud.
+- ADR-1612 updated to use Beget S3 for staging and production while preserving the provider-neutral Object Storage Port.
+- ADR-1600, DECISIONS.md, SUMMARY and GOV-2707 synchronized with the current infrastructure decision.
 - PB-301, PB-303, PB-304 and PB-305 updated to version 1.1.0.
 - Menu and product requirements now define Draft, Preview, Published and Hidden behavior.
 - MVP catalog management now includes image replacement, safe deletion, sorting, Stop List and manual Popular, New and Featured flags.
