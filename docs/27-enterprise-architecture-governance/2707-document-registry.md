@@ -5,7 +5,7 @@ Document Name: DOCUMENT REGISTRY
 
 Book: Enterprise Architecture Governance
 
-Version: 1.9.0
+Version: 1.10.0
 
 Status: APPROVED
 
@@ -114,7 +114,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | ARC-507 | DEPLOYMENT ARCHITECTURE | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/05-architecture/507-deployment-architecture.md` |
 | ARC-508 | TECHNOLOGY STACK | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/05-architecture/508-technology-stack.md` |
 | ARC-509 | CACHING STRATEGY | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/05-architecture/509-caching-strategy.md` |
-| ARC-510 | FILE STORAGE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/510-file-storage.md` |
+| ARC-510 | FILE STORAGE | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/05-architecture/510-file-storage.md` |
 | ARC-511 | SEARCH ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/511-search-architecture.md` |
 | ARC-512 | BACKGROUND JOBS | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/05-architecture/512-background-jobs.md` |
 | ARC-513 | COMMUNICATION ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/513-communication-architecture.md` |
@@ -123,11 +123,11 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | BCP-2001 | BUSINESS CONTINUITY OVERVIEW | Business Continuity & Disaster Recovery | APPROVED | 1.0.0 | July 2026 | `docs/20-business-continuity/2001-business-continuity-overview.md` |
 | BCP-2002 | BUSINESS IMPACT ANALYSIS (BIA) | Business Continuity & Disaster Recovery | APPROVED | 1.0.0 | July 2026 | `docs/20-business-continuity/2002-business-impact-analysis.md` |
 | BCP-2003 | DISASTER RECOVERY STRATEGY | Business Continuity & Disaster Recovery | APPROVED | 1.0.0 | July 2026 | `docs/20-business-continuity/2003-disaster-recovery-strategy.md` |
-| BCP-2004 | HIGH AVAILABILITY ARCHITECTURE | Business Continuity & Disaster Recovery | APPROVED | 1.0.0 | July 2026 | `docs/20-business-continuity/2004-high-availability-architecture.md` |
-| BCP-2005 | FAILOVER & RECOVERY PROCEDURES | Business Continuity & Disaster Recovery | APPROVED | 1.0.0 | July 2026 | `docs/20-business-continuity/2005-failover-recovery-procedures.md` |
+| BCP-2004 | HIGH AVAILABILITY ARCHITECTURE | Business Continuity & Disaster Recovery | APPROVED | 1.1.0 | July 2026 | `docs/20-business-continuity/2004-high-availability-architecture.md` |
+| BCP-2005 | FAILOVER & RECOVERY PROCEDURES | Business Continuity & Disaster Recovery | APPROVED | 1.1.0 | July 2026 | `docs/20-business-continuity/2005-failover-recovery-procedures.md` |
 | BCP-2006 | EMERGENCY OPERATIONS & CRISIS MANAGEMENT | Business Continuity & Disaster Recovery | APPROVED | 1.0.0 | July 2026 | `docs/20-business-continuity/2006-emergency-operations-crisis-management.md` |
-| BCP-2007 | REGIONAL OUTAGE & MULTI-REGION RECOVERY STRATEGY | Business Continuity & Disaster Recovery | APPROVED | 1.0.0 | July 2026 | `docs/20-business-continuity/2007-regional-outage-multi-region-recovery-strategy.md` |
-| BE-901 | BACKEND OVERVIEW | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/901-backend-overview.md` |
+| BCP-2007 | REGIONAL OUTAGE & MULTI-REGION RECOVERY STRATEGY | Business Continuity & Disaster Recovery | APPROVED | 1.1.0 | July 2026 | `docs/20-business-continuity/2007-regional-outage-multi-region-recovery-strategy.md` |
+| BE-901 | BACKEND OVERVIEW | Backend Specification | APPROVED | 1.1.0 | July 2026 | `docs/09-backend/901-backend-overview.md` |
 | BE-902 | BACKEND CODING STANDARDS | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/902-backend-coding-standards.md` |
 | BE-903 | AUTHENTICATION SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/903-authentication-service.md` |
 | BE-904 | CUSTOMER SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/904-customer-service.md` |
@@ -146,16 +146,16 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | CMP-1902 | GDPR COMPLIANCE SPECIFICATION | Compliance & Legal | APPROVED | 1.0.0 | July 2026 | `docs/19-compliance/1902-gdpr-compliance-specification.md` |
 | CMP-1903 | PCI DSS COMPLIANCE SPECIFICATION | Compliance & Legal | APPROVED | 1.0.0 | July 2026 | `docs/19-compliance/1903-pci-dss-compliance-specification.md` |
 | CMP-1904 | DATA RETENTION & DATA LIFECYCLE POLICY | Compliance & Legal | APPROVED | 1.0.0 | July 2026 | `docs/19-compliance/1904-data-retention-data-lifecycle-policy.md` |
-| CMP-1905 | PRIVACY POLICY & DATA PROCESSING ARCHITECTURE | Compliance & Legal | APPROVED | 1.0.0 | July 2026 | `docs/19-compliance/1905-privacy-policy-data-processing-architecture.md` |
+| CMP-1905 | PRIVACY POLICY & DATA PROCESSING ARCHITECTURE | Compliance & Legal | APPROVED | 1.1.0 | July 2026 | `docs/19-compliance/1905-privacy-policy-data-processing-architecture.md` |
 | CMP-1906 | AUDIT & COMPLIANCE CONTROLS | Compliance & Legal | APPROVED | 1.0.0 | July 2026 | `docs/19-compliance/1906-audit-compliance-controls.md` |
 | CMP-1907 | LEGAL REQUIREMENTS & REGULATORY COMPLIANCE | Compliance & Legal | APPROVED | 1.0.0 | July 2026 | `docs/19-compliance/1907-legal-requirements-regulatory-compliance.md` |
-| DATA-2301 | ENTERPRISE DATA PLATFORM OVERVIEW | Enterprise Data Platform | APPROVED | 1.0.0 | July 2026 | `docs/23-enterprise-data-platform/2301-enterprise-data-platform-overview.md` |
+| DATA-2301 | ENTERPRISE DATA PLATFORM OVERVIEW | Enterprise Data Platform | APPROVED | 1.1.0 | July 2026 | `docs/23-enterprise-data-platform/2301-enterprise-data-platform-overview.md` |
 | DATA-2302 | BUSINESS INTELLIGENCE ARCHITECTURE | Enterprise Data Platform | APPROVED | 1.0.0 | July 2026 | `docs/23-enterprise-data-platform/2302-business-intelligence-architecture.md` |
 | DATA-2303 | DATA WAREHOUSE ARCHITECTURE | Enterprise Data Platform | APPROVED | 1.0.0 | July 2026 | `docs/23-enterprise-data-platform/2303-data-warehouse-architecture.md` |
 | DATA-2304 | EVENT ANALYTICS & REAL-TIME PROCESSING | Enterprise Data Platform | APPROVED | 1.0.0 | July 2026 | `docs/23-enterprise-data-platform/2304-event-analytics-real-time-processing.md` |
 | DATA-2305 | MACHINE LEARNING DATA PIPELINE | Enterprise Data Platform | APPROVED | 1.0.0 | July 2026 | `docs/23-enterprise-data-platform/2305-machine-learning-data-pipeline.md` |
 | DATA-2306 | REPORTING & DECISION SUPPORT STRATEGY | Enterprise Data Platform | APPROVED | 1.0.0 | July 2026 | `docs/23-enterprise-data-platform/2306-reporting-decision-support-strategy.md` |
-| DB-601 | DATABASE OVERVIEW | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/601-database-overview.md` |
+| DB-601 | DATABASE OVERVIEW | Database | APPROVED | 1.1.0 | July 2026 | `docs/06-database/601-database-overview.md` |
 | DB-602 | DATABASE STANDARDS | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/602-database-standards.md` |
 | DB-603 | ENTITY RELATIONSHIP MODEL | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/603-entity-relationship-model.md` |
 | DB-604 | IDENTITY SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/604-identity-schema.md` |
@@ -191,7 +191,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | GOV-2704 | TECHNOLOGY LIFECYCLE MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.1.0 | July 2026 | `docs/27-enterprise-architecture-governance/2704-technology-lifecycle-management.md` |
 | GOV-2705 | TECHNICAL DEBT MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2705-technical-debt-management.md` |
 | GOV-2706 | ENTERPRISE ARCHITECTURE ROADMAP | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2706-enterprise-architecture-roadmap.md` |
-| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.9.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
+| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.10.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
 | INT-1001 | INTEGRATION OVERVIEW | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1001-integration-overview.md` |
 | INT-1002 | PAYMENT GATEWAY INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1002-payment-gateway-integrations.md` |
 | INT-1003 | MAPS & GEOLOCATION INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1003-maps-geolocation-integrations.md` |
@@ -235,7 +235,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | PB-108 | BUSINESS RULES | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/BUSINESS_RULES.md` |
 | PB-109 | TERMINOLOGY GLOSSARY | Business | APPROVED | 1.1.0 | July 2026 | `docs/01-business/TERMINOLOGY_GLOSSARY.md` |
 | PB-300 | PRODUCT PRINCIPLES | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/PRODUCT_PRINCIPLES.md` |
-| PB-301 | PRODUCT OVERVIEW | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/PRODUCT_OVERVIEW.md` |
+| PB-301 | PRODUCT OVERVIEW | Product | APPROVED | 1.2.0 | July 2026 | `docs/03-product/PRODUCT_OVERVIEW.md` |
 | PB-302 | USER PERSONAS | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/USER_PERSONAS.md` |
 | PB-303 | USER JOURNEYS | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/USER_JOURNEYS.md` |
 | PB-304 | BUSINESS CAPABILITIES | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/BUSINESS_CAPABILITIES.md` |
@@ -243,7 +243,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | PB-306 | COMMUNICATION AUTOMATION CENTER | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/306-communication-automation-center.md` |
 | PB-401 | PLATFORM OVERVIEW | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/07-architecture/SYSTEM_OVERVIEW.md` |
 | PERF-2101 | PERFORMANCE ENGINEERING OVERVIEW | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2101-performance-engineering-overview.md` |
-| PERF-2102 | SCALABILITY STRATEGY | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2102-scalability-strategy.md` |
+| PERF-2102 | SCALABILITY STRATEGY | Performance Engineering | APPROVED | 1.1.0 | July 2026 | `docs/21-performance/2102-scalability-strategy.md` |
 | PERF-2103 | CAPACITY PLANNING | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2103-capacity-planning.md` |
 | PERF-2104 | DATABASE PERFORMANCE OPTIMIZATION | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2104-database-performance-optimization.md` |
 | PERF-2105 | CACHING STRATEGY | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2105-caching-strategy.md` |
