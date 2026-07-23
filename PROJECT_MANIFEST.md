@@ -3,7 +3,7 @@ Document ID: PB-001
 
 Document Name: PROJECT MANIFEST
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -131,9 +131,9 @@ Quick Resto, iiko, Poster, r_keeper, Stripe и другие рассматрив
 
 ## EP-009 Cloud-Native
 
-Основной облачной платформой является Google Cloud Platform.
+Текущей production-платформой является Beget Cloud в российском регионе.
 
-Архитектура должна быть готова к горизонтальному масштабированию.
+Архитектура сохраняет provider-neutral границы, контейнерную переносимость и готовность к горизонтальному масштабированию.
 
 ---
 
@@ -261,7 +261,11 @@ RabbitMQ
 
 Cloud
 
-Google Cloud
+Beget Cloud
+
+Runtime
+
+Beget Cloud VPS with Docker Compose
 
 Authentication
 
@@ -273,7 +277,7 @@ Firebase Cloud Messaging
 
 Storage
 
-Google Cloud Storage
+Beget S3 through the S3-Compatible Adapter
 
 Back Office / Owner Dashboard
 
