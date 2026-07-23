@@ -5,7 +5,7 @@ Document Name: ADR — OBJECT STORAGE PROVIDER MODEL
 
 Book: Enterprise Architecture Decision Records
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: ACCEPTED
 
@@ -36,7 +36,7 @@ SHIK Platform stores product images, brand assets, documents, imports and genera
 
 The documentation currently names Google Cloud Storage, MinIO and S3-compatible object storage without defining whether they are competing standards, environment-specific providers or interchangeable implementations.
 
-The application must support the current Google Cloud deployment while preserving local development, self-hosted and alternative cloud deployment options.
+The application must support the current Beget Cloud deployment while preserving local development, self-hosted and alternative cloud deployment options.
 
 ---
 
@@ -58,9 +58,10 @@ Provider SDKs are isolated behind adapters.
 
 Provider allocation:
 
-- Google Cloud Storage with a dedicated GCS Adapter for production in Google Cloud;
+- Beget S3 through the S3-Compatible Adapter for staging and production;
 - MinIO through the S3-Compatible Adapter for local and development environments;
-- S3-compatible providers through the S3 Adapter for alternative cloud or self-hosted deployments.
+- other approved S3-compatible providers through the S3-Compatible Adapter for alternative cloud or self-hosted deployments;
+- Google Cloud Storage through a dedicated GCS Adapter only if a future architecture decision selects Google Cloud for a specific deployment.
 
 Google Cloud Storage is not treated as an S3-compatible provider.
 
@@ -84,19 +85,20 @@ Business and domain logic must not import provider SDKs.
 
 # Provider Adapters
 
-## GCS Adapter
-
-- Google Cloud Storage
-- Production in Google Cloud
-- GCS authentication and signed access semantics
-
 ## S3-Compatible Adapter
 
+- Beget S3
 - MinIO
 - AWS S3
 - Cloudflare R2
 - DigitalOcean Spaces
-- Alternative cloud and self-hosted deployments
+- Current production, alternative cloud and self-hosted deployments
+
+## GCS Adapter
+
+- Google Cloud Storage
+- Optional future Google Cloud deployments
+- GCS authentication and signed access semantics
 
 ---
 
@@ -113,11 +115,11 @@ Development
 
 Staging
 
-- Same provider class as the target production environment
+- Beget S3
 
-Production in Google Cloud
+Production
 
-- Google Cloud Storage
+- Beget S3
 
 Self-Hosted / Alternative Cloud
 
@@ -148,7 +150,7 @@ The suite must validate:
 
 - Business logic remains provider-independent.
 - Local development does not require access to production cloud storage.
-- Google Cloud production remains supported.
+- Beget S3 production is supported through the shared S3-compatible contract.
 - Self-hosted and alternative cloud deployment remain possible.
 - Provider migration is isolated to adapter and operational concerns.
 
@@ -208,6 +210,6 @@ BE-901 Backend Overview
 
 DEV-1201 DevOps Overview
 
-ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 END OF DOCUMENT
