@@ -5,7 +5,7 @@ Document Name: CUSTOMER SERVICE
 
 Book: Backend Specification
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -36,6 +36,9 @@ Classification: Internal
 - Devices
 - Preferences
 - Notification Settings
+- Consent Management
+- Legal Acceptance Evidence
+- Data Subject Requests
 - Loyalty Account
 
 ---
@@ -49,6 +52,9 @@ Classification: Internal
 - Manage Preferences
 - Manage Devices
 - Manage Notification Settings
+- Manage Separate Consents
+- Submit Data Subject Requests
+- Get Legal Acceptance History
 - Get Loyalty Information
 
 ---
@@ -73,6 +79,10 @@ Tables
 - customer_preferences
 - customer_favorites
 - customer_notification_settings
+- legal_documents
+- customer_consents
+- customer_legal_acceptances
+- data_subject_requests
 - customer_loyalty_accounts
 
 ---
@@ -87,6 +97,9 @@ Tables
 - FavoriteAdded
 - FavoriteRemoved
 - NotificationSettingsUpdated
+- ConsentGranted
+- ConsentWithdrawn
+- DataSubjectRequestCreated
 
 ---
 
@@ -106,6 +119,9 @@ Tables
 - Избранное хранится отдельно для каждого клиента.
 - Настройки уведомлений применяются перед отправкой сообщений.
 - Все изменения профиля журналируются.
+- Consent evidence is versioned and immutable.
+- Marketing consent is separate from channel preferences and disabled by default.
+- Data-subject requests require identity verification and an audit trail.
 
 ---
 
@@ -116,6 +132,8 @@ Tables
 - Audit Logging
 - Soft Delete
 - Input Validation
+- Personal Data Localization
+- Consent Evidence Integrity
 
 ---
 
@@ -135,6 +153,8 @@ Tables
 - FAVORITE_NOT_FOUND
 - VALIDATION_ERROR
 - ACCESS_DENIED
+- CONSENT_VERSION_INVALID
+- DATA_REQUEST_ALREADY_OPEN
 
 ---
 
@@ -153,5 +173,7 @@ API-704 Customer API
 DB-605 Customer Schema
 
 BE-903 Authentication Service
+
+CMP-1908 Russian Personal Data & Consumer Legal Requirements
 
 END OF DOCUMENT
