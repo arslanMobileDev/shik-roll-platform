@@ -5,7 +5,7 @@ Document Name: PRIVACY POLICY & DATA PROCESSING ARCHITECTURE
 
 Book: Compliance & Legal
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -72,8 +72,8 @@ Storage
 
 - PostgreSQL
 - Provider-neutral Object Storage Port
-- Google Cloud Storage (Production in Google Cloud)
-- MinIO through the S3-Compatible Adapter (Local / Development or approved self-hosted deployment)
+- Beget S3 through the S3-Compatible Adapter (Staging / Production in a Russian region)
+- MinIO through the S3-Compatible Adapter (Local / Development)
 - Audit Storage
 - Backup Storage
 
@@ -289,6 +289,8 @@ Annually
 # Related Documents
 
 ADR-1612 Object Storage Provider Model
+
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 CMP-1901 Compliance Overview
 
