@@ -5,7 +5,7 @@ Document Name: COMPLIANCE OVERVIEW
 
 Book: Compliance & Legal
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -75,6 +75,9 @@ Technology
 
 Current
 
+- Federal Law No. 152-FZ Personal Data Requirements
+- Russian Consumer Protection and Distance-Selling Requirements
+- Public Offer and Consent Governance
 - GDPR Ready
 - PCI DSS Ready
 - OWASP ASVS
@@ -149,6 +152,10 @@ Required Policies
 
 - Security Policy
 - Privacy Policy
+- Personal Data Processing Policy
+- Separate Personal Data Consent
+- Separate Optional Marketing Consent
+- Public Offer
 - Password Policy
 - Access Control Policy
 - Backup Policy
@@ -215,5 +222,7 @@ SEC-1101 Security Overview
 OPS-1507 Service Desk & SLA Management
 
 PM-1805 Project Governance & Delivery Metrics
+
+CMP-1908 Russian Personal Data & Consumer Legal Requirements
 
 END OF DOCUMENT
