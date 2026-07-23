@@ -5,7 +5,7 @@ Document Name: DOCUMENT REGISTRY
 
 Book: Enterprise Architecture Governance
 
-Version: 1.10.0
+Version: 1.11.0
 
 Status: APPROVED
 
@@ -93,10 +93,10 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | API-701 | API OVERVIEW | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/701-api-overview.md` |
 | API-702 | API STANDARDS | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/702-api-standards.md` |
 | API-703 | AUTHENTICATION API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/703-authentication-api.md` |
-| API-704 | CUSTOMER API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/704-customer-api.md` |
+| API-704 | CUSTOMER API | API Specification | APPROVED | 1.1.0 | July 2026 | `docs/07-api/704-customer-api.md` |
 | API-705 | RESTAURANT & BRANCH API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/705-restaurant-branch-api.md` |
 | API-706 | MENU & PRODUCT API | API Specification | APPROVED | 1.2.0 | July 2026 | `docs/07-api/706-menu-product-api.md` |
-| API-707 | ORDER API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/707-order-api.md` |
+| API-707 | ORDER API | API Specification | APPROVED | 1.1.0 | July 2026 | `docs/07-api/707-order-api.md` |
 | API-708 | PAYMENT API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/708-payment-api.md` |
 | API-709 | KITCHEN API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/709-kitchen-api.md` |
 | API-710 | DELIVERY API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/710-delivery-api.md` |
@@ -130,10 +130,10 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | BE-901 | BACKEND OVERVIEW | Backend Specification | APPROVED | 1.1.0 | July 2026 | `docs/09-backend/901-backend-overview.md` |
 | BE-902 | BACKEND CODING STANDARDS | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/902-backend-coding-standards.md` |
 | BE-903 | AUTHENTICATION SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/903-authentication-service.md` |
-| BE-904 | CUSTOMER SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/904-customer-service.md` |
+| BE-904 | CUSTOMER SERVICE | Backend Specification | APPROVED | 1.1.0 | July 2026 | `docs/09-backend/904-customer-service.md` |
 | BE-905 | RESTAURANT & BRANCH SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/905-restaurant-branch-service.md` |
 | BE-906 | MENU & PRODUCT SERVICE | Backend Specification | APPROVED | 1.2.0 | July 2026 | `docs/09-backend/906-menu-product-service.md` |
-| BE-907 | ORDER SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/907-order-service.md` |
+| BE-907 | ORDER SERVICE | Backend Specification | APPROVED | 1.1.0 | July 2026 | `docs/09-backend/907-order-service.md` |
 | BE-908 | PAYMENT SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/908-payment-service.md` |
 | BE-909 | KITCHEN SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/909-kitchen-service.md` |
 | BE-910 | DELIVERY SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/910-delivery-service.md` |
@@ -142,13 +142,14 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | BE-913 | LOYALTY & PROMOTIONS SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/913-loyalty-promotions-service.md` |
 | BE-914 | COMMUNICATION SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/914-communication-service.md` |
 | BE-915 | ANALYTICS SERVICE | Backend Specification | APPROVED | 1.0.0 | July 2026 | `docs/09-backend/915-analytics-service.md` |
-| CMP-1901 | COMPLIANCE OVERVIEW | Compliance & Legal | APPROVED | 1.0.0 | July 2026 | `docs/19-compliance/1901-compliance-overview.md` |
+| CMP-1901 | COMPLIANCE OVERVIEW | Compliance & Legal | APPROVED | 1.1.0 | July 2026 | `docs/19-compliance/1901-compliance-overview.md` |
 | CMP-1902 | GDPR COMPLIANCE SPECIFICATION | Compliance & Legal | APPROVED | 1.0.0 | July 2026 | `docs/19-compliance/1902-gdpr-compliance-specification.md` |
 | CMP-1903 | PCI DSS COMPLIANCE SPECIFICATION | Compliance & Legal | APPROVED | 1.0.0 | July 2026 | `docs/19-compliance/1903-pci-dss-compliance-specification.md` |
 | CMP-1904 | DATA RETENTION & DATA LIFECYCLE POLICY | Compliance & Legal | APPROVED | 1.0.0 | July 2026 | `docs/19-compliance/1904-data-retention-data-lifecycle-policy.md` |
-| CMP-1905 | PRIVACY POLICY & DATA PROCESSING ARCHITECTURE | Compliance & Legal | APPROVED | 1.1.0 | July 2026 | `docs/19-compliance/1905-privacy-policy-data-processing-architecture.md` |
+| CMP-1905 | PRIVACY POLICY & DATA PROCESSING ARCHITECTURE | Compliance & Legal | APPROVED | 1.2.0 | July 2026 | `docs/19-compliance/1905-privacy-policy-data-processing-architecture.md` |
 | CMP-1906 | AUDIT & COMPLIANCE CONTROLS | Compliance & Legal | APPROVED | 1.0.0 | July 2026 | `docs/19-compliance/1906-audit-compliance-controls.md` |
-| CMP-1907 | LEGAL REQUIREMENTS & REGULATORY COMPLIANCE | Compliance & Legal | APPROVED | 1.0.0 | July 2026 | `docs/19-compliance/1907-legal-requirements-regulatory-compliance.md` |
+| CMP-1907 | LEGAL REQUIREMENTS & REGULATORY COMPLIANCE | Compliance & Legal | APPROVED | 1.1.0 | July 2026 | `docs/19-compliance/1907-legal-requirements-regulatory-compliance.md` |
+| CMP-1908 | RUSSIAN PERSONAL DATA & CONSUMER LEGAL REQUIREMENTS | Compliance & Legal | APPROVED | 1.0.0 | July 2026 | `docs/19-compliance/1908-russian-personal-data-consumer-legal-requirements.md` |
 | DATA-2301 | ENTERPRISE DATA PLATFORM OVERVIEW | Enterprise Data Platform | APPROVED | 1.1.0 | July 2026 | `docs/23-enterprise-data-platform/2301-enterprise-data-platform-overview.md` |
 | DATA-2302 | BUSINESS INTELLIGENCE ARCHITECTURE | Enterprise Data Platform | APPROVED | 1.0.0 | July 2026 | `docs/23-enterprise-data-platform/2302-business-intelligence-architecture.md` |
 | DATA-2303 | DATA WAREHOUSE ARCHITECTURE | Enterprise Data Platform | APPROVED | 1.0.0 | July 2026 | `docs/23-enterprise-data-platform/2303-data-warehouse-architecture.md` |
@@ -159,10 +160,10 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | DB-602 | DATABASE STANDARDS | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/602-database-standards.md` |
 | DB-603 | ENTITY RELATIONSHIP MODEL | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/603-entity-relationship-model.md` |
 | DB-604 | IDENTITY SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/604-identity-schema.md` |
-| DB-605 | CUSTOMER SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/605-customer-schema.md` |
+| DB-605 | CUSTOMER SCHEMA | Database | APPROVED | 1.1.0 | July 2026 | `docs/06-database/605-customer-schema.md` |
 | DB-606 | RESTAURANT & BRANCH SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/606-restaurant-branch-schema.md` |
 | DB-607 | MENU & PRODUCT SCHEMA | Database | APPROVED | 1.2.0 | July 2026 | `docs/06-database/607-menu-product-schema.md` |
-| DB-608 | ORDER SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/608-order-schema.md` |
+| DB-608 | ORDER SCHEMA | Database | APPROVED | 1.1.0 | July 2026 | `docs/06-database/608-order-schema.md` |
 | DB-609 | PAYMENT SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/609-payment-schema.md` |
 | DB-610 | KITCHEN & PRODUCTION SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/610-kitchen-production-schema.md` |
 | DB-611 | INVENTORY & WAREHOUSE SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/611-inventory-warehouse-schema.md` |
@@ -191,7 +192,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | GOV-2704 | TECHNOLOGY LIFECYCLE MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.1.0 | July 2026 | `docs/27-enterprise-architecture-governance/2704-technology-lifecycle-management.md` |
 | GOV-2705 | TECHNICAL DEBT MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2705-technical-debt-management.md` |
 | GOV-2706 | ENTERPRISE ARCHITECTURE ROADMAP | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2706-enterprise-architecture-roadmap.md` |
-| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.10.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
+| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.11.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
 | INT-1001 | INTEGRATION OVERVIEW | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1001-integration-overview.md` |
 | INT-1002 | PAYMENT GATEWAY INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1002-payment-gateway-integrations.md` |
 | INT-1003 | MAPS & GEOLOCATION INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1003-maps-geolocation-integrations.md` |
@@ -223,8 +224,8 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | OPS-2604 | OPERATIONAL READINESS | Enterprise Operations | APPROVED | 1.0.0 | July 2026 | `docs/26-enterprise-operations/2604-operational-readiness.md` |
 | OPS-2605 | CAPACITY & COST OPTIMIZATION | Enterprise Operations | APPROVED | 1.0.0 | July 2026 | `docs/26-enterprise-operations/2605-capacity-cost-optimization.md` |
 | OPS-2606 | OPERATIONAL EXCELLENCE FRAMEWORK | Enterprise Operations | APPROVED | 1.0.0 | July 2026 | `docs/26-enterprise-operations/2606-operational-excellence-framework.md` |
-| PB-001 | PROJECT MANIFEST | — | APPROVED | 1.1.0 | July 2026 | `PROJECT_MANIFEST.md` |
-| PB-002 | PROJECT BIBLE | Foundation | APPROVED | 2.1.0 | July 2026 | `PROJECT_BIBLE.md` |
+| PB-001 | PROJECT MANIFEST | — | APPROVED | 1.2.0 | July 2026 | `PROJECT_MANIFEST.md` |
+| PB-002 | PROJECT BIBLE | Foundation | APPROVED | 2.2.0 | July 2026 | `PROJECT_BIBLE.md` |
 | PB-101 | BUSINESS VISION | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/BUSINESS_VISION.md` |
 | PB-102 | PRODUCT VISION | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/PRODUCT_VISION.md` |
 | PB-103 | MISSION | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/MISSION.md` |
@@ -239,7 +240,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | PB-302 | USER PERSONAS | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/USER_PERSONAS.md` |
 | PB-303 | USER JOURNEYS | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/USER_JOURNEYS.md` |
 | PB-304 | BUSINESS CAPABILITIES | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/BUSINESS_CAPABILITIES.md` |
-| PB-305 | PRODUCT REQUIREMENTS | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/PRODUCT_REQUIREMENTS.md` |
+| PB-305 | PRODUCT REQUIREMENTS | Product | APPROVED | 1.2.0 | July 2026 | `docs/03-product/PRODUCT_REQUIREMENTS.md` |
 | PB-306 | COMMUNICATION AUTOMATION CENTER | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/306-communication-automation-center.md` |
 | PB-401 | PLATFORM OVERVIEW | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/07-architecture/SYSTEM_OVERVIEW.md` |
 | PERF-2101 | PERFORMANCE ENGINEERING OVERVIEW | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2101-performance-engineering-overview.md` |
@@ -280,8 +281,8 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | UI-801 | FRONTEND OVERVIEW | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/801-frontend-overview.md` |
 | UI-802 | DESIGN SYSTEM | Frontend Specification | APPROVED | 1.1.0 | July 2026 | `docs/08-frontend/802-design-system.md` |
 | UI-803 | COMPONENT LIBRARY | Frontend Specification | APPROVED | 1.1.0 | July 2026 | `docs/08-frontend/803-component-library.md` |
-| UI-804 | CUSTOMER MOBILE APP UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/804-customer-mobile-app-ux.md` |
-| UI-805 | BACK OFFICE UX | Frontend Specification | APPROVED | 1.1.0 | July 2026 | `docs/08-frontend/805-back-office-ux.md` |
+| UI-804 | CUSTOMER MOBILE APP UX | Frontend Specification | APPROVED | 1.1.0 | July 2026 | `docs/08-frontend/804-customer-mobile-app-ux.md` |
+| UI-805 | BACK OFFICE UX | Frontend Specification | APPROVED | 1.2.0 | July 2026 | `docs/08-frontend/805-back-office-ux.md` |
 | UI-806 | POS UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/806-pos-ux.md` |
 | UI-807 | KITCHEN DISPLAY SYSTEM UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/807-kitchen-display-system-ux.md` |
 | UI-808 | COURIER MOBILE APP UX | Frontend Specification | APPROVED | 1.0.0 | July 2026 | `docs/08-frontend/808-courier-mobile-app-ux.md` |
