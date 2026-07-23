@@ -5,7 +5,7 @@ Document Name: DOCUMENT REGISTRY
 
 Book: Enterprise Architecture Governance
 
-Version: 1.8.0
+Version: 1.9.0
 
 Status: APPROVED
 
@@ -111,8 +111,8 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | ARC-504 | EVENT-DRIVEN ARCHITECTURE | Architecture | APPROVED | 1.2.0 | July 2026 | `docs/05-architecture/504-event-driven-architecture.md` |
 | ARC-505 | DOMAIN MODEL | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/505-domain-model.md` |
 | ARC-506 | MODULE INTERACTIONS | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/506-module-interactions.md` |
-| ARC-507 | DEPLOYMENT ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/507-deployment-architecture.md` |
-| ARC-508 | TECHNOLOGY STACK | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/508-technology-stack.md` |
+| ARC-507 | DEPLOYMENT ARCHITECTURE | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/05-architecture/507-deployment-architecture.md` |
+| ARC-508 | TECHNOLOGY STACK | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/05-architecture/508-technology-stack.md` |
 | ARC-509 | CACHING STRATEGY | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/05-architecture/509-caching-strategy.md` |
 | ARC-510 | FILE STORAGE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/510-file-storage.md` |
 | ARC-511 | SEARCH ARCHITECTURE | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/05-architecture/511-search-architecture.md` |
@@ -170,10 +170,10 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | DB-613 | LOYALTY & PROMOTIONS SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/613-loyalty-promotions-schema.md` |
 | DB-614 | COMMUNICATION SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/614-communication-schema.md` |
 | DB-615 | ANALYTICS & AUDIT SCHEMA | Database | APPROVED | 1.0.0 | July 2026 | `docs/06-database/615-analytics-audit-schema.md` |
-| DEV-1201 | DEVOPS OVERVIEW | DevOps & Infrastructure | APPROVED | 1.0.0 | July 2026 | `docs/12-devops/1201-devops-overview.md` |
+| DEV-1201 | DEVOPS OVERVIEW | DevOps & Infrastructure | APPROVED | 1.1.0 | July 2026 | `docs/12-devops/1201-devops-overview.md` |
 | DEV-1202 | REPOSITORY STRUCTURE | DevOps & Infrastructure | APPROVED | 1.0.0 | July 2026 | `docs/12-devops/1202-repository-structure.md` |
 | DEV-1203 | GIT WORKFLOW & BRANCHING STRATEGY | DevOps & Infrastructure | APPROVED | 1.0.0 | July 2026 | `docs/12-devops/1203-git-workflow-branching-strategy.md` |
-| DEV-1204 | CI/CD PIPELINE SPECIFICATION | DevOps & Infrastructure | APPROVED | 1.0.0 | July 2026 | `docs/12-devops/1204-cicd-pipeline-specification.md` |
+| DEV-1204 | CI/CD PIPELINE SPECIFICATION | DevOps & Infrastructure | APPROVED | 1.1.0 | July 2026 | `docs/12-devops/1204-cicd-pipeline-specification.md` |
 | DEV-1205 | DOCKER & CONTAINERIZATION | DevOps & Infrastructure | APPROVED | 1.0.0 | July 2026 | `docs/12-devops/1205-docker-containerization.md` |
 | DEV-1206 | ENVIRONMENT CONFIGURATION & SECRETS MANAGEMENT | DevOps & Infrastructure | APPROVED | 1.0.0 | July 2026 | `docs/12-devops/1206-environment-configuration-secrets-management.md` |
 | DEV-1207 | MONITORING, LOGGING & OBSERVABILITY | DevOps & Infrastructure | APPROVED | 1.0.0 | July 2026 | `docs/12-devops/1207-monitoring-logging-observability.md` |
@@ -188,10 +188,10 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | GOV-2701 | ENTERPRISE ARCHITECTURE GOVERNANCE OVERVIEW | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2701-enterprise-architecture-governance-overview.md` |
 | GOV-2702 | ARCHITECTURE REVIEW BOARD (ARB) | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2702-architecture-review-board.md` |
 | GOV-2703 | ARCHITECTURE DECISION RECORDS (ADR) GOVERNANCE | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2703-architecture-decision-records-governance.md` |
-| GOV-2704 | TECHNOLOGY LIFECYCLE MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2704-technology-lifecycle-management.md` |
+| GOV-2704 | TECHNOLOGY LIFECYCLE MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.1.0 | July 2026 | `docs/27-enterprise-architecture-governance/2704-technology-lifecycle-management.md` |
 | GOV-2705 | TECHNICAL DEBT MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2705-technical-debt-management.md` |
 | GOV-2706 | ENTERPRISE ARCHITECTURE ROADMAP | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2706-enterprise-architecture-roadmap.md` |
-| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.8.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
+| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.9.0 | July 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
 | INT-1001 | INTEGRATION OVERVIEW | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1001-integration-overview.md` |
 | INT-1002 | PAYMENT GATEWAY INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1002-payment-gateway-integrations.md` |
 | INT-1003 | MAPS & GEOLOCATION INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1003-maps-geolocation-integrations.md` |
@@ -223,8 +223,8 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | OPS-2604 | OPERATIONAL READINESS | Enterprise Operations | APPROVED | 1.0.0 | July 2026 | `docs/26-enterprise-operations/2604-operational-readiness.md` |
 | OPS-2605 | CAPACITY & COST OPTIMIZATION | Enterprise Operations | APPROVED | 1.0.0 | July 2026 | `docs/26-enterprise-operations/2605-capacity-cost-optimization.md` |
 | OPS-2606 | OPERATIONAL EXCELLENCE FRAMEWORK | Enterprise Operations | APPROVED | 1.0.0 | July 2026 | `docs/26-enterprise-operations/2606-operational-excellence-framework.md` |
-| PB-001 | PROJECT MANIFEST | — | APPROVED | 1.0.0 | July 2026 | `PROJECT_MANIFEST.md` |
-| PB-002 | PROJECT BIBLE | Foundation | APPROVED | 2.0.0 | July 2026 | `PROJECT_BIBLE.md` |
+| PB-001 | PROJECT MANIFEST | — | APPROVED | 1.1.0 | July 2026 | `PROJECT_MANIFEST.md` |
+| PB-002 | PROJECT BIBLE | Foundation | APPROVED | 2.1.0 | July 2026 | `PROJECT_BIBLE.md` |
 | PB-101 | BUSINESS VISION | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/BUSINESS_VISION.md` |
 | PB-102 | PRODUCT VISION | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/PRODUCT_VISION.md` |
 | PB-103 | MISSION | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/MISSION.md` |
@@ -233,7 +233,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | PB-106 | STAKEHOLDERS | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/STAKEHOLDERS.md` |
 | PB-107 | SUCCESS METRICS | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/SUCCESS_METRICS.md` |
 | PB-108 | BUSINESS RULES | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/BUSINESS_RULES.md` |
-| PB-109 | TERMINOLOGY GLOSSARY | Business | APPROVED | 1.0.0 | July 2026 | `docs/01-business/TERMINOLOGY_GLOSSARY.md` |
+| PB-109 | TERMINOLOGY GLOSSARY | Business | APPROVED | 1.1.0 | July 2026 | `docs/01-business/TERMINOLOGY_GLOSSARY.md` |
 | PB-300 | PRODUCT PRINCIPLES | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/PRODUCT_PRINCIPLES.md` |
 | PB-301 | PRODUCT OVERVIEW | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/PRODUCT_OVERVIEW.md` |
 | PB-302 | USER PERSONAS | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/USER_PERSONAS.md` |
@@ -241,7 +241,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | PB-304 | BUSINESS CAPABILITIES | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/BUSINESS_CAPABILITIES.md` |
 | PB-305 | PRODUCT REQUIREMENTS | Product | APPROVED | 1.1.0 | July 2026 | `docs/03-product/PRODUCT_REQUIREMENTS.md` |
 | PB-306 | COMMUNICATION AUTOMATION CENTER | Product | APPROVED | 1.0.0 | July 2026 | `docs/03-product/306-communication-automation-center.md` |
-| PB-401 | PLATFORM OVERVIEW | Architecture | APPROVED | 1.0.0 | July 2026 | `docs/07-architecture/SYSTEM_OVERVIEW.md` |
+| PB-401 | PLATFORM OVERVIEW | Architecture | APPROVED | 1.1.0 | July 2026 | `docs/07-architecture/SYSTEM_OVERVIEW.md` |
 | PERF-2101 | PERFORMANCE ENGINEERING OVERVIEW | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2101-performance-engineering-overview.md` |
 | PERF-2102 | SCALABILITY STRATEGY | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2102-scalability-strategy.md` |
 | PERF-2103 | CAPACITY PLANNING | Performance Engineering | APPROVED | 1.0.0 | July 2026 | `docs/21-performance/2103-capacity-planning.md` |
