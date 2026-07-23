@@ -5,7 +5,7 @@ Document Name: LEGAL REQUIREMENTS & REGULATORY COMPLIANCE
 
 Book: Compliance & Legal
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -56,6 +56,11 @@ Applies To
 
 Current
 
+- Federal Law No. 152-FZ On Personal Data
+- Law No. 2300-1 On Consumer Rights Protection
+- Civil Code rules for public offers and distance selling
+- Federal Law No. 54-FZ cash-register and receipt requirements
+- Applicable Russian distance-selling rules
 - GDPR
 - PCI DSS
 - Local Labor Laws
@@ -69,6 +74,25 @@ Future
 - SOC 2
 - EU AI Act
 - Regional Privacy Regulations
+
+---
+
+# Russian Consumer and Personal Data Requirements
+
+Required Before Production
+
+- identify the personal-data operator and determine whether Roskomnadzor notification is required;
+- publish the personal-data processing policy and privacy notice;
+- obtain personal-data consent separately from other confirmed documents when consent is the legal basis;
+- obtain optional marketing consent separately and leave it disabled by default;
+- maintain Russian localization of production personal-data databases;
+- document external processors and cross-border data flows;
+- publish a legally reviewed public offer for distance selling;
+- display seller details, product terms, prices, payment, delivery, cancellation, claims and other legally required information;
+- preserve the offer version and order terms accepted by the customer;
+- provide consumer support and legally required claim handling.
+
+The repository defines system requirements, not final legal wording. Public-offer, privacy-policy and consent texts require approval by qualified Russian legal counsel before publication.
 
 ---
 
@@ -281,5 +305,7 @@ CMP-1903 PCI DSS Compliance Specification
 CMP-1906 Audit & Compliance Controls
 
 AI-1405 AI Governance & Security
+
+CMP-1908 Russian Personal Data & Consumer Legal Requirements
 
 END OF DOCUMENT
