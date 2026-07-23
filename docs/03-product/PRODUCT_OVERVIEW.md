@@ -5,7 +5,7 @@ Document Name: PRODUCT OVERVIEW
 
 Book: Product
 
-Version: 1.1.0
+Version: 1.2.0
 
 Status: APPROVED
 
@@ -259,7 +259,7 @@ Database
 - Menu Boards;
 - Owner Dashboard.
 
-Файлы сохраняются через Object Storage Port. В production используется Google Cloud Storage через GCS Adapter, а ссылка и метаданные изображения сохраняются в PostgreSQL.
+Файлы сохраняются через Object Storage Port. В staging и production используется Beget S3 через S3-Compatible Adapter, а ссылка и метаданные изображения сохраняются в PostgreSQL.
 
 Загрузка, замена, назначение главной фотографии и безопасное удаление выполняются через Back Office без публикации новой версии приложения.
 
@@ -357,6 +357,10 @@ Back Office → Backend API → PostgreSQL / Object Storage → Customer App и 
 ---
 
 # Related Documents
+
+ADR-1612 Object Storage Provider Model
+
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 PB-300 PRODUCT_PRINCIPLES
 
