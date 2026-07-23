@@ -5,7 +5,7 @@ Document Name: TECHNOLOGY LIFECYCLE MANAGEMENT
 
 Book: Enterprise Architecture Governance
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -93,7 +93,11 @@ Examples
 - Redis
 - RabbitMQ
 - Docker
-- Google Cloud Run
+- Docker Compose
+- Beget Cloud VPS
+- Beget PostgreSQL DBaaS
+- Beget S3
+- GitHub Container Registry (GHCR)
 
 ---
 
@@ -171,8 +175,12 @@ Messaging
 Infrastructure
 
 - Docker
-- Google Cloud Run
-- Kubernetes (Trial)
+- Docker Compose
+- Beget Cloud VPS
+- Beget PostgreSQL DBaaS
+- Beget S3
+- GitHub Container Registry (GHCR)
+- Beget Managed Kubernetes (Trial)
 
 Observability
 
@@ -415,7 +423,7 @@ GOV-2702 Architecture Review Board
 
 GOV-2703 Architecture Decision Records (ADR) Governance
 
-ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 DEV-1201 DEVOPS OVERVIEW
 
