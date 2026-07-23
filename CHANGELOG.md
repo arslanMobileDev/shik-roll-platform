@@ -24,6 +24,8 @@ Classification: Internal
 
 ### Changed
 
+- Deployment documentation synchronized on Beget Cloud VPS, Docker Compose, Nginx, Beget PostgreSQL DBaaS and GitHub Container Registry.
+- Project foundation, terminology, platform overview, DevOps and technology lifecycle documents now reference ADR-1613 as the current infrastructure decision.
 - ADR-1611 superseded by ADR-1613 after the production infrastructure provider changed from Google Cloud to Beget Cloud.
 - ADR-1612 updated to use Beget S3 for staging and production while preserving the provider-neutral Object Storage Port.
 - ADR-1600, DECISIONS.md, SUMMARY and GOV-2707 synchronized with the current infrastructure decision.
