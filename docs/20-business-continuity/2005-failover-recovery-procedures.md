@@ -5,7 +5,7 @@ Document Name: FAILOVER & RECOVERY PROCEDURES
 
 Book: Business Continuity & Disaster Recovery
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -161,9 +161,11 @@ Symptoms
 
 Provider Selection
 
-- Google Cloud Storage for production in Google Cloud
-- MinIO for local, development or approved self-hosted deployments
-- Approved S3-compatible provider for alternative deployments
+- Beget S3 through the S3-Compatible Adapter for staging and production
+- MinIO through the S3-Compatible Adapter for local and development
+- Approved provider adapter for alternative deployments
+
+Recovery copies containing personal data must remain in a legally approved Russian region unless a separate legal and architecture review permits otherwise.
 
 Procedure
 
@@ -311,6 +313,8 @@ Log
 # Related Documents
 
 ADR-1612 Object Storage Provider Model
+
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 BCP-2003 Disaster Recovery Strategy
 
