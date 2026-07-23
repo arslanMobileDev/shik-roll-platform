@@ -5,7 +5,7 @@ Document Name: CUSTOMER MOBILE APP UX
 
 Book: Frontend Specification
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -50,6 +50,7 @@ Screens
 - Welcome
 - Login
 - Registration
+- Personal Data Consent
 - OTP Verification
 - Forgot Password
 
@@ -101,6 +102,7 @@ Screens
 - Delivery Address
 - Delivery Time
 - Payment Method
+- Public Offer & Legal Confirmation
 - Order Confirmation
 
 ---
@@ -147,8 +149,34 @@ Screens
 - Language
 - Theme
 - Devices
+- Legal & Privacy Center
+- Manage Consents
+- Data Request & Account Deletion
 - About
 - Support
+
+---
+
+# Legal & Privacy
+
+Screens
+
+- Public Offer
+- Privacy Policy
+- Personal Data Consent
+- Marketing Consent
+- Consent History
+- Withdraw Optional Consent
+- Personal Data Request
+- Account Deletion Request
+
+Rules
+
+- Personal data consent is presented separately from all other documents.
+- Marketing consent is optional and disabled by default.
+- Checkout displays the current public-offer version before order submission.
+- Legal text links remain available without authentication.
+- The app must not use preselected consent controls or dark patterns.
 
 ---
 
@@ -213,5 +241,7 @@ UI-802 Design System
 UI-803 Component Library
 
 PB-305 Product Requirements
+
+CMP-1908 Russian Personal Data & Consumer Legal Requirements
 
 END OF DOCUMENT
