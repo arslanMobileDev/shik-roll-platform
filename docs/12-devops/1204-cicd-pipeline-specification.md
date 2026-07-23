@@ -5,7 +5,7 @@ Document Name: CI/CD PIPELINE SPECIFICATION
 
 Book: DevOps & Infrastructure
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -43,12 +43,15 @@ Classification: Internal
 Current
 
 - GitHub Actions
-- Google Cloud Run
+- GitHub Container Registry (GHCR)
+- Beget Cloud VPS
+- Docker Compose
+- Nginx
 
 Future
 
 - ArgoCD
-- Kubernetes
+- Beget Managed Kubernetes
 
 ---
 
@@ -122,11 +125,12 @@ Environments
 
 Current Runtime
 
-- Google Cloud Run
+- Beget Cloud VPS
+- Docker Compose
 
 Future Runtime
 
-- Kubernetes
+- Beget Managed Kubernetes
 
 ---
 
@@ -199,6 +203,6 @@ SEC-1107 Secure Development Lifecycle
 
 ARC-508 Technology Stack
 
-ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+ADR-1613 Beget Cloud for MVP and Infrastructure Evolution
 
 END OF DOCUMENT
