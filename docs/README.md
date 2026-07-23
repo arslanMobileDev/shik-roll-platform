@@ -67,7 +67,7 @@ Classification: Internal
 - [PB-401 Platform Overview](07-architecture/SYSTEM_OVERVIEW.md) — высокоуровневый обзор платформы.
 - [ADR-1600 Architecture Decision Records Index](16-adr/1600-adr-index.md) — реестр решений.
 - [ARC-508 Technology Stack](05-architecture/508-technology-stack.md) — согласованный стек.
-- [ADR-1611 Cloud Run for MVP and Kubernetes Evolution](16-adr/1611-adr-cloud-run-mvp-kubernetes-evolution.md).
+- [ADR-1613 Beget Cloud for MVP and Infrastructure Evolution](16-adr/1613-adr-beget-cloud-mvp-deployment.md).
 - [ADR-1612 Object Storage Provider Model](16-adr/1612-adr-object-storage-provider-model.md).
 
 ---
