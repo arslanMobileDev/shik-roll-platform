@@ -5,7 +5,7 @@ Document Name: PROJECT BIBLE
 
 Book: Foundation
 
-Version: 2.0.0
+Version: 2.1.0
 
 Status: APPROVED
 
@@ -450,7 +450,23 @@ RabbitMQ
 
 Cloud
 
-Google Cloud Platform
+Beget Cloud
+
+Runtime
+
+Beget Cloud VPS with Docker Compose
+
+Managed Database
+
+Beget PostgreSQL DBaaS
+
+Object Storage
+
+Beget S3
+
+Container Registry
+
+GitHub Container Registry (GHCR)
 
 Authentication
 
