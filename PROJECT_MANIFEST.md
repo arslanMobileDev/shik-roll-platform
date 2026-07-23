@@ -3,7 +3,7 @@ Document ID: PB-001
 
 Document Name: PROJECT MANIFEST
 
-Version: 1.1.0
+Version: 1.2.0
 
 Status: APPROVED
 
@@ -269,7 +269,7 @@ Beget Cloud VPS with Docker Compose
 
 Authentication
 
-Firebase Authentication
+Firebase Authentication (Candidate; production use requires CMP-1908 compliance gate and a separate architecture decision)
 
 Notifications
 
