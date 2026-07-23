@@ -5,7 +5,7 @@ Document Name: CUSTOMER SCHEMA
 
 Book: Database
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -39,6 +39,10 @@ Classification: Internal
 - customer_favorites
 - customer_loyalty_accounts
 - customer_notification_settings
+- legal_documents
+- customer_consents
+- customer_legal_acceptances
+- data_subject_requests
 
 ---
 
@@ -148,7 +152,6 @@ Columns
 - language
 - favorite_branch_id
 - dark_mode
-- marketing_enabled
 - created_at
 - updated_at
 
@@ -169,8 +172,99 @@ Columns
 - sms_enabled
 - whatsapp_enabled
 - in_app_enabled
-- marketing_consent
 - quiet_hours_enabled
+- created_at
+- updated_at
+
+---
+
+# legal_documents
+
+Purpose
+
+Неизменяемые версии юридических документов.
+
+Columns
+
+- id
+- document_type
+- version
+- locale
+- status
+- content_hash
+- effective_at
+- published_at
+- superseded_at
+- created_by
+- created_at
+
+---
+
+# customer_consents
+
+Purpose
+
+Отдельные доказательства согласий и их отзыва.
+
+Columns
+
+- id
+- customer_id
+- purpose
+- legal_document_id
+- legal_document_version
+- legal_document_hash
+- status
+- granted_at
+- withdrawn_at
+- source
+- ip_address
+- user_agent
+- evidence_id
+- created_at
+
+---
+
+# customer_legal_acceptances
+
+Purpose
+
+Доказательство ознакомления или принятия юридического документа, включая публичную оферту.
+
+Columns
+
+- id
+- customer_id
+- order_id
+- legal_document_id
+- legal_document_version
+- legal_document_hash
+- accepted_at
+- source
+- ip_address
+- user_agent
+- evidence_id
+- created_at
+
+---
+
+# data_subject_requests
+
+Purpose
+
+Запросы субъекта персональных данных.
+
+Columns
+
+- id
+- customer_id
+- request_type
+- status
+- requested_at
+- verified_at
+- completed_at
+- rejection_reason
+- audit_reference
 - created_at
 - updated_at
 
@@ -241,6 +335,10 @@ customer_notification_settings
 
 ↓
 
+customer_consents / customer_legal_acceptances / data_subject_requests
+
+↓
+
 customer_favorites
 
 ↓
@@ -256,6 +354,9 @@ customer_loyalty_accounts
 - Один клиент → много устройств.
 - Только один адрес может быть основным.
 - Только одна запись настроек коммуникаций.
+- Каждое согласие хранится как отдельная версионированная запись.
+- Published legal document and acceptance records are immutable.
+- Marketing consent is never inferred from notification preferences.
 
 ---
 
@@ -266,6 +367,9 @@ Protected Data
 - Personal Data
 - Addresses
 - Device Information
+- Consent Evidence
+- Legal Acceptance Evidence
+- Data Subject Requests
 
 Rules
 
@@ -282,5 +386,7 @@ DB-604 Identity Schema
 PB-305 Product Requirements
 
 ARC-513 Communication Architecture
+
+CMP-1908 Russian Personal Data & Consumer Legal Requirements
 
 END OF DOCUMENT
