@@ -319,7 +319,7 @@ Loki
 
 ## Authentication
 
-Firebase Authentication
+Firebase Authentication (candidate; production use requires CMP-1908 compliance gate and a separate architecture decision)
 
 ---
 
