@@ -5,7 +5,7 @@ Document Name: DATABASE OVERVIEW
 
 Book: Database
 
-Version: 1.0.0
+Version: 1.1
 
 Status: APPROVED
 
@@ -17,7 +17,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: July 2026
+Last Updated: August 2026
 
 Classification: Internal
 ---
@@ -43,9 +43,9 @@ Cache
 Object Storage
 
 - Provider-neutral Object Storage Port
-- Google Cloud Storage (Production)
+- Timeweb Cloud Object Storage (Production)
 - MinIO (Local / Development)
-- S3-compatible providers (Alternative)
+- Google Cloud Storage (Approved Alternative)
 
 ---
 
@@ -231,6 +231,8 @@ ARC-505 Domain Model
 ARC-508 Technology Stack
 
 ADR-1612 Object Storage Provider Model
+
+ADR-1613 Timeweb Cloud MVP Infrastructure
 
 PB-305 Product Requirements
 

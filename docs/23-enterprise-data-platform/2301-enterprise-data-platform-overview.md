@@ -5,7 +5,7 @@ Document Name: ENTERPRISE DATA PLATFORM OVERVIEW
 
 Book: Enterprise Data Platform
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -15,7 +15,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: July 2026
+Last Updated: August 2026
 
 Classification: Internal
 ---
@@ -121,7 +121,8 @@ Event Streaming
 Object Storage
 
 - Provider-neutral Object Storage Port
-- Google Cloud Storage (Production in Google Cloud)
+- Timeweb Cloud S3-compatible Object Storage (Current Production Provider)
+- Google Cloud Storage (Approved Alternative)
 - MinIO (Local / Development or approved self-hosted deployment)
 
 Data Warehouse

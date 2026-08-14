@@ -5,7 +5,7 @@ Document Name: DEPLOYMENT ARCHITECTURE
 
 Book: Architecture
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -15,7 +15,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: July 2026
+Last Updated: August 2026
 
 Classification: Internal
 ---
@@ -44,9 +44,12 @@ Horizontal Scaling Ready
 
 ## Current Stage — MVP and Early Production
 
-- Google Cloud Platform
-- Google Cloud Run
-- Managed Cloud Services
+- Timeweb Cloud in a Russian region
+- Ubuntu 24.04 LTS
+- Docker and Docker Compose
+- Managed PostgreSQL, RabbitMQ and Valkey
+- Timeweb Cloud Object Storage
+- Private network for infrastructure services
 
 ## Target Evolution
 
@@ -59,7 +62,7 @@ Kubernetes is not required for the current stage. It may be introduced when one 
 - the number of independently deployed services creates operational pressure;
 - a mature DevOps/SRE team is available.
 
-The decision is governed by ADR-1611.
+The decision is governed by ADR-1613. ADR-1611 is retained as the historical Cloud Run decision that ADR-1613 superseded.
 
 ---
 
@@ -259,14 +262,16 @@ Production
 
 # Related Documents
 
-ARC-501 System Overview
-
 ARC-508 Technology Stack
+
+ARC-510 File Storage
+
+ARC-514 Security Architecture
 
 ADR-1611 Cloud Run for MVP and Kubernetes Evolution
 
-ARC-509 Caching Strategy
+ADR-1613 Timeweb Cloud MVP Infrastructure
 
-ARC-514 Security Architecture
+CMP-1907 Legal Requirements & Regulatory Compliance
 
 END OF DOCUMENT

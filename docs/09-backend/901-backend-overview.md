@@ -5,7 +5,7 @@ Document Name: BACKEND OVERVIEW
 
 Book: Backend Specification
 
-Version: 1.0.0
+Version: 1.1
 
 Status: APPROVED
 
@@ -15,7 +15,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: July 2026
+Last Updated: August 2026
 
 Classification: Internal
 ---
@@ -81,8 +81,9 @@ Runtime
 - PostgreSQL
 - Redis
 - RabbitMQ
-- Google Cloud Storage (Production)
+- Timeweb Cloud Object Storage (Production)
 - MinIO (Local / Development)
+- Google Cloud Storage (Approved Alternative)
 - Elasticsearch (Future)
 
 ---
@@ -121,7 +122,8 @@ Asynchronous
 
 - PostgreSQL
 - Provider-neutral Object Storage Port
-- GCS Adapter (Production)
+- Timeweb Cloud S3-Compatible Adapter (Production)
+- GCS Adapter (Approved Alternative)
 - S3-Compatible Adapter with MinIO (Local / Development)
 - Cache
 
@@ -158,6 +160,8 @@ Asynchronous
 ARC-508 Technology Stack
 
 ADR-1612 Object Storage Provider Model
+
+ADR-1613 Timeweb Cloud MVP Infrastructure
 
 DB-601 Database Overview
 
