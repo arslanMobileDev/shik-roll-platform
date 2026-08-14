@@ -1,7 +1,7 @@
 ---
 Document Type: Decision Summary
 Status: ACTIVE
-Last Updated: July 2026
+Last Updated: August 2026
 Classification: Internal
 ---
 
@@ -34,11 +34,12 @@ Classification: Internal
 | API Development | API-First и Contract-First | ACCEPTED | [ADR-1609](docs/16-adr/1609-adr-api-first-contract-first-development.md) |
 | Event Bus | RabbitMQ для межмодульных, межсервисных и интеграционных событий | ACCEPTED | [ADR-1603](docs/16-adr/1603-adr-event-driven-architecture.md) |
 | Background Jobs | BullMQ + Redis для локальных фоновых, повторных и плановых задач | ACCEPTED SCOPE | [ADR-1603](docs/16-adr/1603-adr-event-driven-architecture.md), [ARC-512](docs/05-architecture/512-background-jobs.md) |
-| Current Deployment | Google Cloud Run для MVP и early production | ACCEPTED | [ADR-1611](docs/16-adr/1611-adr-cloud-run-mvp-kubernetes-evolution.md) |
-| Future Orchestration | Kubernetes только после выполнения критериев миграции | CONDITIONAL OPTION | [ADR-1611](docs/16-adr/1611-adr-cloud-run-mvp-kubernetes-evolution.md) |
+| Current Deployment | Timeweb Cloud в российском регионе; Ubuntu 24.04 LTS, Docker Compose и управляемые инфраструктурные сервисы | ACCEPTED | [ADR-1613](docs/16-adr/1613-adr-timeweb-cloud-mvp-infrastructure.md) |
+| Future Orchestration | Kubernetes только после выполнения критериев миграции и отдельного architecture review | CONDITIONAL OPTION | [ADR-1613](docs/16-adr/1613-adr-timeweb-cloud-mvp-infrastructure.md) |
 | Object Storage Contract | Provider-neutral Object Storage Port | ACCEPTED | [ADR-1612](docs/16-adr/1612-adr-object-storage-provider-model.md) |
-| Production Object Storage | Google Cloud Storage через GCS Adapter | ACCEPTED SCOPE | [ADR-1612](docs/16-adr/1612-adr-object-storage-provider-model.md) |
+| Production Object Storage | Timeweb Cloud Object Storage через S3-Compatible Adapter | ACCEPTED SCOPE | [ADR-1612](docs/16-adr/1612-adr-object-storage-provider-model.md), [ADR-1613](docs/16-adr/1613-adr-timeweb-cloud-mvp-infrastructure.md) |
 | Local Object Storage | MinIO через S3-Compatible Adapter | ACCEPTED SCOPE | [ADR-1612](docs/16-adr/1612-adr-object-storage-provider-model.md) |
+| Personal Data Responsibility | Владелец проекта остается оператором ПД; ответ провайдера является частью оценки инфраструктуры, но не юридическим разрешением на production | ACCEPTED BOUNDARY | [ADR-1613](docs/16-adr/1613-adr-timeweb-cloud-mvp-infrastructure.md), [CMP-1907](docs/19-compliance/1907-legal-requirements-regulatory-compliance.md) |
 | Communication Automation | Единый provider-neutral Communication Automation Center | ACCEPTED | [ADR-006](docs/03-product/COMMUNICATION_AUTOMATION_CENTER.md) |
 | AI Architecture | AI-First platform principles | ACCEPTED | [ADR-1610](docs/16-adr/1610-adr-ai-first-platform-architecture.md) |
 
@@ -89,6 +90,8 @@ ADR-1606 Flutter as Cross-Platform Framework
 ADR-1611 Cloud Run for MVP and Kubernetes Evolution
 
 ADR-1612 Object Storage Provider Model
+
+ADR-1613 Timeweb Cloud MVP Infrastructure
 
 GOV-2707 Document Registry
 

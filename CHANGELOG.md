@@ -1,7 +1,7 @@
 ---
 Document Type: Changelog
 Status: ACTIVE
-Last Updated: July 2026
+Last Updated: August 2026
 Classification: Internal
 ---
 
@@ -20,6 +20,7 @@ Classification: Internal
 - Product Book requirements for pre-launch catalog preparation through Back Office.
 - UJ-013 Prepare and Publish Catalog.
 - CAP-006 Product Catalog Management.
+- ADR-1613 Timeweb Cloud MVP Infrastructure.
 
 ### Changed
 
@@ -47,6 +48,11 @@ Classification: Internal
 - Catalog import identity is now scoped by `menu_id + source_key`, preserving product UUID when a category changes.
 - Product, media and import lifecycle values are explicit, and the legacy product `is_active` ambiguity is removed.
 - RabbitMQ remains the current event bus; only its topology evolution is listed as future work.
+- Timeweb Cloud in a Russian region is now the current infrastructure baseline for development, MVP and early production.
+- ADR-1611 is superseded as the current deployment-provider decision and remains a historical record.
+- Production Object Storage now uses Timeweb Cloud through the S3-Compatible Adapter; Google Cloud Storage remains an alternative requiring separate approval.
+- Russian personal data requirements, Timeweb Cloud responsibility boundaries and production legal gates are documented in CMP-1907 and ADR-1613.
+- Independent backup, restore and provider-exit controls are required because provider termination can delete hosted data without additional warning.
 
 ---
 

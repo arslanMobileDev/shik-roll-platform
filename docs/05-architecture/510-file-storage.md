@@ -5,7 +5,7 @@ Document Name: FILE STORAGE
 
 Book: Architecture
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -15,7 +15,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: July 2026
+Last Updated: August 2026
 
 Classification: Internal
 ---
@@ -48,10 +48,10 @@ Object Storage Provider
 
 # Provider Model
 
-## Production in Google Cloud
+## Current Production
 
-- Google Cloud Storage
-- Dedicated GCS Adapter
+- Timeweb Cloud Object Storage
+- S3-Compatible Adapter
 
 ## Local / Development
 
@@ -63,6 +63,11 @@ Object Storage Provider
 - AWS S3
 - Cloudflare R2
 - DigitalOcean Spaces
+
+## Alternative Google Cloud Deployment
+
+- Google Cloud Storage
+- Dedicated GCS Adapter
 
 Google Cloud Storage is not treated as an S3-compatible provider and must use a separate adapter.
 
@@ -193,6 +198,8 @@ ARC-507 Deployment Architecture
 ARC-508 Technology Stack
 
 ADR-1612 Object Storage Provider Model
+
+ADR-1613 Timeweb Cloud MVP Infrastructure
 
 ARC-511 Search Architecture
 

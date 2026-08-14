@@ -5,7 +5,7 @@ Document Name: DEVOPS OVERVIEW
 
 Book: DevOps & Infrastructure
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -15,7 +15,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: July 2026
+Last Updated: August 2026
 
 Classification: Internal
 ---
@@ -46,12 +46,13 @@ Classification: Internal
 - Docker
 - Docker Compose
 - GitHub Actions
-- Google Cloud Run
+- Timeweb Cloud virtual machine
 - Nginx
 - PostgreSQL
-- Redis
+- Valkey (Redis-compatible)
 - RabbitMQ
-- Google Cloud Storage (Production)
+- Timeweb Cloud S3-compatible Object Storage (Production)
+- Google Cloud Storage (Approved Alternative)
 - MinIO (Local / Development)
 
 Future
@@ -128,7 +129,9 @@ BE-901 Backend Overview
 
 ARC-508 Technology Stack
 
-ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+ADR-1611 Cloud Run for MVP and Kubernetes Evolution (Superseded)
+
+ADR-1613 Timeweb Cloud MVP Infrastructure
 
 ADR-1612 Object Storage Provider Model
 

@@ -5,7 +5,7 @@ Document Name: LEGAL REQUIREMENTS & REGULATORY COMPLIANCE
 
 Book: Compliance & Legal
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -15,7 +15,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: July 2026
+Last Updated: August 2026
 
 Classification: Internal
 ---
@@ -56,6 +56,9 @@ Applies To
 
 Current
 
+- Federal Law No. 152-FZ on Personal Data
+- Russian personal data localization and operator requirements
+- Roskomnadzor notification requirements
 - GDPR
 - PCI DSS
 - Local Labor Laws
@@ -69,6 +72,42 @@ Future
 - SOC 2
 - EU AI Act
 - Regional Privacy Regulations
+
+---
+
+# Russian Personal Data Requirements
+
+Before production processing of personal data, the project must:
+
+- document the operator, processing purposes, data categories, data subjects, legal grounds and processing operations;
+- map the processing model to Federal Law No. 152-FZ, including Articles 18, 18.1 and 19;
+- determine whether notification of Roskomnadzor is required and submit it before processing begins unless legal counsel confirms a specific statutory exception;
+- ensure that collection and primary recording of Russian citizens' personal data use databases located in the Russian Federation;
+- approve and publish the personal data processing policy and privacy policy;
+- approve consent texts, the public offer and withdrawal procedures where applicable;
+- define access roles, authentication, audit logging, incident response, retention, correction, blocking and deletion procedures;
+- document responsible persons and internal controls;
+- complete legal and security review before production launch.
+
+---
+
+# Timeweb Cloud Infrastructure Assessment
+
+Timeweb Cloud confirmed in its written response that:
+
+- services are located in the region selected when they are created;
+- the account holder can obtain a certificate of service location;
+- the provider supplies infrastructure and platform-level protection;
+- the provider does not accept the role of a person processing personal data on the operator's instruction;
+- customers independently process their users' personal data;
+- support access is limited to critical diagnostics and requires the account owner's permission;
+- hosted files, databases and other information are deleted when the agreement terminates without additional warning.
+
+The provider's response is evidence for infrastructure and vendor assessment. It is not a legal clearance for the SHIK Platform processing model and does not transfer the personal data operator's obligations.
+
+Before production, the project must preserve the provider's current offer, policies and written response; obtain the service-location certificate; record the approved service regions; and receive legal confirmation for the final contractual and processing model.
+
+Independent encrypted backups, tested restoration and a provider exit procedure are mandatory because termination can remove hosted data without additional warning.
 
 ---
 
@@ -192,7 +231,7 @@ Required
 
 - Security Assessment
 - Privacy Assessment
-- DPA Signed
+- DPA or equivalent contractual assessment where applicable
 - SLA Approved
 - Periodic Review
 
@@ -281,5 +320,11 @@ CMP-1903 PCI DSS Compliance Specification
 CMP-1906 Audit & Compliance Controls
 
 AI-1405 AI Governance & Security
+
+ARC-507 Deployment Architecture
+
+ARC-514 Security Architecture
+
+ADR-1613 Timeweb Cloud MVP Infrastructure
 
 END OF DOCUMENT

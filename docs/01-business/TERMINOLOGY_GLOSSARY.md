@@ -5,7 +5,7 @@ Document Name: TERMINOLOGY GLOSSARY
 
 Book: Business
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -13,7 +13,7 @@ Project: SHIK Platform
 
 Owner: Arslan Berslanov
 
-Last Updated: July 2026
+Last Updated: August 2026
 
 Classification: Internal
 ---
@@ -118,15 +118,15 @@ RabbitMQ Event Bus и BullMQ Background Job Queue не являются взаи
 
 # Deployment
 
-## Google Cloud Run
+## Timeweb Cloud Virtual Machine
 
 Каноническое полное имя production runtime для MVP и early production.
 
-После первого полного упоминания в одном разделе допускается Cloud Run.
+После первого полного упоминания в одном разделе допускается Timeweb Cloud VM.
 
 ## Kubernetes
 
-Future evolution option по критериям ADR-1611.
+Future evolution option по критериям ADR-1613.
 
 Kubernetes не должен называться текущим production runtime без нового принятого ADR.
 
@@ -138,11 +138,15 @@ Kubernetes не должен называться текущим production runt
 
 Каноническое имя внутреннего provider-neutral контракта приложения.
 
+## Timeweb Cloud S3-compatible Object Storage
+
+Текущий production provider объектного хранилища.
+
+После первого полного упоминания допускается Timeweb Object Storage.
+
 ## Google Cloud Storage
 
-Production provider в Google Cloud.
-
-После первого полного упоминания допускается GCS.
+Approved alternative provider, подключаемый через Object Storage Port.
 
 ## S3-Compatible Adapter
 

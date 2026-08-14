@@ -5,7 +5,7 @@ Document Name: TECHNOLOGY STACK
 
 Book: Architecture
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -15,7 +15,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: July 2026
+Last Updated: August 2026
 
 Classification: Internal
 ---
@@ -203,11 +203,14 @@ Containers
 
 Current Runtime
 
-- Google Cloud Run
+- Timeweb Cloud virtual machine in a Russian region
+- Ubuntu 24.04 LTS
+- Docker Compose
 
 Orchestration
 
-- Managed by Google Cloud Run
+- Docker Compose for MVP and early production
+- Kubernetes only after the scaling and operational criteria in ADR-1613 are met
 
 Reverse Proxy
 
@@ -215,7 +218,7 @@ Reverse Proxy
 
 Environment
 
-- Docker Compose (Development)
+- Docker Compose (Development, Staging, MVP Production)
 
 ---
 
@@ -231,7 +234,7 @@ Automation
 
 Deployment
 
-- Google Cloud Run
+- Timeweb Cloud virtual machine through GitHub Actions
 
 ---
 
@@ -318,9 +321,11 @@ ARC-503 Microservices Strategy
 
 ARC-507 Deployment Architecture
 
-ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+ADR-1611 Cloud Run for MVP and Kubernetes Evolution (Superseded)
 
 ADR-1612 Object Storage Provider Model
+
+ADR-1613 Timeweb Cloud MVP Infrastructure
 
 ARC-509 Caching Strategy
 

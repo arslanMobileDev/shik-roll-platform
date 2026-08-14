@@ -5,7 +5,7 @@ Document Name: CI/CD PIPELINE SPECIFICATION
 
 Book: DevOps & Infrastructure
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -15,7 +15,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: July 2026
+Last Updated: August 2026
 
 Classification: Internal
 ---
@@ -43,7 +43,8 @@ Classification: Internal
 Current
 
 - GitHub Actions
-- Google Cloud Run
+- Timeweb Cloud virtual machine
+- Docker Compose
 
 Future
 
@@ -122,7 +123,7 @@ Environments
 
 Current Runtime
 
-- Google Cloud Run
+- Docker Compose on a Timeweb Cloud virtual machine
 
 Future Runtime
 
@@ -199,6 +200,8 @@ SEC-1107 Secure Development Lifecycle
 
 ARC-508 Technology Stack
 
-ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+ADR-1611 Cloud Run for MVP and Kubernetes Evolution (Superseded)
+
+ADR-1613 Timeweb Cloud MVP Infrastructure
 
 END OF DOCUMENT

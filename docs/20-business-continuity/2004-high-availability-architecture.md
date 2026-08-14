@@ -5,7 +5,7 @@ Document Name: HIGH AVAILABILITY ARCHITECTURE
 
 Book: Business Continuity & Disaster Recovery
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -15,7 +15,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: July 2026
+Last Updated: August 2026
 
 Classification: Internal
 ---
@@ -162,10 +162,14 @@ Application Contract
 
 - Provider-neutral Object Storage Port
 
-Production in Google Cloud
+Current Production Provider
 
-- Google Cloud Storage
+- Timeweb Cloud S3-compatible Object Storage
 - Provider-managed durability and recovery
+
+Approved Alternative
+
+- Google Cloud Storage through the provider adapter
 
 Approved Self-Hosted Deployment
 

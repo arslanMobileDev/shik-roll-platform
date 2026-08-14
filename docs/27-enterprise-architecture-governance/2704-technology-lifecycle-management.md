@@ -5,7 +5,7 @@ Document Name: TECHNOLOGY LIFECYCLE MANAGEMENT
 
 Book: Enterprise Architecture Governance
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -15,7 +15,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: July 2026
+Last Updated: August 2026
 
 Classification: Internal
 ---
@@ -90,10 +90,12 @@ Examples
 - Flutter
 - NestJS
 - PostgreSQL
-- Redis
+- Valkey (Redis-compatible)
 - RabbitMQ
 - Docker
-- Google Cloud Run
+- Docker Compose
+- Timeweb Cloud virtual machine
+- Timeweb Cloud S3-compatible Object Storage
 
 ---
 
@@ -171,7 +173,9 @@ Messaging
 Infrastructure
 
 - Docker
-- Google Cloud Run
+- Docker Compose
+- Timeweb Cloud virtual machine
+- Timeweb Cloud S3-compatible Object Storage
 - Kubernetes (Trial)
 
 Observability
@@ -415,7 +419,9 @@ GOV-2702 Architecture Review Board
 
 GOV-2703 Architecture Decision Records (ADR) Governance
 
-ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+ADR-1611 Cloud Run for MVP and Kubernetes Evolution (Superseded)
+
+ADR-1613 Timeweb Cloud MVP Infrastructure
 
 DEV-1201 DEVOPS OVERVIEW
 

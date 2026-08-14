@@ -5,7 +5,7 @@ Document Name: ADR — OBJECT STORAGE PROVIDER MODEL
 
 Book: Enterprise Architecture Decision Records
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: ACCEPTED
 
@@ -16,7 +16,7 @@ Owner: Arslan Berslanov
 Solution Architect: OpenAI ChatGPT
 
 Decision Date: July 2026
-Last Updated: July 2026
+Last Updated: August 2026
 
 
 Classification: Internal
@@ -36,7 +36,7 @@ SHIK Platform stores product images, brand assets, documents, imports and genera
 
 The documentation currently names Google Cloud Storage, MinIO and S3-compatible object storage without defining whether they are competing standards, environment-specific providers or interchangeable implementations.
 
-The application must support the current Google Cloud deployment while preserving local development, self-hosted and alternative cloud deployment options.
+The application must support the current Timeweb Cloud deployment while preserving local development and alternative cloud deployment options.
 
 ---
 
@@ -58,9 +58,10 @@ Provider SDKs are isolated behind adapters.
 
 Provider allocation:
 
-- Google Cloud Storage with a dedicated GCS Adapter for production in Google Cloud;
+- Timeweb Cloud Object Storage through the S3-Compatible Adapter for current production;
 - MinIO through the S3-Compatible Adapter for local and development environments;
-- S3-compatible providers through the S3 Adapter for alternative cloud or self-hosted deployments.
+- other approved S3-compatible providers through the S3-Compatible Adapter for alternative cloud deployments;
+- Google Cloud Storage through a dedicated GCS Adapter when a separately approved Google Cloud deployment requires it.
 
 Google Cloud Storage is not treated as an S3-compatible provider.
 
@@ -84,19 +85,20 @@ Business and domain logic must not import provider SDKs.
 
 # Provider Adapters
 
-## GCS Adapter
-
-- Google Cloud Storage
-- Production in Google Cloud
-- GCS authentication and signed access semantics
-
 ## S3-Compatible Adapter
 
+- Timeweb Cloud Object Storage
 - MinIO
 - AWS S3
 - Cloudflare R2
 - DigitalOcean Spaces
 - Alternative cloud and self-hosted deployments
+
+## GCS Adapter
+
+- Google Cloud Storage
+- Alternative Google Cloud deployment only
+- GCS authentication and signed access semantics
 
 ---
 
@@ -109,19 +111,21 @@ Local
 Development
 
 - MinIO by default
-- GCS integration environment when required
+- Timeweb Cloud Object Storage integration environment when required
+- GCS integration environment only for an approved alternative Google Cloud deployment
 
 Staging
 
-- Same provider class as the target production environment
+- Timeweb Cloud Object Storage through the S3-Compatible Adapter
 
-Production in Google Cloud
+Production
 
-- Google Cloud Storage
+- Timeweb Cloud Object Storage through the S3-Compatible Adapter
 
-Self-Hosted / Alternative Cloud
+Alternative Cloud
 
 - Approved S3-compatible provider
+- Google Cloud Storage through the dedicated GCS Adapter when separately approved
 
 ---
 
@@ -148,7 +152,8 @@ The suite must validate:
 
 - Business logic remains provider-independent.
 - Local development does not require access to production cloud storage.
-- Google Cloud production remains supported.
+- The current Timeweb Cloud production model is supported.
+- Google Cloud Storage remains available as an alternative adapter.
 - Self-hosted and alternative cloud deployment remain possible.
 - Provider migration is isolated to adapter and operational concerns.
 
@@ -208,6 +213,6 @@ BE-901 Backend Overview
 
 DEV-1201 DevOps Overview
 
-ADR-1611 Cloud Run for MVP and Kubernetes Evolution
+ADR-1613 Timeweb Cloud MVP Infrastructure
 
 END OF DOCUMENT

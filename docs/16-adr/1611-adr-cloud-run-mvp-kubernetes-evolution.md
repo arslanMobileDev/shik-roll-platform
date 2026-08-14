@@ -5,9 +5,9 @@ Document Name: ADR — CLOUD RUN FOR MVP AND KUBERNETES EVOLUTION
 
 Book: Enterprise Architecture Decision Records
 
-Version: 1.0.0
+Version: 1.1.0
 
-Status: ACCEPTED
+Status: SUPERSEDED
 
 Project: SHIK Platform
 
@@ -16,7 +16,7 @@ Owner: Arslan Berslanov
 Solution Architect: OpenAI ChatGPT
 
 Decision Date: July 2026
-Last Updated: July 2026
+Last Updated: August 2026
 
 
 Classification: Internal
@@ -26,7 +26,9 @@ Classification: Internal
 
 ## Status
 
-Accepted
+Superseded by ADR-1613
+
+This document is retained as the historical record of the previously accepted Google Cloud Run baseline. ADR-1613 defines the current MVP and early production infrastructure decision.
 
 ---
 
@@ -131,6 +133,8 @@ Review this decision when:
 ---
 
 # Related Documents
+
+ADR-1613 Timeweb Cloud MVP Infrastructure
 
 PB-401 Platform Overview
 

@@ -5,7 +5,7 @@ Document Name: SCALABILITY STRATEGY
 
 Book: Performance Engineering
 
-Version: 1.0.0
+Version: 1.1.0
 
 Status: APPROVED
 
@@ -15,7 +15,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: July 2026
+Last Updated: August 2026
 
 Classification: Internal
 ---
@@ -206,9 +206,13 @@ Application Contract
 
 - Provider-neutral Object Storage Port
 
-Production in Google Cloud
+Current Production Provider
 
-- Google Cloud Storage managed scaling
+- Timeweb Cloud S3-compatible Object Storage managed scaling
+
+Approved Alternative
+
+- Google Cloud Storage managed scaling through the provider adapter
 
 Approved Self-Hosted Deployment
 
