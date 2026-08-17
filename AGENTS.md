@@ -6,7 +6,7 @@
 - Treat the repository content as the source of truth.
 - Treat `main` as the source branch for the original state.
 - Perform documentation changes only in an explicitly designated working branch.
-- Use `docs/architecture-qa-v1` as the current documentation QA branch until the project owner explicitly selects another branch.
+- Use `docs/ai-tooling-neutrality` as the current documentation QA branch until the project owner explicitly selects another branch.
 
 ## Change Authorization
 
@@ -28,6 +28,7 @@ Do not create or change files, branches, commits, issues, pull requests, release
 - Record only decisions explicitly accepted by the project owner.
 - Treat accepted ADRs as authoritative within their documented scope.
 - Do not allow navigation documents, summaries, or compatibility redirects to override governed documents.
+- Treat AI models, providers, agent shells, and MCP tools as replaceable execution tools. They must not override repository requirements, accepted ADRs, or approved Figma design artifacts.
 
 ## Documentation Safety
 
@@ -49,7 +50,7 @@ After every package:
 4. Recheck Related Documents.
 5. Recheck local Markdown links.
 6. Run the repository documentation validation when available.
-7. Report the commit created for the package.
+7. Report any commit created for the package; if no commit was authorized, state that no commit was created.
 8. Stop until the next confirmation unless the project owner explicitly waived that pause for the package.
 
 ## Publishing
