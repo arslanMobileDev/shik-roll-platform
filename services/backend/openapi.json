@@ -1,0 +1,1353 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/menus": {
+      "get": {
+        "operationId": "MenuController_getMenus",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "brandId",
+            "required": false,
+            "in": "query",
+            "description": "Filter menus by brand",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Filter menus by branch; brand-level default menus (branchId = null) are included",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuPage"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List menus (brand / branch filtered, paginated)",
+        "tags": [
+          "Menu",
+          "menus"
+        ]
+      }
+    },
+    "/categories": {
+      "get": {
+        "operationId": "MenuController_getCategories",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "menuId",
+            "required": false,
+            "in": "query",
+            "description": "Filter categories by menu",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "brandId",
+            "required": false,
+            "in": "query",
+            "description": "Filter categories by brand",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryPage"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List categories (menu / brand filtered, paginated)",
+        "tags": [
+          "Menu",
+          "categories"
+        ]
+      },
+      "post": {
+        "operationId": "MenuController_createCategory",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a category",
+        "tags": [
+          "Menu",
+          "categories"
+        ]
+      }
+    },
+    "/categories/{id}": {
+      "patch": {
+        "operationId": "MenuController_updateCategory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update a category",
+        "tags": [
+          "Menu",
+          "categories"
+        ]
+      }
+    },
+    "/menu-items": {
+      "get": {
+        "operationId": "MenuController_getItems",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "brandId",
+            "required": false,
+            "in": "query",
+            "description": "Filter items by brand",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Branch context: resolves branch price override, availability and stop list",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Filter items by category",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isHalal",
+            "required": false,
+            "in": "query",
+            "description": "Only items holding a valid HALAL certification tag",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "availableOnly",
+            "required": false,
+            "in": "query",
+            "description": "Excludes items that are unavailable or stop-listed for the given branchId",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive search by name, SKU or description",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuItemPage"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List menu items with brand/branch/category filters, Halal filter, availability filter, search and pagination",
+        "tags": [
+          "Menu",
+          "menu-items"
+        ]
+      },
+      "post": {
+        "operationId": "MenuController_createMenuItem",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMenuItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuItemEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a menu item (composition, modifier groups, certifications)",
+        "tags": [
+          "Menu",
+          "menu-items"
+        ]
+      }
+    },
+    "/menu-items/{id}": {
+      "get": {
+        "operationId": "MenuController_getItemById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuItemEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get a menu item; branchId resolves branch price, availability and stop list",
+        "tags": [
+          "Menu",
+          "menu-items"
+        ]
+      },
+      "patch": {
+        "operationId": "MenuController_updateMenuItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMenuItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuItemEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update scalar fields of a menu item",
+        "tags": [
+          "Menu",
+          "menu-items"
+        ]
+      }
+    },
+    "/menu-items/{id}/price": {
+      "patch": {
+        "operationId": "MenuController_updatePrice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePriceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuItemEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set or replace the branch price override",
+        "tags": [
+          "Menu",
+          "menu-items"
+        ]
+      }
+    },
+    "/menu-items/{id}/availability": {
+      "patch": {
+        "operationId": "MenuController_updateAvailability",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAvailabilityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuItemEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Enable or disable the item at a branch",
+        "tags": [
+          "Menu",
+          "menu-items"
+        ]
+      }
+    },
+    "/menu-items/{id}/stop-list": {
+      "patch": {
+        "operationId": "MenuController_updateStopList",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStopListDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuItemEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add the item to or remove it from the branch stop list",
+        "tags": [
+          "Menu",
+          "menu-items"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "SHIK Platform — Menu & Product API",
+    "description": "Menu & Product catalog API (API-706, DB-607, BE-906)",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "menus",
+      "description": ""
+    },
+    {
+      "name": "categories",
+      "description": ""
+    },
+    {
+      "name": "menu-items",
+      "description": ""
+    }
+  ],
+  "servers": [],
+  "components": {
+    "schemas": {
+      "MenuEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "brandId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "object",
+            "nullable": true,
+            "description": "null — brand-level default menu"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "ARCHIVED"
+            ]
+          },
+          "publishedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "categoryCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "name",
+          "status",
+          "categoryCount",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PageMeta": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "totalPages": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ]
+      },
+      "MenuPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuEntity"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CategoryEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "brandId": {
+            "type": "string"
+          },
+          "menuId": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "object",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "imageUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "itemCount": {
+            "type": "number",
+            "description": "Number of active items in the category"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "menuId",
+          "name",
+          "sortOrder",
+          "isActive",
+          "itemCount",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CategoryPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryEntity"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "menuId": {
+            "type": "string",
+            "description": "Menu the category belongs to"
+          },
+          "parentId": {
+            "type": "string",
+            "description": "Parent category for a sub-category"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number",
+            "default": 0
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "menuId",
+          "name"
+        ]
+      },
+      "UpdateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "string",
+            "description": "Parent category for a sub-category"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number",
+            "default": 0
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "MenuItemCategoryRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "menuId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "menuId"
+        ]
+      },
+      "MenuItemPriceEntity": {
+        "type": "object",
+        "properties": {
+          "base": {
+            "type": "number",
+            "description": "Base price from the product card"
+          },
+          "branch": {
+            "type": "object",
+            "nullable": true,
+            "description": "Branch override; null when the branch has no override or no branchId was passed"
+          },
+          "effective": {
+            "type": "number",
+            "description": "Selling price for the requested branch: branch ?? base"
+          },
+          "currency": {
+            "type": "string",
+            "example": "RUB"
+          }
+        },
+        "required": [
+          "base",
+          "effective",
+          "currency"
+        ]
+      },
+      "BranchAvailabilityEntity": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "object",
+            "nullable": true,
+            "description": "Branch context the flag was resolved for; null when no branchId was passed"
+          },
+          "isAvailable": {
+            "type": "boolean",
+            "description": "true unless an explicit per-branch override disables the item"
+          }
+        },
+        "required": [
+          "isAvailable"
+        ]
+      },
+      "StopListStatusEntity": {
+        "type": "object",
+        "properties": {
+          "isActive": {
+            "type": "boolean",
+            "description": "true when an active stop list entry exists for the branch"
+          },
+          "reason": {
+            "type": "object",
+            "nullable": true
+          },
+          "since": {
+            "type": "object",
+            "nullable": true,
+            "description": "Entry start timestamp (ISO 8601)"
+          }
+        },
+        "required": [
+          "isActive"
+        ]
+      },
+      "CertificationEntity": {
+        "type": "object",
+        "properties": {
+          "tagId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "HALAL"
+          },
+          "name": {
+            "type": "string"
+          },
+          "certificateNumber": {
+            "type": "object",
+            "nullable": true
+          },
+          "validUntil": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "tagId",
+          "code",
+          "name"
+        ]
+      },
+      "MenuItemIngredientEntity": {
+        "type": "object",
+        "properties": {
+          "ingredientId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "object",
+            "nullable": true
+          },
+          "unit": {
+            "type": "string",
+            "description": "Effective unit: row override or ingredient default"
+          },
+          "isOptional": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "ingredientId",
+          "name",
+          "unit",
+          "isOptional",
+          "sortOrder"
+        ]
+      },
+      "ModifierItemEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number",
+            "description": "Extra charge in the given currency"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "calories": {
+            "type": "object",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "price",
+          "currency",
+          "sortOrder"
+        ]
+      },
+      "ModifierGroupEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "selectionType": {
+            "type": "string",
+            "enum": [
+              "SINGLE",
+              "MULTIPLE"
+            ]
+          },
+          "minSelected": {
+            "type": "number"
+          },
+          "maxSelected": {
+            "type": "object",
+            "nullable": true
+          },
+          "isRequired": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModifierItemEntity"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "selectionType",
+          "minSelected",
+          "isRequired",
+          "sortOrder",
+          "items"
+        ]
+      },
+      "MenuItemEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "brandId": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "category": {
+            "$ref": "#/components/schemas/MenuItemCategoryRef"
+          },
+          "weight": {
+            "type": "object",
+            "nullable": true,
+            "description": "Weight in grams"
+          },
+          "calories": {
+            "type": "object",
+            "nullable": true
+          },
+          "preparationTime": {
+            "type": "object",
+            "nullable": true,
+            "description": "Preparation time, minutes"
+          },
+          "isFeatured": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isHalal": {
+            "type": "boolean",
+            "description": "Holds a valid HALAL certification tag"
+          },
+          "available": {
+            "type": "boolean",
+            "description": "Sellable in the requested branch context: active, available and not stop-listed"
+          },
+          "price": {
+            "$ref": "#/components/schemas/MenuItemPriceEntity"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/BranchAvailabilityEntity"
+          },
+          "stopList": {
+            "$ref": "#/components/schemas/StopListStatusEntity"
+          },
+          "certifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CertificationEntity"
+            }
+          },
+          "ingredients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuItemIngredientEntity"
+            }
+          },
+          "modifierGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModifierGroupEntity"
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "brandId",
+          "sku",
+          "name",
+          "slug",
+          "category",
+          "isFeatured",
+          "isActive",
+          "isHalal",
+          "available",
+          "price",
+          "availability",
+          "stopList",
+          "certifications",
+          "ingredients",
+          "modifierGroups",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "MenuItemPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuItemEntity"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "MenuItemIngredientInputDto": {
+        "type": "object",
+        "properties": {
+          "ingredientId": {
+            "type": "string",
+            "description": "Ingredient UUID (brand catalog)"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Quantity in the given unit"
+          },
+          "unit": {
+            "type": "string",
+            "description": "Unit override (g | ml | pcs)"
+          },
+          "isOptional": {
+            "type": "boolean",
+            "default": false
+          },
+          "sortOrder": {
+            "type": "number",
+            "default": 0
+          }
+        },
+        "required": [
+          "ingredientId"
+        ]
+      },
+      "CreateMenuItemDto": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "Category the item belongs to"
+          },
+          "sku": {
+            "type": "string",
+            "description": "SKU, unique within the brand"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL slug, unique within the brand; generated from the name when omitted"
+          },
+          "description": {
+            "type": "string"
+          },
+          "basePrice": {
+            "type": "number",
+            "description": "Base price in RUB (branch overrides via PATCH price)"
+          },
+          "currency": {
+            "type": "string",
+            "default": "RUB"
+          },
+          "weight": {
+            "type": "number",
+            "description": "Weight in grams"
+          },
+          "calories": {
+            "type": "number",
+            "description": "Calories, kcal"
+          },
+          "preparationTime": {
+            "type": "number",
+            "description": "Preparation time, minutes"
+          },
+          "isFeatured": {
+            "type": "boolean",
+            "default": false
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": false
+          },
+          "ingredients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuItemIngredientInputDto"
+            }
+          },
+          "modifierGroupIds": {
+            "description": "Modifier group UUIDs attached to the item",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "certificationTagIds": {
+            "description": "Certification tag UUIDs (e.g. HALAL) attached to the item",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "categoryId",
+          "sku",
+          "name",
+          "basePrice"
+        ]
+      },
+      "UpdateMenuItemDto": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "Category the item belongs to"
+          },
+          "sku": {
+            "type": "string",
+            "description": "SKU, unique within the brand"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL slug, unique within the brand; generated from the name when omitted"
+          },
+          "description": {
+            "type": "string"
+          },
+          "basePrice": {
+            "type": "number",
+            "description": "Base price in RUB (branch overrides via PATCH price)"
+          },
+          "currency": {
+            "type": "string",
+            "default": "RUB"
+          },
+          "weight": {
+            "type": "number",
+            "description": "Weight in grams"
+          },
+          "calories": {
+            "type": "number",
+            "description": "Calories, kcal"
+          },
+          "preparationTime": {
+            "type": "number",
+            "description": "Preparation time, minutes"
+          },
+          "isFeatured": {
+            "type": "boolean",
+            "default": false
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "UpdatePriceDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "description": "Branch the price override applies to"
+          },
+          "price": {
+            "type": "number",
+            "description": "New branch price in RUB",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "default": "RUB"
+          }
+        },
+        "required": [
+          "branchId",
+          "price"
+        ]
+      },
+      "UpdateAvailabilityDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "description": "Branch the availability flag applies to"
+          },
+          "isAvailable": {
+            "type": "boolean",
+            "description": "Whether the item is sellable at the branch"
+          }
+        },
+        "required": [
+          "branchId",
+          "isAvailable"
+        ]
+      },
+      "UpdateStopListDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "description": "Branch the stop list entry applies to"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "true — put the item on the stop list, false — remove it"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for stopping sales"
+          }
+        },
+        "required": [
+          "branchId",
+          "isActive"
+        ]
+      }
+    }
+  }
+}

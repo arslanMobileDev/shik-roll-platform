@@ -1,0 +1,426 @@
+// SHIK Platform — Menu & Product catalog schema.
+// Governing documents: DB-607 (Menu & Product Schema), DB-606 (Restaurant & Branch),
+// DB-602 (Database Standards), API-706, BE-906, ADR-1607 (Prisma as data access layer).
+//
+// Conventions (DB-602):
+//   - snake_case plural table names, snake_case columns (via @@map / @map);
+//   - UUID primary keys (v4 fallback of the UUID v7 standard — Prisma client-side generation);
+//   - timestamptz columns, UTC;
+//   - soft delete via deleted_at on business tables;
+//   - indexes named idx_<table>_<column>, unique constraints uq_<table>_<column>,
+//     foreign keys fk_<table>_<reference>.
+//
+// Money: Decimal(10,2) in RUB, as explicitly authorized by the package task
+// (deviates from the DB-602 "integer minor units" default).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MenuStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ModifierSelectionType {
+  SINGLE
+  MULTIPLE
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy: brands and branches (multi-brand support, BrandBranch junction).
+// In the catalog bounded context Brand plays the tenant role; the Restaurant
+// aggregate from DB-606 belongs to the Restaurant bounded context.
+// ---------------------------------------------------------------------------
+
+model Brand {
+  id        String    @id @default(uuid()) @db.Uuid
+  code      String    // e.g. SHIK_ROLL
+  name      String
+  legalName String?   @map("legal_name")
+  status    String    @default("ACTIVE")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+
+  brandBranches   BrandBranch[]
+  menus           Menu[]
+  categories      Category[]
+  menuItems       MenuItem[]
+  ingredients     Ingredient[]
+  modifierGroups  ModifierGroup[]
+
+  @@unique([code], map: "uq_brands_code")
+  @@index([status], map: "idx_brands_status")
+  @@map("brands")
+}
+
+model Branch {
+  id        String    @id @default(uuid()) @db.Uuid
+  code      String // short branch code, unique across the platform
+  name      String
+  address   String?
+  phone     String?
+  email     String?
+  latitude  Decimal?  @db.Decimal(9, 6)
+  longitude Decimal?  @db.Decimal(9, 6)
+  status    String    @default("ACTIVE")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+
+  brandBranches BrandBranch[]
+  menus         Menu[]
+  prices        MenuItemPrice[]
+  availability  BranchMenuItemAvailability[]
+  stopList      StopListEntry[]
+
+  @@unique([code], map: "uq_branches_code")
+  @@index([status], map: "idx_branches_status")
+  @@map("branches")
+}
+
+// Which brands operate at which branches.
+model BrandBranch {
+  id        String   @id @default(uuid()) @db.Uuid
+  brandId   String   @map("brand_id") @db.Uuid
+  branchId  String   @map("branch_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  brand  Brand  @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_brand_branches_brands")
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_brand_branches_branches")
+
+  @@unique([brandId, branchId], map: "uq_brand_branches_brand_id_branch_id")
+  @@index([branchId], map: "idx_brand_branches_branch_id")
+  @@map("brand_branches")
+}
+
+// ---------------------------------------------------------------------------
+// Menu tree: menus -> menu_categories -> products (DB-607).
+// branch_id = NULL marks the brand-level default menu.
+// ---------------------------------------------------------------------------
+
+model Menu {
+  id          String    @id @default(uuid()) @db.Uuid
+  brandId     String    @map("brand_id") @db.Uuid
+  branchId    String?   @map("branch_id") @db.Uuid
+  name        String
+  status      MenuStatus @default(DRAFT)
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedBy   String?   @map("updated_by") @db.Uuid
+  version     Int       @default(1)
+
+  brand      Brand      @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_menus_brands")
+  branch     Branch?    @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_menus_branches")
+  categories Category[]
+
+  @@index([brandId], map: "idx_menus_brand_id")
+  @@index([branchId], map: "idx_menus_branch_id")
+  @@index([status], map: "idx_menus_status")
+  @@map("menus")
+}
+
+model Category {
+  id          String    @id @default(uuid()) @db.Uuid
+  brandId     String    @map("brand_id") @db.Uuid
+  menuId      String    @map("menu_id") @db.Uuid
+  parentId    String?   @map("parent_id") @db.Uuid
+  name        String
+  description String?
+  imageUrl    String?   @map("image_url")
+  sortOrder   Int       @default(0) @map("sort_order")
+  isActive    Boolean   @default(false) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedBy   String?   @map("updated_by") @db.Uuid
+  version     Int       @default(1)
+
+  brand    Brand      @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_menu_categories_brands")
+  menu     Menu       @relation(fields: [menuId], references: [id], onDelete: Restrict, map: "fk_menu_categories_menus")
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict, map: "fk_menu_categories_parent")
+  children Category[] @relation("CategoryTree")
+  items    MenuItem[]
+
+  @@index([brandId], map: "idx_menu_categories_brand_id")
+  @@index([menuId], map: "idx_menu_categories_menu_id")
+  @@index([parentId], map: "idx_menu_categories_parent_id")
+  @@map("menu_categories")
+}
+
+// MenuItem is mapped to the canonical "products" table (DB-607).
+model MenuItem {
+  id              String    @id @default(uuid()) @db.Uuid
+  brandId         String    @map("brand_id") @db.Uuid
+  categoryId      String    @map("category_id") @db.Uuid
+  sku             String
+  name            String
+  slug            String
+  description     String?
+  weight          Decimal?  @db.Decimal(10, 3)
+  calories        Int?
+  preparationTime Int?      @map("preparation_time") // minutes
+  isFeatured      Boolean   @default(false) @map("is_featured")
+  isActive        Boolean   @default(false) @map("is_active")
+  basePrice       Decimal   @map("base_price") @db.Decimal(10, 2)
+  currency        String    @default("RUB")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBy       String?   @map("created_by") @db.Uuid
+  updatedBy       String?   @map("updated_by") @db.Uuid
+  version         Int       @default(1)
+
+  brand           Brand                        @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_products_brands")
+  category        Category                     @relation(fields: [categoryId], references: [id], onDelete: Restrict, map: "fk_products_menu_categories")
+  ingredients     MenuItemIngredient[]
+  certifications  MenuItemCertification[]
+  prices          MenuItemPrice[]
+  availability    BranchMenuItemAvailability[]
+  stopList        StopListEntry[]
+  modifierGroups  MenuItemModifierGroup[]
+
+  @@unique([brandId, sku], map: "uq_products_brand_id_sku")
+  @@unique([brandId, slug], map: "uq_products_brand_id_slug")
+  @@index([categoryId], map: "idx_products_category_id")
+  @@index([brandId], map: "idx_products_brand_id")
+  @@index([isActive], map: "idx_products_is_active")
+  @@index([name], map: "idx_products_name")
+  @@map("products")
+}
+
+// ---------------------------------------------------------------------------
+// Ingredients and product composition.
+// ---------------------------------------------------------------------------
+
+model Ingredient {
+  id        String    @id @default(uuid()) @db.Uuid
+  brandId   String    @map("brand_id") @db.Uuid
+  name      String
+  unit      String    @default("g") // g | ml | pcs
+  isActive  Boolean   @default(false) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBy String?   @map("created_by") @db.Uuid
+  updatedBy String?   @map("updated_by") @db.Uuid
+  version   Int       @default(1)
+
+  brand     Brand                @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_ingredients_brands")
+  menuItems MenuItemIngredient[]
+
+  @@unique([brandId, name], map: "uq_ingredients_brand_id_name")
+  @@index([brandId], map: "idx_ingredients_brand_id")
+  @@map("ingredients")
+}
+
+model MenuItemIngredient {
+  id           String   @id @default(uuid()) @db.Uuid
+  menuItemId   String   @map("product_id") @db.Uuid
+  ingredientId String   @map("ingredient_id") @db.Uuid
+  quantity     Decimal? @db.Decimal(10, 3)
+  unit         String? // overrides the ingredient default unit when set
+  isOptional   Boolean  @default(false) @map("is_optional")
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  menuItem   MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade, map: "fk_product_ingredients_products")
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict, map: "fk_product_ingredients_ingredients")
+
+  @@unique([menuItemId, ingredientId], map: "uq_product_ingredients_product_id_ingredient_id")
+  @@index([ingredientId], map: "idx_product_ingredients_ingredient_id")
+  @@map("product_ingredients")
+}
+
+// ---------------------------------------------------------------------------
+// Certification tags (Halal etc.) — generalizes DB-607 halal_labels.
+// ---------------------------------------------------------------------------
+
+model CertificationTag {
+  id          String    @id @default(uuid()) @db.Uuid
+  code        String // stable machine code, e.g. HALAL
+  name        String
+  description String?
+  icon        String?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBy   String?   @map("created_by") @db.Uuid
+  updatedBy   String?   @map("updated_by") @db.Uuid
+  version     Int       @default(1)
+
+  items MenuItemCertification[]
+
+  @@unique([code], map: "uq_certification_tags_code")
+  @@map("certification_tags")
+}
+
+model MenuItemCertification {
+  id                String    @id @default(uuid()) @db.Uuid
+  menuItemId        String    @map("product_id") @db.Uuid
+  tagId             String    @map("tag_id") @db.Uuid
+  certificateNumber String?   @map("certificate_number")
+  issuedBy          String?   @map("issued_by")
+  validFrom         DateTime? @map("valid_from") @db.Timestamptz(6)
+  validUntil        DateTime? @map("valid_until") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  menuItem MenuItem         @relation(fields: [menuItemId], references: [id], onDelete: Cascade, map: "fk_product_certifications_products")
+  tag      CertificationTag @relation(fields: [tagId], references: [id], onDelete: Restrict, map: "fk_product_certifications_certification_tags")
+
+  @@unique([menuItemId, tagId], map: "uq_product_certifications_product_id_tag_id")
+  @@index([tagId], map: "idx_product_certifications_tag_id")
+  @@map("product_certifications")
+}
+
+// ---------------------------------------------------------------------------
+// Pricing, per-branch availability and stop list (DB-607 business rules:
+// price, availability and stop list are resolved per branch).
+// ---------------------------------------------------------------------------
+
+// Branch price override. One current row per (product, branch); the effective
+// price is the override when present, otherwise products.base_price.
+model MenuItemPrice {
+  id         String    @id @default(uuid()) @db.Uuid
+  menuItemId String    @map("product_id") @db.Uuid
+  branchId   String    @map("branch_id") @db.Uuid
+  price      Decimal   @db.Decimal(10, 2)
+  oldPrice   Decimal?  @map("old_price") @db.Decimal(10, 2)
+  currency   String    @default("RUB")
+  validFrom  DateTime  @default(now()) @map("valid_from") @db.Timestamptz(6)
+  validTo    DateTime? @map("valid_to") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version    Int       @default(1)
+
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade, map: "fk_product_prices_products")
+  branch   Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_product_prices_branches")
+
+  @@unique([menuItemId, branchId], map: "uq_product_prices_product_id_branch_id")
+  @@index([branchId], map: "idx_product_prices_branch_id")
+  @@map("product_prices")
+}
+
+model BranchMenuItemAvailability {
+  id          String   @id @default(uuid()) @db.Uuid
+  branchId    String   @map("branch_id") @db.Uuid
+  menuItemId  String   @map("product_id") @db.Uuid
+  isAvailable Boolean  @default(false) @map("is_available")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  branch   Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_branch_product_availability_branches")
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade, map: "fk_branch_product_availability_products")
+
+  @@unique([branchId, menuItemId], map: "uq_branch_product_availability_branch_id_product_id")
+  @@index([menuItemId], map: "idx_branch_product_availability_product_id")
+  @@map("branch_product_availability")
+}
+
+model StopListEntry {
+  id         String    @id @default(uuid()) @db.Uuid
+  menuItemId String    @map("product_id") @db.Uuid
+  branchId   String    @map("branch_id") @db.Uuid
+  reason     String?
+  startsAt   DateTime  @default(now()) @map("starts_at") @db.Timestamptz(6)
+  endsAt     DateTime? @map("ends_at") @db.Timestamptz(6)
+  isActive   Boolean   @default(false) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version    Int       @default(1)
+
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade, map: "fk_stop_list_products")
+  branch   Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_stop_list_branches")
+
+  @@unique([menuItemId, branchId], map: "uq_stop_list_product_id_branch_id")
+  @@index([branchId], map: "idx_stop_list_branch_id")
+  @@map("stop_list")
+}
+
+// ---------------------------------------------------------------------------
+// Modifier tree: modifier_groups -> modifiers, bound to products
+// through product_modifiers (DB-607).
+// ---------------------------------------------------------------------------
+
+model ModifierGroup {
+  id            String                 @id @default(uuid()) @db.Uuid
+  brandId       String                 @map("brand_id") @db.Uuid
+  name          String
+  selectionType ModifierSelectionType  @default(SINGLE) @map("selection_type")
+  minSelected   Int                    @default(0) @map("min_selected")
+  maxSelected   Int?                   @map("max_selected")
+  isRequired    Boolean                @default(false) @map("required")
+  sortOrder     Int                    @default(0) @map("sort_order")
+  createdAt     DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime?              @map("deleted_at") @db.Timestamptz(6)
+  createdBy     String?                @map("created_by") @db.Uuid
+  updatedBy     String?                @map("updated_by") @db.Uuid
+  version       Int                    @default(1)
+
+  brand     Brand                    @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_modifier_groups_brands")
+  items     ModifierItem[]
+  menuItems MenuItemModifierGroup[]
+
+  @@index([brandId], map: "idx_modifier_groups_brand_id")
+  @@map("modifier_groups")
+}
+
+// ModifierItem is mapped to the canonical "modifiers" table (DB-607).
+model ModifierItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  groupId   String   @map("group_id") @db.Uuid
+  name      String
+  price     Decimal  @default(0) @db.Decimal(10, 2)
+  currency  String   @default("RUB")
+  calories  Int?
+  isActive  Boolean  @default(false) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBy String?  @map("created_by") @db.Uuid
+  updatedBy String?  @map("updated_by") @db.Uuid
+  version   Int      @default(1)
+
+  group ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade, map: "fk_modifiers_modifier_groups")
+
+  @@index([groupId], map: "idx_modifiers_group_id")
+  @@map("modifiers")
+}
+
+model MenuItemModifierGroup {
+  id              String   @id @default(uuid()) @db.Uuid
+  menuItemId      String   @map("product_id") @db.Uuid
+  modifierGroupId String   @map("modifier_group_id") @db.Uuid
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  menuItem      MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade, map: "fk_product_modifiers_products")
+  modifierGroup ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Restrict, map: "fk_product_modifiers_modifier_groups")
+
+  @@unique([menuItemId, modifierGroupId], map: "uq_product_modifiers_product_id_modifier_group_id")
+  @@index([modifierGroupId], map: "idx_product_modifiers_modifier_group_id")
+  @@map("product_modifiers")
+}
