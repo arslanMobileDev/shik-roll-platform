@@ -13,7 +13,7 @@ Project: SHIK Platform
 
 Owner: Arslan Berslanov
 
-Solution Architect: OpenAI ChatGPT
+Solution Architect: AI-Assisted Workflow
 
 Last Updated: July 2026
 
@@ -43,9 +43,7 @@ Classification: Internal
 
 # Supported Providers
 
-- OpenAI
-- Anthropic Claude
-- Google Gemini
+- Cloud LLM providers (vendor-neutral; routing targets of this gateway)
 
 Future
 

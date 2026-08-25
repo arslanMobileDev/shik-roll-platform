@@ -13,7 +13,7 @@ Project: SHIK Platform
 
 Owner: Arslan Berslanov
 
-Solution Architect: OpenAI ChatGPT
+Solution Architect: AI-Assisted Workflow
 
 Last Updated: July 2026
 
