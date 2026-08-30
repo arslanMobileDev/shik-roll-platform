@@ -756,11 +756,192 @@
           "menu-items"
         ]
       }
+    },
+    "/orders": {
+      "post": {
+        "operationId": "OrdersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create an order from POS or the mobile app",
+        "tags": [
+          "orders"
+        ]
+      },
+      "get": {
+        "operationId": "OrdersController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "brandId",
+            "required": false,
+            "in": "query",
+            "description": "Filter orders by brand",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Filter orders by branch",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by order status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEW",
+                "CONFIRMED",
+                "COOKING",
+                "READY",
+                "COMPLETED",
+                "CANCELLED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderPage"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List orders (brand / branch / status filters, pagination)",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "operationId": "OrdersController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get an order by id",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/orders/{id}/status": {
+      "patch": {
+        "operationId": "OrdersController_updateStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrderStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change order status (operator / POS / kitchen); validated against the state machine",
+        "tags": [
+          "orders"
+        ]
+      }
     }
   },
   "info": {
     "title": "SHIK Platform — Menu & Product API",
-    "description": "Menu & Product catalog API (API-706, DB-607, BE-906)",
+    "description": "Menu & Product catalog and Order management API (API-706, DB-607, DB-608, BE-906, BE-907)",
     "version": "0.1.0",
     "contact": {}
   },
@@ -775,6 +956,10 @@
     },
     {
       "name": "menu-items",
+      "description": ""
+    },
+    {
+      "name": "orders",
       "description": ""
     }
   ],
@@ -1687,6 +1872,303 @@
         "required": [
           "branchId",
           "isActive"
+        ]
+      },
+      "CreateOrderItemModifierDto": {
+        "type": "object",
+        "properties": {
+          "modifierItemId": {
+            "type": "string",
+            "description": "Modifier (modifiers table) id"
+          },
+          "quantity": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          }
+        },
+        "required": [
+          "modifierItemId"
+        ]
+      },
+      "CreateOrderItemDto": {
+        "type": "object",
+        "properties": {
+          "menuItemId": {
+            "type": "string",
+            "description": "Menu item (products table) id"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "description": "Kitchen / line comment"
+          },
+          "modifiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateOrderItemModifierDto"
+            }
+          }
+        },
+        "required": [
+          "menuItemId",
+          "quantity"
+        ]
+      },
+      "CreateOrderDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "DINE_IN",
+              "TAKEAWAY",
+              "DELIVERY"
+            ]
+          },
+          "brandId": {
+            "type": "string",
+            "description": "Brand the order belongs to"
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Branch the order is placed at"
+          },
+          "tableNumber": {
+            "type": "string",
+            "description": "Table number (DINE_IN)"
+          },
+          "deliveryAddress": {
+            "type": "string",
+            "description": "Delivery address (DELIVERY)"
+          },
+          "comment": {
+            "type": "string",
+            "description": "Order-level comment"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateOrderItemDto"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "brandId",
+          "branchId",
+          "items"
+        ]
+      },
+      "OrderItemModifierEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "modifierItemId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "priceDelta": {
+            "type": "number",
+            "description": "Price delta in RUB"
+          },
+          "quantity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "modifierItemId",
+          "name",
+          "priceDelta",
+          "quantity"
+        ]
+      },
+      "OrderItemEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "menuItemId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": "number",
+            "description": "Unit price in RUB"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "Line total in RUB"
+          },
+          "comment": {
+            "type": "object"
+          },
+          "modifiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItemModifierEntity"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "menuItemId",
+          "name",
+          "quantity",
+          "unitPrice",
+          "totalAmount",
+          "modifiers"
+        ]
+      },
+      "OrderEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "orderNumber": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NEW",
+              "CONFIRMED",
+              "COOKING",
+              "READY",
+              "COMPLETED",
+              "CANCELLED"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "DINE_IN",
+              "TAKEAWAY",
+              "DELIVERY"
+            ]
+          },
+          "brandId": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          },
+          "tableNumber": {
+            "type": "object"
+          },
+          "deliveryAddress": {
+            "type": "object"
+          },
+          "comment": {
+            "type": "object"
+          },
+          "subtotalAmount": {
+            "type": "number",
+            "description": "Subtotal in RUB"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "Total in RUB"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "estimatedReadyAt": {
+            "type": "object"
+          },
+          "completedAt": {
+            "type": "object"
+          },
+          "cancelledAt": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItemEntity"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "orderNumber",
+          "status",
+          "type",
+          "brandId",
+          "branchId",
+          "subtotalAmount",
+          "totalAmount",
+          "currency",
+          "createdAt",
+          "updatedAt",
+          "items"
+        ]
+      },
+      "OrderPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderEntity"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "UpdateOrderStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "NEW",
+              "CONFIRMED",
+              "COOKING",
+              "READY",
+              "COMPLETED",
+              "CANCELLED"
+            ],
+            "description": "Target status of the transition"
+          },
+          "changedBy": {
+            "type": "string",
+            "description": "Actor performing the transition (user id)"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason, e.g. cancellation cause"
+          }
+        },
+        "required": [
+          "status"
         ]
       }
     }

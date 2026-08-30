@@ -67,6 +67,7 @@ model Brand {
   menuItems       MenuItem[]
   ingredients     Ingredient[]
   modifierGroups  ModifierGroup[]
+  orders          Order[]
 
   @@unique([code], map: "uq_brands_code")
   @@index([status], map: "idx_brands_status")
@@ -95,6 +96,7 @@ model Branch {
   prices        MenuItemPrice[]
   availability  BranchMenuItemAvailability[]
   stopList      StopListEntry[]
+  orders        Order[]
 
   @@unique([code], map: "uq_branches_code")
   @@index([status], map: "idx_branches_status")
@@ -225,6 +227,7 @@ model MenuItem {
   availability    BranchMenuItemAvailability[]
   stopList        StopListEntry[]
   modifierGroups  MenuItemModifierGroup[]
+  orderItems      OrderItem[]
 
   @@unique([brandId, sku], map: "uq_products_brand_id_sku")
   @@unique([brandId, slug], map: "uq_products_brand_id_slug")
@@ -436,6 +439,8 @@ model ModifierItem {
 
   group ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade, map: "fk_modifiers_modifier_groups")
 
+  orderItemModifiers OrderItemModifier[]
+
   @@index([groupId], map: "idx_modifiers_group_id")
   @@map("modifiers")
 }
@@ -454,4 +459,118 @@ model MenuItemModifierGroup {
   @@unique([menuItemId, modifierGroupId], map: "uq_product_modifiers_product_id_modifier_group_id")
   @@index([modifierGroupId], map: "idx_product_modifiers_modifier_group_id")
   @@map("product_modifiers")
+}
+
+// ---------------------------------------------------------------------------
+// Order management (DB-608). Bounded context: orders.
+// Money: Decimal(10,2) in RUB (same task-authorized deviation as the catalog).
+// Order status transitions are governed by the state machine in
+// modules/orders (NEW -> CONFIRMED -> COOKING -> READY -> COMPLETED | CANCELLED).
+// ---------------------------------------------------------------------------
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+}
+
+enum OrderStatus {
+  NEW
+  CONFIRMED
+  COOKING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+model Order {
+  id              String      @id @default(uuid()) @db.Uuid
+  orderNumber     String      @map("order_number")
+  status          OrderStatus @default(NEW)
+  type            OrderType
+  brandId         String      @map("brand_id") @db.Uuid
+  branchId        String      @map("branch_id") @db.Uuid
+  tableNumber     String?     @map("table_number") // DINE_IN
+  deliveryAddress String?     @map("delivery_address") // DELIVERY
+  comment         String?
+  subtotalAmount  Decimal     @default(0) @map("subtotal_amount") @db.Decimal(10, 2)
+  totalAmount     Decimal     @default(0) @map("total_amount") @db.Decimal(10, 2)
+  currency        String      @default("RUB")
+  estimatedReadyAt DateTime?  @map("estimated_ready_at") @db.Timestamptz(6)
+  completedAt     DateTime?   @map("completed_at") @db.Timestamptz(6)
+  cancelledAt     DateTime?   @map("cancelled_at") @db.Timestamptz(6)
+  cancelReason    String?     @map("cancel_reason")
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?   @map("deleted_at") @db.Timestamptz(6)
+  createdBy       String?     @map("created_by") @db.Uuid
+  updatedBy       String?     @map("updated_by") @db.Uuid
+  version         Int         @default(1)
+
+  brand   Brand                @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_orders_brands")
+  branch  Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_orders_branches")
+  items   OrderItem[]
+  history OrderStatusHistory[]
+
+  @@unique([orderNumber], map: "uq_orders_order_number")
+  @@index([brandId], map: "idx_orders_brand_id")
+  @@index([branchId], map: "idx_orders_branch_id")
+  @@index([status], map: "idx_orders_status")
+  @@index([createdAt], map: "idx_orders_created_at")
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  orderId      String   @map("order_id") @db.Uuid
+  menuItemId   String   @map("product_id") @db.Uuid
+  name         String // snapshot of the product name at order time
+  quantity     Int
+  unitPrice    Decimal  @map("unit_price") @db.Decimal(10, 2)
+  totalAmount  Decimal  @map("total_amount") @db.Decimal(10, 2)
+  comment      String?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order     Order               @relation(fields: [orderId], references: [id], onDelete: Cascade, map: "fk_order_items_orders")
+  menuItem  MenuItem            @relation(fields: [menuItemId], references: [id], onDelete: Restrict, map: "fk_order_items_products")
+  modifiers OrderItemModifier[]
+
+  @@index([orderId], map: "idx_order_items_order_id")
+  @@index([menuItemId], map: "idx_order_items_product_id")
+  @@map("order_items")
+}
+
+model OrderItemModifier {
+  id             String   @id @default(uuid()) @db.Uuid
+  orderItemId    String   @map("order_item_id") @db.Uuid
+  modifierItemId String   @map("modifier_id") @db.Uuid
+  name           String // snapshot of the modifier name at order time
+  priceDelta     Decimal  @default(0) @map("price_delta") @db.Decimal(10, 2)
+  quantity       Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  orderItem    OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade, map: "fk_order_item_modifiers_order_items")
+  modifierItem ModifierItem @relation(fields: [modifierItemId], references: [id], onDelete: Restrict, map: "fk_order_item_modifiers_modifiers")
+
+  @@index([orderItemId], map: "idx_order_item_modifiers_order_item_id")
+  @@index([modifierItemId], map: "idx_order_item_modifiers_modifier_id")
+  @@map("order_item_modifiers")
+}
+
+// Append-only audit of order status transitions (DB-608: every status change
+// is recorded in history).
+model OrderStatusHistory {
+  id             String      @id @default(uuid()) @db.Uuid
+  orderId        String      @map("order_id") @db.Uuid
+  previousStatus OrderStatus @map("previous_status")
+  newStatus      OrderStatus @map("new_status")
+  changedBy      String?     @map("changed_by") @db.Uuid
+  reason         String?
+  changedAt      DateTime    @default(now()) @map("changed_at") @db.Timestamptz(6)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, map: "fk_order_status_history_orders")
+
+  @@index([orderId], map: "idx_order_status_history_order_id")
+  @@map("order_status_history")
 }

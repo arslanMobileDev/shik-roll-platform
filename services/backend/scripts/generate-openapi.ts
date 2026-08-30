@@ -15,11 +15,12 @@ async function generate(): Promise<void> {
 
   const config = new DocumentBuilder()
     .setTitle('SHIK Platform — Menu & Product API')
-    .setDescription('Menu & Product catalog API (API-706, DB-607, BE-906)')
+    .setDescription('Menu & Product catalog and Order management API (API-706, DB-607, DB-608, BE-906, BE-907)')
     .setVersion('0.1.0')
     .addTag('menus')
     .addTag('categories')
     .addTag('menu-items')
+    .addTag('orders')
     .build();
   const document = SwaggerModule.createDocument(app, config);
 
