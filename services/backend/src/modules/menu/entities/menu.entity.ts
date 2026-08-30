@@ -14,11 +14,17 @@ export class MenuEntity {
   @ApiProperty()
   name!: string;
 
-  @ApiProperty({ enum: ['DRAFT', 'PUBLISHED', 'ARCHIVED'] })
+  @ApiProperty({ enum: ['DRAFT', 'PUBLISHED', 'UNPUBLISHED'] })
   status!: string;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Current published version number (menu_versions)' })
+  currentVersion!: number | null;
 
   @ApiPropertyOptional({ nullable: true })
   publishedAt!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  unpublishedAt!: string | null;
 
   @ApiProperty()
   categoryCount!: number;

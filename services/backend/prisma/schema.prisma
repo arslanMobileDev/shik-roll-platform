@@ -25,6 +25,15 @@ datasource db {
 enum MenuStatus {
   DRAFT
   PUBLISHED
+  UNPUBLISHED
+}
+
+// Product lifecycle (DB-607 v1.2.0): the single lifecycle field of products;
+// a separate products.is_active flag is not used.
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  HIDDEN
   ARCHIVED
 }
 
@@ -114,22 +123,26 @@ model BrandBranch {
 // ---------------------------------------------------------------------------
 
 model Menu {
-  id          String    @id @default(uuid()) @db.Uuid
-  brandId     String    @map("brand_id") @db.Uuid
-  branchId    String?   @map("branch_id") @db.Uuid
-  name        String
-  status      MenuStatus @default(DRAFT)
-  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
-  createdBy   String?   @map("created_by") @db.Uuid
-  updatedBy   String?   @map("updated_by") @db.Uuid
-  version     Int       @default(1)
+  id             String    @id @default(uuid()) @db.Uuid
+  brandId        String    @map("brand_id") @db.Uuid
+  branchId       String?   @map("branch_id") @db.Uuid
+  name           String
+  status         MenuStatus @default(DRAFT)
+  currentVersion Int?      @map("current_version") // menu_versions.number, set on publish
+  draftUpdatedAt DateTime? @map("draft_updated_at") @db.Timestamptz(6)
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz(6)
+  unpublishedAt  DateTime? @map("unpublished_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBy      String?   @map("created_by") @db.Uuid
+  updatedBy      String?   @map("updated_by") @db.Uuid
+  version        Int       @default(1)
 
   brand      Brand      @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_menus_brands")
   branch     Branch?    @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_menus_branches")
   categories Category[]
+  items      MenuItem[]
 
   @@index([brandId], map: "idx_menus_brand_id")
   @@index([branchId], map: "idx_menus_branch_id")
@@ -160,37 +173,52 @@ model Category {
   children Category[] @relation("CategoryTree")
   items    MenuItem[]
 
+  // DB-607: unique id + menu_id — anchor of the products compound FK.
+  @@unique([id, menuId], map: "uq_menu_categories_id_menu_id")
   @@index([brandId], map: "idx_menu_categories_brand_id")
   @@index([menuId], map: "idx_menu_categories_menu_id")
   @@index([parentId], map: "idx_menu_categories_parent_id")
   @@map("menu_categories")
 }
 
-// MenuItem is mapped to the canonical "products" table (DB-607).
+// MenuItem is mapped to the canonical "products" table (DB-607 v1.2.0).
+// Lifecycle is governed by status only; a separate is_active flag is not used.
+// brand_id is a platform extension over DB-607 for direct multi-brand isolation.
 model MenuItem {
-  id              String    @id @default(uuid()) @db.Uuid
-  brandId         String    @map("brand_id") @db.Uuid
-  categoryId      String    @map("category_id") @db.Uuid
+  id              String        @id @default(uuid()) @db.Uuid
+  brandId         String        @map("brand_id") @db.Uuid
+  menuId          String        @map("menu_id") @db.Uuid
+  categoryId      String        @map("category_id") @db.Uuid
+  sourceKey       String?       @map("source_key") // stable external import key within the menu
   sku             String
   name            String
   slug            String
   description     String?
-  weight          Decimal?  @db.Decimal(10, 3)
+  weight          Decimal?      @db.Decimal(10, 3)
   calories        Int?
-  preparationTime Int?      @map("preparation_time") // minutes
-  isFeatured      Boolean   @default(false) @map("is_featured")
-  isActive        Boolean   @default(false) @map("is_active")
-  basePrice       Decimal   @map("base_price") @db.Decimal(10, 2)
-  currency        String    @default("RUB")
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
-  createdBy       String?   @map("created_by") @db.Uuid
-  updatedBy       String?   @map("updated_by") @db.Uuid
-  version         Int       @default(1)
+  preparationTime Int?          @map("preparation_time") // minutes
+  status          ProductStatus @default(DRAFT)
+  sortOrder       Int           @default(0) @map("sort_order")
+  isPopular       Boolean       @default(false) @map("is_popular")
+  isNew           Boolean       @default(false) @map("is_new")
+  isFeatured      Boolean       @default(false) @map("is_featured")
+  publishedAt     DateTime?     @map("published_at") @db.Timestamptz(6)
+  hiddenAt        DateTime?     @map("hidden_at") @db.Timestamptz(6)
+  archivedAt      DateTime?     @map("archived_at") @db.Timestamptz(6)
+  basePrice       Decimal       @map("base_price") @db.Decimal(10, 2)
+  currency        String        @default("RUB")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?     @map("deleted_at") @db.Timestamptz(6)
+  createdBy       String?       @map("created_by") @db.Uuid
+  updatedBy       String?       @map("updated_by") @db.Uuid
+  version         Int           @default(1)
 
   brand           Brand                        @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_products_brands")
-  category        Category                     @relation(fields: [categoryId], references: [id], onDelete: Restrict, map: "fk_products_menu_categories")
+  menu            Menu                         @relation(fields: [menuId], references: [id], onDelete: Restrict, map: "fk_products_menus")
+  // Compound FK (category_id, menu_id) -> menu_categories(id, menu_id) keeps
+  // a product and its category inside the same menu (DB-607 constraint).
+  category        Category                     @relation(fields: [categoryId, menuId], references: [id, menuId], onDelete: Restrict, map: "fk_products_menu_categories")
   ingredients     MenuItemIngredient[]
   certifications  MenuItemCertification[]
   prices          MenuItemPrice[]
@@ -200,9 +228,12 @@ model MenuItem {
 
   @@unique([brandId, sku], map: "uq_products_brand_id_sku")
   @@unique([brandId, slug], map: "uq_products_brand_id_slug")
+  @@unique([menuId, sourceKey], map: "uq_products_menu_id_source_key")
   @@index([categoryId], map: "idx_products_category_id")
+  @@index([menuId], map: "idx_products_menu_id")
   @@index([brandId], map: "idx_products_brand_id")
-  @@index([isActive], map: "idx_products_is_active")
+  @@index([status], map: "idx_products_status")
+  @@index([sourceKey], map: "idx_products_source_key")
   @@index([name], map: "idx_products_name")
   @@map("products")
 }

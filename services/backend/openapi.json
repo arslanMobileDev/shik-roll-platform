@@ -158,6 +158,52 @@
         ]
       }
     },
+    "/categories/order": {
+      "patch": {
+        "operationId": "MenuController_reorderCategories",
+        "parameters": [
+          {
+            "name": "menuId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "updated": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reorder categories inside a menu (index becomes sort_order)",
+        "tags": [
+          "Menu",
+          "categories"
+        ]
+      }
+    },
     "/categories/{id}": {
       "patch": {
         "operationId": "MenuController_updateCategory",
@@ -194,6 +240,52 @@
           }
         },
         "summary": "Update a category",
+        "tags": [
+          "Menu",
+          "categories"
+        ]
+      }
+    },
+    "/categories/{id}/products/order": {
+      "patch": {
+        "operationId": "MenuController_reorderCategoryProducts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "updated": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reorder products inside a category (index becomes sort_order)",
         "tags": [
           "Menu",
           "categories"
@@ -250,6 +342,21 @@
             "description": "Filter items by category",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Admin filter by lifecycle status. When omitted, the public catalog returns PUBLISHED items only (BE-906).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "PUBLISHED",
+                "HIDDEN",
+                "ARCHIVED"
+              ]
             }
           },
           {
@@ -404,6 +511,120 @@
           }
         },
         "summary": "Update scalar fields of a menu item",
+        "tags": [
+          "Menu",
+          "menu-items"
+        ]
+      },
+      "delete": {
+        "operationId": "MenuController_archiveMenuItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuItemEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Archive a product (lifecycle → ARCHIVED)",
+        "tags": [
+          "Menu",
+          "menu-items"
+        ]
+      }
+    },
+    "/menu-items/{id}/status": {
+      "patch": {
+        "operationId": "MenuController_updateItemStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuItemEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change the product lifecycle status (DRAFT/PUBLISHED/HIDDEN)",
+        "tags": [
+          "Menu",
+          "menu-items"
+        ]
+      }
+    },
+    "/menu-items/{id}/merchandising": {
+      "patch": {
+        "operationId": "MenuController_updateMerchandising",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMerchandisingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuItemEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update manual merchandising flags (popular / new / featured)",
         "tags": [
           "Menu",
           "menu-items"
@@ -582,10 +803,19 @@
             "enum": [
               "DRAFT",
               "PUBLISHED",
-              "ARCHIVED"
+              "UNPUBLISHED"
             ]
           },
+          "currentVersion": {
+            "type": "object",
+            "nullable": true,
+            "description": "Current published version number (menu_versions)"
+          },
           "publishedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "unpublishedAt": {
             "type": "object",
             "nullable": true
           },
@@ -756,6 +986,21 @@
         "required": [
           "menuId",
           "name"
+        ]
+      },
+      "ReorderDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "UUIDs in the desired order; index becomes sortOrder",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
         ]
       },
       "UpdateCategoryDto": {
@@ -1006,6 +1251,23 @@
           "items"
         ]
       },
+      "LifecycleTimestamps": {
+        "type": "object",
+        "properties": {
+          "publishedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "hiddenAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "archivedAt": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      },
       "MenuItemEntity": {
         "type": "object",
         "properties": {
@@ -1014,6 +1276,14 @@
           },
           "brandId": {
             "type": "string"
+          },
+          "menuId": {
+            "type": "string"
+          },
+          "sourceKey": {
+            "type": "object",
+            "nullable": true,
+            "description": "Stable external import key within the menu"
           },
           "sku": {
             "type": "string"
@@ -1045,11 +1315,31 @@
             "nullable": true,
             "description": "Preparation time, minutes"
           },
-          "isFeatured": {
-            "type": "boolean"
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "HIDDEN",
+              "ARCHIVED"
+            ],
+            "description": "Single lifecycle field (DB-607 v1.2.0)"
           },
-          "isActive": {
-            "type": "boolean"
+          "sortOrder": {
+            "type": "number",
+            "description": "Position inside the category"
+          },
+          "isPopular": {
+            "type": "boolean",
+            "description": "Manual merchandising flag"
+          },
+          "isNew": {
+            "type": "boolean",
+            "description": "Manual merchandising flag"
+          },
+          "isFeatured": {
+            "type": "boolean",
+            "description": "Manual merchandising flag"
           },
           "isHalal": {
             "type": "boolean",
@@ -1057,7 +1347,7 @@
           },
           "available": {
             "type": "boolean",
-            "description": "Sellable in the requested branch context: active, available and not stop-listed"
+            "description": "Sellable in the requested branch context: PUBLISHED, available and not stop-listed"
           },
           "price": {
             "$ref": "#/components/schemas/MenuItemPriceEntity"
@@ -1086,6 +1376,9 @@
               "$ref": "#/components/schemas/ModifierGroupEntity"
             }
           },
+          "lifecycle": {
+            "$ref": "#/components/schemas/LifecycleTimestamps"
+          },
           "createdAt": {
             "type": "string"
           },
@@ -1096,12 +1389,16 @@
         "required": [
           "id",
           "brandId",
+          "menuId",
           "sku",
           "name",
           "slug",
           "category",
+          "status",
+          "sortOrder",
+          "isPopular",
+          "isNew",
           "isFeatured",
-          "isActive",
           "isHalal",
           "available",
           "price",
@@ -1110,6 +1407,7 @@
           "certifications",
           "ingredients",
           "modifierGroups",
+          "lifecycle",
           "createdAt",
           "updatedAt"
         ]
@@ -1201,12 +1499,18 @@
             "type": "number",
             "description": "Preparation time, minutes"
           },
+          "sortOrder": {
+            "type": "number",
+            "description": "Position of the item inside its category",
+            "default": 0
+          },
+          "sourceKey": {
+            "type": "string",
+            "description": "Stable external import key within the menu"
+          },
           "isFeatured": {
             "type": "boolean",
-            "default": false
-          },
-          "isActive": {
-            "type": "boolean",
+            "description": "Manual merchandising flag (managed via PATCH merchandising)",
             "default": false
           },
           "ingredients": {
@@ -1278,13 +1582,50 @@
             "type": "number",
             "description": "Preparation time, minutes"
           },
+          "sortOrder": {
+            "type": "number",
+            "description": "Position of the item inside its category",
+            "default": 0
+          },
+          "sourceKey": {
+            "type": "string",
+            "description": "Stable external import key within the menu"
+          },
           "isFeatured": {
             "type": "boolean",
+            "description": "Manual merchandising flag (managed via PATCH merchandising)",
             "default": false
+          }
+        }
+      },
+      "UpdateProductStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "HIDDEN"
+            ],
+            "description": "New lifecycle status. Allowed: DRAFT→PUBLISHED, PUBLISHED→HIDDEN, HIDDEN→PUBLISHED. ARCHIVED via DELETE."
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "UpdateMerchandisingDto": {
+        "type": "object",
+        "properties": {
+          "isPopular": {
+            "type": "boolean"
           },
-          "isActive": {
-            "type": "boolean",
-            "default": false
+          "isNew": {
+            "type": "boolean"
+          },
+          "isFeatured": {
+            "type": "boolean"
           }
         }
       },

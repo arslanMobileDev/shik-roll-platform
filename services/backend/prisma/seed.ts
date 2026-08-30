@@ -124,13 +124,14 @@ async function main() {
       const createdItem = await prisma.menuItem.create({
         data: {
           brandId: brand.id,
+          menuId: menu.id,
           categoryId: createdCategory.id,
           sku: item.sku,
           name: item.name,
           slug: item.sku.toLowerCase(),
           description: item.description ?? null,
           basePrice: item.basePrice,
-          isActive: true,
+          status: 'PUBLISHED',
         },
       });
       for (const [index, ingredient] of item.ingredients.entries()) {

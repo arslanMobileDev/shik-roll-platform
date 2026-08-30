@@ -52,6 +52,7 @@ async function truncateAll(): Promise<void> {
 interface Fixture {
   brandA: string;
   brandB: string;
+  menuA: string;
   branchA1: string;
   branchA2: string;
   branchB1: string;
@@ -61,6 +62,7 @@ interface Fixture {
   itemHalalPriced: string; // halal, base 400, override 450.50 @ branchA1, modifiers
   itemStopListed: string; // stop-listed @ branchA1
   itemUnavailable: string; // halal, availability=false @ branchA1
+  itemDraft: string; // DRAFT — not in the public catalog
   itemBrandB: string;
 }
 
@@ -128,12 +130,15 @@ async function seedFixtures(): Promise<Fixture> {
   const itemHalalPriced = await prisma.menuItem.create({
     data: {
       brandId: brandA.id,
+      menuId: menuA.id,
       categoryId: categoryRolls.id,
       sku: 'ROLL-001',
       name: 'Филадельфия',
       slug: 'filadelfiya',
       basePrice: 400,
-      isActive: true,
+      status: 'PUBLISHED',
+      sortOrder: 1,
+      publishedAt: new Date(),
       ingredients: {
         create: [
           { ingredientId: rice.id, quantity: 50, sortOrder: 0 },
@@ -148,37 +153,57 @@ async function seedFixtures(): Promise<Fixture> {
   const itemStopListed = await prisma.menuItem.create({
     data: {
       brandId: brandA.id,
+      menuId: menuA.id,
       categoryId: categoryRolls.id,
       sku: 'ROLL-002',
       name: 'Калифорния',
       slug: 'kaliforniya',
       basePrice: 300,
-      isActive: true,
+      status: 'PUBLISHED',
+      sortOrder: 0,
+      publishedAt: new Date(),
     },
   });
 
   const itemUnavailable = await prisma.menuItem.create({
     data: {
       brandId: brandA.id,
+      menuId: menuA.id,
       categoryId: categorySets.id,
       sku: 'SET-001',
       name: 'Сет Сяке',
       slug: 'set-syake',
       basePrice: 900,
-      isActive: true,
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
       certifications: { create: [{ tagId: halal.id }] },
+    },
+  });
+
+  const itemDraft = await prisma.menuItem.create({
+    data: {
+      brandId: brandA.id,
+      menuId: menuA.id,
+      categoryId: categoryRolls.id,
+      sku: 'ROLL-003',
+      name: 'Черновик',
+      slug: 'chernovik',
+      basePrice: 100,
+      status: 'DRAFT',
     },
   });
 
   const itemBrandB = await prisma.menuItem.create({
     data: {
       brandId: brandB.id,
+      menuId: menuB.id,
       categoryId: categoryB.id,
       sku: 'BRG-001',
       name: 'Cheeseburger',
       slug: 'cheeseburger',
       basePrice: 250,
-      isActive: true,
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
     },
   });
 
@@ -201,6 +226,7 @@ async function seedFixtures(): Promise<Fixture> {
   return {
     brandA: brandA.id,
     brandB: brandB.id,
+    menuA: menuA.id,
     branchA1: branchA1.id,
     branchA2: branchA2.id,
     branchB1: branchB1.id,
@@ -210,6 +236,7 @@ async function seedFixtures(): Promise<Fixture> {
     itemHalalPriced: itemHalalPriced.id,
     itemStopListed: itemStopListed.id,
     itemUnavailable: itemUnavailable.id,
+    itemDraft: itemDraft.id,
     itemBrandB: itemBrandB.id,
   };
 }
@@ -490,5 +517,98 @@ describe('Menu & Product API (e2e)', () => {
       .send({ parentId: fx.categoryRolls })
       .expect(400);
     expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('public catalog shows only PUBLISHED items (lifecycle gate)', async () => {
+    const pub = await get(`/menu-items?brandId=${fx.brandA}`).expect(200);
+    expect(pub.body.data.every((i: { status: string }) => i.status === 'PUBLISHED')).toBe(true);
+    expect(pub.body.data.map((i: { id: string }) => i.id)).not.toContain(fx.itemDraft);
+
+    // Scoped by search so DRAFT items created by other tests do not leak in.
+    const drafts = await get(
+      `/menu-items?brandId=${fx.brandA}&status=DRAFT&search=${encodeURIComponent('Черновик')}`,
+    ).expect(200);
+    expect(drafts.body.meta.total).toBe(1);
+    expect(drafts.body.data[0]).toMatchObject({ id: fx.itemDraft, status: 'DRAFT' });
+
+    const allDrafts = await get(`/menu-items?brandId=${fx.brandA}&status=DRAFT`).expect(200);
+    expect(
+      allDrafts.body.data.every((i: { status: string }) => i.status === 'DRAFT'),
+    ).toBe(true);
+  });
+
+  it('lifecycle: DRAFT→PUBLISHED→HIDDEN→PUBLISHED; rejects invalid transitions', async () => {
+    const publish = await request(app.getHttpServer())
+      .patch(`/menu-items/${fx.itemDraft}/status`)
+      .send({ status: 'PUBLISHED' })
+      .expect(200);
+    expect(publish.body.status).toBe('PUBLISHED');
+    expect(publish.body.lifecycle.publishedAt).not.toBeNull();
+
+    const invalid = await request(app.getHttpServer())
+      .patch(`/menu-items/${fx.itemDraft}/status`)
+      .send({ status: 'DRAFT' })
+      .expect(400);
+    expect(invalid.body.code).toBe('INVALID_PRODUCT_STATUS_TRANSITION');
+
+    const hidden = await request(app.getHttpServer())
+      .patch(`/menu-items/${fx.itemDraft}/status`)
+      .send({ status: 'HIDDEN' })
+      .expect(200);
+    expect(hidden.body.status).toBe('HIDDEN');
+    expect(hidden.body.lifecycle.hiddenAt).not.toBeNull();
+    expect(hidden.body.available).toBe(false);
+
+    const republished = await request(app.getHttpServer())
+      .patch(`/menu-items/${fx.itemDraft}/status`)
+      .send({ status: 'PUBLISHED' })
+      .expect(200);
+    expect(republished.body.status).toBe('PUBLISHED');
+  });
+
+  it('merchandising flags are independent manual toggles', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/menu-items/${fx.itemHalalPriced}/merchandising`)
+      .send({ isPopular: true, isNew: true })
+      .expect(200);
+    expect(res.body).toMatchObject({ isPopular: true, isNew: true, isFeatured: false });
+  });
+
+  it('DELETE /menu-items/:id archives the product and excludes it from the catalog', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/menu-items')
+      .send({ categoryId: fx.categorySets, sku: 'SET-009', name: 'Архивный сет', basePrice: 500 })
+      .expect(201);
+    expect(created.body.status).toBe('DRAFT');
+
+    const archived = await request(app.getHttpServer())
+      .delete(`/menu-items/${created.body.id}`)
+      .expect(200);
+    expect(archived.body.status).toBe('ARCHIVED');
+    expect(archived.body.lifecycle.archivedAt).not.toBeNull();
+  });
+
+  it('ordering: categories and products reorder by ids', async () => {
+    const reordered = await request(app.getHttpServer())
+      .patch(`/categories/order?menuId=${fx.menuA}`)
+      .send({ ids: [fx.categorySets, fx.categoryRolls] })
+      .expect(200);
+    expect(reordered.body.updated).toBe(2);
+
+    const cats = await get(`/categories?brandId=${fx.brandA}`).expect(200);
+    // Other tests create extra categories in the same menu — assert the fixture pair's relative order.
+    const fixtureOrder = cats.body.data
+      .filter((c: { id: string }) => [fx.categorySets, fx.categoryRolls].includes(c.id))
+      .map((c: { name: string }) => c.name);
+    expect(fixtureOrder).toEqual(['Сеты', 'Роллы']);
+
+    const prodOrder = await request(app.getHttpServer())
+      .patch(`/categories/${fx.categoryRolls}/products/order`)
+      .send({ ids: [fx.itemHalalPriced, fx.itemStopListed] })
+      .expect(200);
+    expect(prodOrder.body.updated).toBe(2);
+
+    const items = await get(`/menu-items?brandId=${fx.brandA}&categoryId=${fx.categoryRolls}`).expect(200);
+    expect(items.body.data[0].id).toBe(fx.itemHalalPriced);
   });
 });

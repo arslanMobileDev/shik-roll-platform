@@ -1,8 +1,11 @@
 import { Prisma } from '@prisma/client';
 import { CategoryEntity } from '../entities/category.entity';
 
+// itemCount counts sellable (PUBLISHED) products — the public catalog figure.
 export type CategoryRecord = Prisma.CategoryGetPayload<{
-  include: { _count: { select: { items: true } } };
+  include: {
+    _count: { select: { items: { where: { status: 'PUBLISHED'; deletedAt: null } } } };
+  };
 }>;
 
 export function toCategoryEntity(record: CategoryRecord): CategoryEntity {

@@ -11,7 +11,9 @@ function makeRecord(overrides: Partial<MenuItemRecord> = {}): MenuItemRecord {
   const base = {
     id: '11111111-1111-1111-1111-111111111111',
     brandId: '22222222-2222-2222-2222-222222222222',
+    menuId: '44444444-4444-4444-4444-444444444444',
     categoryId: '33333333-3333-3333-3333-333333333333',
+    sourceKey: null,
     sku: 'ROLL-001',
     name: 'Филадельфия',
     slug: 'filadelfija',
@@ -19,8 +21,14 @@ function makeRecord(overrides: Partial<MenuItemRecord> = {}): MenuItemRecord {
     weight: null,
     calories: null,
     preparationTime: null,
+    status: 'PUBLISHED',
+    sortOrder: 0,
+    isPopular: false,
+    isNew: false,
     isFeatured: false,
-    isActive: true,
+    publishedAt: new Date('2026-01-01T00:00:00Z'),
+    hiddenAt: null,
+    archivedAt: null,
     basePrice: D('400.00'),
     currency: 'RUB',
     createdAt: new Date('2026-01-01T00:00:00Z'),
@@ -29,7 +37,7 @@ function makeRecord(overrides: Partial<MenuItemRecord> = {}): MenuItemRecord {
     createdBy: null,
     updatedBy: null,
     version: 1,
-    category: { id: '33333333-3333-3333-3333-333333333333', name: 'Роллы', menuId: 'm1' },
+    category: { id: '33333333-3333-3333-3333-333333333333', name: 'Роллы', menuId: '44444444-4444-4444-4444-444444444444' },
     ingredients: [],
     certifications: [],
     prices: [],
@@ -46,6 +54,30 @@ describe('toMenuItemEntity', () => {
     expect(entity.price).toEqual({ base: 400, branch: null, effective: 400, currency: 'RUB' });
     expect(entity.available).toBe(true);
     expect(entity.stopList.isActive).toBe(false);
+    expect(entity.status).toBe('PUBLISHED');
+  });
+
+  it('available requires PUBLISHED status (lifecycle gate)', () => {
+    expect(toMenuItemEntity(makeRecord({ status: 'PUBLISHED' })).available).toBe(true);
+    for (const status of ['DRAFT', 'HIDDEN', 'ARCHIVED'] as const) {
+      expect(toMenuItemEntity(makeRecord({ status })).available).toBe(false);
+    }
+  });
+
+  it('maps lifecycle timestamps and merchandising flags', () => {
+    const entity = toMenuItemEntity(
+      makeRecord({ isPopular: true, isNew: true, sortOrder: 7, sourceKey: 'ext-1' }),
+    );
+    expect(entity).toMatchObject({
+      isPopular: true,
+      isNew: true,
+      isFeatured: false,
+      sortOrder: 7,
+      sourceKey: 'ext-1',
+    });
+    expect(entity.lifecycle.publishedAt).toBe('2026-01-01T00:00:00.000Z');
+    expect(entity.lifecycle.hiddenAt).toBeNull();
+    expect(entity.lifecycle.archivedAt).toBeNull();
   });
 
   it('resolves the branch price override (branch price override rule)', () => {
@@ -194,6 +226,11 @@ describe('MenuService', () => {
             updateCategory: jest.fn(),
             createMenuItem: jest.fn(),
             updateMenuItem: jest.fn(),
+            updateItemStatus: jest.fn(),
+            updateMerchandising: jest.fn(),
+            archiveMenuItem: jest.fn(),
+            reorderCategories: jest.fn(),
+            reorderCategoryProducts: jest.fn(),
             upsertPrice: jest.fn(),
             upsertAvailability: jest.fn(),
             upsertStopList: jest.fn(),
@@ -291,15 +328,15 @@ describe('MenuService', () => {
     ).rejects.toMatchObject({ response: { code: 'CATEGORY_NOT_FOUND' } });
   });
 
-  it('derives brandId from the category when creating an item (tenant consistency)', async () => {
-    repository.findCategoryById.mockResolvedValue({ id: 'c1', brandId: 'brand-A' } as never);
+  it('derives brandId and menuId from the category when creating an item (tenant consistency)', async () => {
+    repository.findCategoryById.mockResolvedValue({ id: 'c1', brandId: 'brand-A', menuId: 'menu-1' } as never);
     repository.createMenuItem.mockResolvedValue({ id: 'i1' } as never);
     repository.findItemById.mockResolvedValue(makeRecord());
 
     await service.createMenuItem({ categoryId: 'c1', sku: 'S1', name: 'Ролл', basePrice: 100 });
     expect(repository.createMenuItem).toHaveBeenCalledWith(
       expect.objectContaining({ sku: 'S1' }),
-      'brand-A',
+      { brandId: 'brand-A', menuId: 'menu-1' },
       'roll',
     );
   });
@@ -328,6 +365,77 @@ describe('MenuService', () => {
       expect.objectContaining({ description: 'новое описание' }),
       undefined,
     );
+  });
+
+  describe('lifecycle: updateItemStatus', () => {
+    const itemWith = (status: string, publishedAt: Date | null = null) =>
+      ({ id: 'i1', status, publishedAt }) as never;
+
+    it.each([
+      ['DRAFT', 'PUBLISHED'],
+      ['PUBLISHED', 'HIDDEN'],
+      ['HIDDEN', 'PUBLISHED'],
+    ])('allows %s → %s', async (from, to) => {
+      repository.findMenuItemById.mockResolvedValue(itemWith(from));
+      repository.updateItemStatus.mockResolvedValue({} as never);
+      repository.findItemById.mockResolvedValue(makeRecord());
+
+      await service.updateItemStatus('i1', { status: to as 'PUBLISHED' | 'HIDDEN' });
+      expect(repository.updateItemStatus).toHaveBeenCalledWith('i1', expect.objectContaining({ status: to }));
+    });
+
+    it.each([
+      ['DRAFT', 'HIDDEN'],
+      ['PUBLISHED', 'DRAFT'],
+      ['HIDDEN', 'DRAFT'],
+      ['ARCHIVED', 'PUBLISHED'],
+    ])('rejects %s → %s with INVALID_PRODUCT_STATUS_TRANSITION', async (from, to) => {
+      repository.findMenuItemById.mockResolvedValue(itemWith(from));
+      await expect(
+        service.updateItemStatus('i1', { status: to as 'PUBLISHED' }),
+      ).rejects.toMatchObject({ response: { code: 'INVALID_PRODUCT_STATUS_TRANSITION' } });
+      expect(repository.updateItemStatus).not.toHaveBeenCalled();
+    });
+
+    it('sets publishedAt only on the first publish', async () => {
+      repository.findMenuItemById.mockResolvedValue(itemWith('DRAFT', null));
+      repository.updateItemStatus.mockResolvedValue({} as never);
+      repository.findItemById.mockResolvedValue(makeRecord());
+      await service.updateItemStatus('i1', { status: 'PUBLISHED' });
+      expect(repository.updateItemStatus).toHaveBeenCalledWith('i1', expect.objectContaining({ publishedAt: expect.any(Date) }));
+
+      jest.clearAllMocks();
+      repository.findMenuItemById.mockResolvedValue(itemWith('HIDDEN', new Date('2026-01-01')));
+      repository.updateItemStatus.mockResolvedValue({} as never);
+      repository.findItemById.mockResolvedValue(makeRecord());
+      await service.updateItemStatus('i1', { status: 'PUBLISHED' });
+      expect(repository.updateItemStatus).toHaveBeenCalledWith('i1', expect.not.objectContaining({ publishedAt: expect.anything() }));
+    });
+
+    it('sets hiddenAt on HIDDEN', async () => {
+      repository.findMenuItemById.mockResolvedValue(itemWith('PUBLISHED', new Date()));
+      repository.updateItemStatus.mockResolvedValue({} as never);
+      repository.findItemById.mockResolvedValue(makeRecord());
+      await service.updateItemStatus('i1', { status: 'HIDDEN' });
+      expect(repository.updateItemStatus).toHaveBeenCalledWith('i1', expect.objectContaining({ status: 'HIDDEN', hiddenAt: expect.any(Date) }));
+    });
+  });
+
+  it('archiveMenuItem archives a product', async () => {
+    repository.findMenuItemById.mockResolvedValue({ id: 'i1' } as never);
+    repository.archiveMenuItem.mockResolvedValue({} as never);
+    repository.findItemById.mockResolvedValue(makeRecord({ status: 'ARCHIVED' }));
+    const entity = await service.archiveMenuItem('i1');
+    expect(repository.archiveMenuItem).toHaveBeenCalledWith('i1');
+    expect(entity.status).toBe('ARCHIVED');
+  });
+
+  it('updateMerchandising passes flags through', async () => {
+    repository.findMenuItemById.mockResolvedValue({ id: 'i1' } as never);
+    repository.updateMerchandising.mockResolvedValue({} as never);
+    repository.findItemById.mockResolvedValue(makeRecord());
+    await service.updateMerchandising('i1', { isPopular: true });
+    expect(repository.updateMerchandising).toHaveBeenCalledWith('i1', { isPopular: true });
   });
 });
 

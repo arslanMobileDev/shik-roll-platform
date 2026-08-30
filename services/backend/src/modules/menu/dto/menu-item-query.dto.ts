@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ProductStatus } from '@prisma/client';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { PaginationQueryDto } from './pagination-query.dto';
 
 const toBoolean = ({ value }: { value: unknown }): unknown =>
@@ -28,6 +29,15 @@ export class MenuItemQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsUUID()
   categoryId?: string;
+
+  @ApiPropertyOptional({
+    enum: ProductStatus,
+    description:
+      'Admin filter by lifecycle status. When omitted, the public catalog returns PUBLISHED items only (BE-906).',
+  })
+  @IsOptional()
+  @IsEnum(ProductStatus)
+  status?: ProductStatus;
 
   @ApiPropertyOptional({
     description: 'Only items holding a valid HALAL certification tag',

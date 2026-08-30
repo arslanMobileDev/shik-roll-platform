@@ -112,15 +112,28 @@ export class CreateMenuItemDto {
   @Max(1440)
   preparationTime?: number;
 
-  @ApiPropertyOptional({ default: false })
+  @ApiPropertyOptional({
+    description: 'Position of the item inside its category',
+    default: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @ApiPropertyOptional({ description: 'Stable external import key within the menu' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  sourceKey?: string;
+
+  @ApiPropertyOptional({
+    description: 'Manual merchandising flag (managed via PATCH merchandising)',
+    default: false,
+  })
   @IsOptional()
   @IsBoolean()
   isFeatured?: boolean;
-
-  @ApiPropertyOptional({ default: false })
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
 
   @ApiPropertyOptional({ type: [MenuItemIngredientInputDto] })
   @IsOptional()
