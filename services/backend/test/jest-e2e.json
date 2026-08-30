@@ -3,8 +3,12 @@
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
+  "setupFiles": ["<rootDir>/setup-e2e.ts"],
   "transform": {
     "^.+\\.(t|j)s$": ["ts-jest", { "isolatedModules": true }]
   },
+  "transformIgnorePatterns": [
+    "node_modules/(?!.*(@nestjs/bullmq|@nestjs/bull-shared|bullmq|msgpackr|cron-parser))/.*"
+  ],
   "testTimeout": 120000
 }

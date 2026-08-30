@@ -26,11 +26,19 @@ const TEST_DATABASE_URL =
 
 // The application's PrismaService picks up DATABASE_URL at instantiation.
 process.env.DATABASE_URL = TEST_DATABASE_URL;
+// No Redis in the test environment: QueuesModule swaps BullMQ for in-memory stubs.
+process.env.DISABLE_QUEUES = 'true';
 
 const prisma = new PrismaClient({ datasourceUrl: TEST_DATABASE_URL });
 
 /** Clears every catalog table in FK-safe order using the Prisma client only. */
 async function truncateAll(): Promise<void> {
+  // Order tables first: this suite shares the test database with
+  // orders.e2e-spec.ts, and order rows restrict catalog deletes.
+  await prisma.orderStatusHistory.deleteMany();
+  await prisma.orderItemModifier.deleteMany();
+  await prisma.orderItem.deleteMany();
+  await prisma.order.deleteMany();
   await prisma.menuItemModifierGroup.deleteMany();
   await prisma.modifierItem.deleteMany();
   await prisma.modifierGroup.deleteMany();
