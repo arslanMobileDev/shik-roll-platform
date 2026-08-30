@@ -1,13 +1,17 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { MenuItemQueryDto } from './dto/menu-item-query.dto';
 import { MenuQueryDto } from './dto/menu-query.dto';
 import { CategoryQueryDto } from './dto/category-query.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
+import { ReorderDto } from './dto/reorder.dto';
 import { UpdateAvailabilityDto } from './dto/update-availability.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
+import { UpdateMerchandisingDto } from './dto/update-merchandising.dto';
 import { UpdatePriceDto } from './dto/update-price.dto';
+import { UpdateProductStatusDto } from './dto/update-product-status.dto';
 import { UpdateStopListDto } from './dto/update-stop-list.dto';
 import { CategoryEntity, CategoryPage } from './entities/category.entity';
 import { MenuEntity, MenuPage } from './entities/menu.entity';
@@ -100,7 +104,11 @@ export class MenuService {
       throw notFound('CATEGORY_NOT_FOUND', `Category ${dto.categoryId} not found`);
     }
     const slug = dto.slug ?? slugify(dto.name, dto.sku.toLowerCase());
-    const created = await this.repository.createMenuItem(dto, category.brandId, slug);
+    const created = await this.repository.createMenuItem(
+      dto,
+      { brandId: category.brandId, menuId: category.menuId },
+      slug,
+    );
     return this.getItemById(created.id);
   }
 
@@ -157,6 +165,73 @@ export class MenuService {
     await this.assertBranchExists(dto.branchId);
     await this.repository.upsertStopList(id, dto.branchId, dto.isActive, dto.reason);
     return this.getItemById(id, dto.branchId);
+  }
+
+  /** Allowed lifecycle transitions (API-706); ARCHIVED is reached via DELETE only. */
+  private static readonly STATUS_TRANSITIONS: Record<string, string[]> = {
+    DRAFT: ['PUBLISHED'],
+    PUBLISHED: ['HIDDEN'],
+    HIDDEN: ['PUBLISHED'],
+    ARCHIVED: [],
+  };
+
+  async updateItemStatus(id: string, dto: UpdateProductStatusDto): Promise<MenuItemEntity> {
+    const item = await this.repository.findMenuItemById(id);
+    if (!item) {
+      throw notFound('PRODUCT_NOT_FOUND', `Menu item ${id} not found`);
+    }
+    const allowed = MenuService.STATUS_TRANSITIONS[item.status] ?? [];
+    if (!allowed.includes(dto.status)) {
+      throw badRequest(
+        'INVALID_PRODUCT_STATUS_TRANSITION',
+        `cannot transition product from ${item.status} to ${dto.status}`,
+      );
+    }
+    const data: Prisma.MenuItemUpdateInput = { status: dto.status };
+    if (dto.status === 'PUBLISHED' && !item.publishedAt) {
+      data.publishedAt = new Date();
+    }
+    if (dto.status === 'HIDDEN') {
+      data.hiddenAt = new Date();
+    }
+    await this.repository.updateItemStatus(id, data);
+    return this.getItemById(id);
+  }
+
+  async updateMerchandising(id: string, dto: UpdateMerchandisingDto): Promise<MenuItemEntity> {
+    const item = await this.repository.findMenuItemById(id);
+    if (!item) {
+      throw notFound('PRODUCT_NOT_FOUND', `Menu item ${id} not found`);
+    }
+    await this.repository.updateMerchandising(id, dto);
+    return this.getItemById(id);
+  }
+
+  async archiveMenuItem(id: string): Promise<MenuItemEntity> {
+    const item = await this.repository.findMenuItemById(id);
+    if (!item) {
+      throw notFound('PRODUCT_NOT_FOUND', `Menu item ${id} not found`);
+    }
+    await this.repository.archiveMenuItem(id);
+    return this.getItemById(id);
+  }
+
+  async reorderCategories(menuId: string, dto: ReorderDto): Promise<{ updated: number }> {
+    const menu = await this.repository.findMenuById(menuId);
+    if (!menu) {
+      throw notFound('MENU_NOT_FOUND', `Menu ${menuId} not found`);
+    }
+    const results = await this.repository.reorderCategories(menuId, dto.ids);
+    return { updated: results.reduce((sum, r) => sum + r.count, 0) };
+  }
+
+  async reorderCategoryProducts(categoryId: string, dto: ReorderDto): Promise<{ updated: number }> {
+    const category = await this.repository.findCategoryById(categoryId);
+    if (!category) {
+      throw notFound('CATEGORY_NOT_FOUND', `Category ${categoryId} not found`);
+    }
+    const results = await this.repository.reorderCategoryProducts(categoryId, category.menuId, dto.ids);
+    return { updated: results.reduce((sum, r) => sum + r.count, 0) };
   }
 
   private async assertCategoryExists(id: string): Promise<void> {

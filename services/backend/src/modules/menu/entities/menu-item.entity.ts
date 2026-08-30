@@ -13,6 +13,17 @@ export class MenuItemCategoryRef {
   menuId!: string;
 }
 
+export class LifecycleTimestamps {
+  @ApiPropertyOptional({ nullable: true })
+  publishedAt!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  hiddenAt!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  archivedAt!: string | null;
+}
+
 export class MenuItemIngredientEntity {
   @ApiProperty()
   ingredientId!: string;
@@ -97,6 +108,12 @@ export class MenuItemEntity {
   brandId!: string;
 
   @ApiProperty()
+  menuId!: string;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Stable external import key within the menu' })
+  sourceKey!: string | null;
+
+  @ApiProperty()
   sku!: string;
 
   @ApiProperty()
@@ -120,18 +137,27 @@ export class MenuItemEntity {
   @ApiPropertyOptional({ nullable: true, description: 'Preparation time, minutes' })
   preparationTime!: number | null;
 
-  @ApiProperty()
-  isFeatured!: boolean;
+  @ApiProperty({ enum: ['DRAFT', 'PUBLISHED', 'HIDDEN', 'ARCHIVED'], description: 'Single lifecycle field (DB-607 v1.2.0)' })
+  status!: string;
 
-  @ApiProperty()
-  isActive!: boolean;
+  @ApiProperty({ description: 'Position inside the category' })
+  sortOrder!: number;
+
+  @ApiProperty({ description: 'Manual merchandising flag' })
+  isPopular!: boolean;
+
+  @ApiProperty({ description: 'Manual merchandising flag' })
+  isNew!: boolean;
+
+  @ApiProperty({ description: 'Manual merchandising flag' })
+  isFeatured!: boolean;
 
   @ApiProperty({ description: 'Holds a valid HALAL certification tag' })
   isHalal!: boolean;
 
   @ApiProperty({
     description:
-      'Sellable in the requested branch context: active, available and not stop-listed',
+      'Sellable in the requested branch context: PUBLISHED, available and not stop-listed',
   })
   available!: boolean;
 
@@ -152,6 +178,9 @@ export class MenuItemEntity {
 
   @ApiProperty({ type: [ModifierGroupEntity] })
   modifierGroups!: ModifierGroupEntity[];
+
+  @ApiProperty()
+  lifecycle!: LifecycleTimestamps;
 
   @ApiProperty()
   createdAt!: string;

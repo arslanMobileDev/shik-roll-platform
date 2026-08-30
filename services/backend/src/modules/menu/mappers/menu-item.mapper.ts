@@ -139,6 +139,8 @@ export function toMenuItemEntity(record: MenuItemRecord, branchId?: string): Men
   return {
     id: record.id,
     brandId: record.brandId,
+    menuId: record.menuId,
+    sourceKey: record.sourceKey,
     sku: record.sku,
     name: record.name,
     slug: record.slug,
@@ -151,10 +153,13 @@ export function toMenuItemEntity(record: MenuItemRecord, branchId?: string): Men
     weight: dec(record.weight),
     calories: record.calories,
     preparationTime: record.preparationTime,
+    status: record.status,
+    sortOrder: record.sortOrder,
+    isPopular: record.isPopular,
+    isNew: record.isNew,
     isFeatured: record.isFeatured,
-    isActive: record.isActive,
     isHalal,
-    available: record.isActive && isAvailable && !isStopListed,
+    available: record.status === 'PUBLISHED' && isAvailable && !isStopListed,
     price: {
       base,
       branch,
@@ -175,6 +180,11 @@ export function toMenuItemEntity(record: MenuItemRecord, branchId?: string): Men
     modifierGroups: [...record.modifierGroups]
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map(toModifierGroupEntity),
+    lifecycle: {
+      publishedAt: iso(record.publishedAt),
+      hiddenAt: iso(record.hiddenAt),
+      archivedAt: iso(record.archivedAt),
+    },
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   };

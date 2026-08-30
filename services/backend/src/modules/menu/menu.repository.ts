@@ -8,6 +8,7 @@ import { MenuItemQueryDto } from './dto/menu-item-query.dto';
 import { MenuQueryDto } from './dto/menu-query.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
+import { UpdateMerchandisingDto } from './dto/update-merchandising.dto';
 import { CategoryRecord } from './mappers/category.mapper';
 import { buildMenuItemInclude, HALAL_CODE, MenuItemRecord } from './mappers/menu-item.mapper';
 import { MenuRecord } from './mappers/menu.mapper';
@@ -67,7 +68,10 @@ export class MenuRepository {
       ...(query.menuId ? { menuId: query.menuId } : {}),
       ...(query.brandId ? { brandId: query.brandId } : {}),
     };
-    const include = { _count: { select: { items: true } } };
+    // CategoryRecord counts sellable (PUBLISHED) products only — the public figure.
+    const include: Prisma.CategoryInclude = {
+      _count: { select: { items: { where: { status: 'PUBLISHED', deletedAt: null } } } },
+    };
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.category.findMany({
         where,
@@ -85,7 +89,8 @@ export class MenuRepository {
     const now = new Date();
     const where: Prisma.MenuItemWhereInput = {
       deletedAt: null,
-      isActive: true,
+      // Public catalog exposes PUBLISHED only; an explicit status is the admin filter (BE-906).
+      status: query.status ?? 'PUBLISHED',
       ...(query.brandId ? { brandId: query.brandId } : {}),
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.search
@@ -128,7 +133,7 @@ export class MenuRepository {
       this.prisma.menuItem.findMany({
         where,
         include,
-        orderBy: [{ name: 'asc' }],
+        orderBy: [{ categoryId: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
         skip: (query.page! - 1) * query.limit!,
         take: query.limit,
       }),
@@ -173,7 +178,7 @@ export class MenuRepository {
         sortOrder: dto.sortOrder ?? 0,
         isActive: dto.isActive ?? false,
       },
-      include: { _count: { select: { items: true } } },
+      include: { _count: { select: { items: { where: { status: 'PUBLISHED', deletedAt: null } } } } },
     });
     return row as CategoryRecord;
   }
@@ -190,16 +195,22 @@ export class MenuRepository {
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
         version: { increment: 1 },
       },
-      include: { _count: { select: { items: true } } },
+      include: { _count: { select: { items: { where: { status: 'PUBLISHED', deletedAt: null } } } } },
     });
     return row as CategoryRecord;
   }
 
-  createMenuItem(dto: CreateMenuItemDto, brandId: string, slug: string) {
+  createMenuItem(
+    dto: CreateMenuItemDto,
+    ctx: { brandId: string; menuId: string },
+    slug: string,
+  ) {
     return this.prisma.menuItem.create({
       data: {
-        brandId,
+        brandId: ctx.brandId,
+        menuId: ctx.menuId,
         categoryId: dto.categoryId,
+        sourceKey: dto.sourceKey ?? null,
         sku: dto.sku,
         name: dto.name,
         slug,
@@ -209,8 +220,9 @@ export class MenuRepository {
         weight: dto.weight ?? null,
         calories: dto.calories ?? null,
         preparationTime: dto.preparationTime ?? null,
+        sortOrder: dto.sortOrder ?? 0,
         isFeatured: dto.isFeatured ?? false,
-        isActive: dto.isActive ?? false,
+        status: 'DRAFT',
         ...(dto.ingredients
           ? {
               ingredients: {
@@ -261,11 +273,61 @@ export class MenuRepository {
         ...(dto.preparationTime !== undefined
           ? { preparationTime: dto.preparationTime }
           : {}),
+        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
         ...(dto.isFeatured !== undefined ? { isFeatured: dto.isFeatured } : {}),
-        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
         version: { increment: 1 },
       },
     });
+  }
+
+  updateItemStatus(id: string, data: Prisma.MenuItemUpdateInput) {
+    return this.prisma.menuItem.update({
+      where: { id },
+      data: { ...data, version: { increment: 1 } },
+    });
+  }
+
+  archiveMenuItem(id: string) {
+    return this.prisma.menuItem.update({
+      where: { id },
+      data: { status: 'ARCHIVED', archivedAt: new Date(), version: { increment: 1 } },
+    });
+  }
+
+  updateMerchandising(id: string, dto: UpdateMerchandisingDto) {
+    return this.prisma.menuItem.update({
+      where: { id },
+      data: {
+        ...(dto.isPopular !== undefined ? { isPopular: dto.isPopular } : {}),
+        ...(dto.isNew !== undefined ? { isNew: dto.isNew } : {}),
+        ...(dto.isFeatured !== undefined ? { isFeatured: dto.isFeatured } : {}),
+        version: { increment: 1 },
+      },
+    });
+  }
+
+  /** Sets sort_order of the given categories to their array index (one transaction). */
+  async reorderCategories(menuId: string, ids: string[]) {
+    return this.prisma.$transaction(
+      ids.map((id, index) =>
+        this.prisma.category.updateMany({
+          where: { id, menuId, deletedAt: null },
+          data: { sortOrder: index },
+        }),
+      ),
+    );
+  }
+
+  /** Sets sort_order of items inside one category to their array index. */
+  async reorderCategoryProducts(categoryId: string, menuId: string, ids: string[]) {
+    return this.prisma.$transaction(
+      ids.map((id, index) =>
+        this.prisma.menuItem.updateMany({
+          where: { id, categoryId, menuId, deletedAt: null },
+          data: { sortOrder: index },
+        }),
+      ),
+    );
   }
 
   async upsertPrice(
