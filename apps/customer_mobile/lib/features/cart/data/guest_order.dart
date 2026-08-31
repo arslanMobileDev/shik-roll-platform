@@ -13,9 +13,13 @@ final class GuestOrder extends Equatable {
 
   factory GuestOrder.fromJson(Map<String, dynamic> json) {
     try {
+      final orderNumber = json['orderNumber'];
+      if (orderNumber == null) {
+        throw const FormatException('Missing orderNumber in order payload');
+      }
       return GuestOrder(
         id: json['id'] as String,
-        orderNumber: '${json['orderNumber']}',
+        orderNumber: '$orderNumber',
         status: json['status'] as String? ?? 'NEW',
         totalAmount: Money.fromRubles((json['totalAmount'] as num?) ?? 0),
       );
