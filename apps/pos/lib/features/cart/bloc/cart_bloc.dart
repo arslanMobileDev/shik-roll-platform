@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../orders/data/create_order_request.dart';
+import '../../orders/data/orders_repository.dart';
 import '../domain/cart_line.dart';
 import 'cart_event.dart';
 import 'cart_state.dart';
@@ -7,14 +9,20 @@ import 'cart_state.dart';
 /// Cashier cart: items, modifier configurations, quantities and totals.
 ///
 /// All money math is exact decimal (integer kopecks via [Money]); the bloc
-/// holds the only source of truth for the order being built.
+/// holds the only source of truth for the order being built and submits it
+/// to the Orders API on checkout.
 class CartBloc extends Bloc<CartEvent, CartState> {
-  CartBloc() : super(const CartState()) {
+  CartBloc({required this.ordersRepository}) : super(const CartState()) {
     on<CartItemAdded>(_onItemAdded);
     on<CartLineQuantityChanged>(_onQuantityChanged);
     on<CartLineRemoved>(_onLineRemoved);
     on<CartCleared>(_onCleared);
+    on<CheckoutSubmitted>(_onCheckoutSubmitted);
+    on<CheckoutFeedbackConsumed>(_onFeedbackConsumed);
   }
+
+  /// Orders API access used by [CheckoutSubmitted].
+  final OrdersRepository ordersRepository;
 
   void _onItemAdded(CartItemAdded event, Emitter<CartState> emit) {
     if (!event.item.available || event.quantity <= 0) return;
@@ -57,6 +65,70 @@ class CartBloc extends Bloc<CartEvent, CartState> {
 
   void _onCleared(CartCleared event, Emitter<CartState> emit) {
     emit(const CartState());
+  }
+
+  Future<void> _onCheckoutSubmitted(
+    CheckoutSubmitted event,
+    Emitter<CartState> emit,
+  ) async {
+    if (state.isEmpty || state.isCheckoutInProgress) return;
+    emit(state.copyWith(checkoutStatus: CheckoutStatus.inProgress));
+    try {
+      final order = await ordersRepository.createOrder(
+        CreateOrderRequest(
+          branchId: event.branchId,
+          orderType: event.orderType,
+          tableNumber: event.tableNumber,
+          comment: event.comment,
+          items: [
+            for (final line in state.lines)
+              OrderItemRequest(
+                menuItemId: line.itemId,
+                quantity: line.quantity,
+                selectedModifiers: [
+                  for (final modifier in line.modifiers)
+                    SelectedModifierRequest(modifierItemId: modifier.optionId),
+                ],
+              ),
+          ],
+        ),
+      );
+      // Success clears the cart; the order number is kept for the
+      // confirmation dialog.
+      emit(
+        CartState(
+          checkoutStatus: CheckoutStatus.success,
+          completedOrder: order,
+        ),
+      );
+    } on OrdersException catch (e) {
+      emit(
+        state.copyWith(
+          checkoutStatus: CheckoutStatus.failure,
+          checkoutError: e.message,
+        ),
+      );
+    } catch (_) {
+      emit(
+        state.copyWith(
+          checkoutStatus: CheckoutStatus.failure,
+          checkoutError: 'Не удалось отправить заказ. Попробуйте ещё раз.',
+        ),
+      );
+    }
+  }
+
+  void _onFeedbackConsumed(
+    CheckoutFeedbackConsumed event,
+    Emitter<CartState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        checkoutStatus: CheckoutStatus.idle,
+        completedOrder: null,
+        checkoutError: null,
+      ),
+    );
   }
 
   void _removeLine(String lineKey, Emitter<CartState> emit) {

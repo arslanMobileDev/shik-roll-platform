@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../catalog/data/catalog_models.dart';
+import '../../orders/domain/order_entity.dart';
 import '../domain/cart_line.dart';
 
 sealed class CartEvent extends Equatable {
@@ -48,4 +49,30 @@ final class CartLineRemoved extends CartEvent {
 
 final class CartCleared extends CartEvent {
   const CartCleared();
+}
+
+/// Submits the current cart to the Orders API (`POST /orders`).
+final class CheckoutSubmitted extends CartEvent {
+  const CheckoutSubmitted({
+    required this.branchId,
+    required this.orderType,
+    this.tableNumber,
+    this.comment,
+  });
+
+  final String branchId;
+  final OrderType orderType;
+
+  /// Table label for [OrderType.dineIn] orders.
+  final String? tableNumber;
+  final String? comment;
+
+  @override
+  List<Object?> get props => [branchId, orderType, tableNumber, comment];
+}
+
+/// Resets checkout feedback (success dialog dismissed / error snackbar
+/// shown) back to [CheckoutStatus.idle].
+final class CheckoutFeedbackConsumed extends CartEvent {
+  const CheckoutFeedbackConsumed();
 }

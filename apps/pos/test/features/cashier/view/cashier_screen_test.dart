@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pos/app/app.dart';
 import 'package:pos/features/catalog/data/fake_catalog_repository.dart';
+import 'package:pos/features/orders/data/fake_orders_repository.dart';
 
 void main() {
   Future<void> pumpCashier(WidgetTester tester) async {
@@ -10,7 +11,10 @@ void main() {
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
-      PosApp(catalogRepository: FakeCatalogRepository(latency: Duration.zero)),
+      PosApp(
+        catalogRepository: FakeCatalogRepository(latency: Duration.zero),
+        ordersRepository: FakeOrdersRepository(latency: Duration.zero),
+      ),
     );
     await tester.pumpAndSettle();
   }
