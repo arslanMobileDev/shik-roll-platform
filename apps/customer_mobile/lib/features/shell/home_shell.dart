@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../cart/bloc/cart_cubit.dart';
+import '../cart/bloc/cart_state.dart';
+import '../cart/bloc/checkout_cubit.dart';
+import '../cart/bloc/customer_cart_bloc.dart';
+import '../cart/data/orders_repository.dart';
+import '../cart/view/cart_screen.dart';
 import '../menu/bloc/order_type.dart';
 import '../menu/bloc/menu_bloc.dart';
 import '../menu/bloc/menu_event.dart';
@@ -10,9 +14,14 @@ import '../menu/view/menu_screen.dart';
 
 /// Mobile shell with the bottom navigation: Меню, Корзина, Заказы, Профиль.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, required this.repository});
+  const HomeShell({
+    super.key,
+    required this.repository,
+    required this.ordersRepository,
+  });
 
   final CustomerMenuRepository repository;
+  final CustomerOrdersRepository ordersRepository;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -25,7 +34,10 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider<CartCountCubit>(create: (_) => CartCountCubit()),
+        BlocProvider<CustomerCartBloc>(create: (_) => CustomerCartBloc()),
+        BlocProvider<CheckoutCubit>(
+          create: (_) => CheckoutCubit(repository: widget.ordersRepository),
+        ),
         BlocProvider<OrderTypeCubit>(create: (_) => OrderTypeCubit()),
         BlocProvider<MenuBloc>(
           create: (_) => MenuBloc(repository: widget.repository)
@@ -39,7 +51,7 @@ class _HomeShellState extends State<HomeShell> {
               index: _tab,
               children: [
                 const MenuScreen(),
-                _PlaceholderTab(title: 'Корзина', icon: Icons.shopping_cart_outlined),
+                CartScreen(onGoToMenu: () => setState(() => _tab = 0)),
                 _PlaceholderTab(
                   title: 'Заказы',
                   icon: Icons.receipt_long_outlined,
@@ -59,11 +71,11 @@ class _HomeShellState extends State<HomeShell> {
                   label: 'Меню',
                 ),
                 NavigationDestination(
-                  icon: BlocBuilder<CartCountCubit, int>(
-                    builder: (context, count) {
+                  icon: BlocBuilder<CustomerCartBloc, CartState>(
+                    builder: (context, cart) {
                       return Badge(
-                        isLabelVisible: count > 0,
-                        label: Text('$count'),
+                        isLabelVisible: cart.itemCount > 0,
+                        label: Text('${cart.itemCount}'),
                         child: const Icon(Icons.shopping_cart_outlined),
                       );
                     },

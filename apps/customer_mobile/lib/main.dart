@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'app/app.dart';
 import 'core/config/app_config.dart';
 import 'core/network/api_client.dart';
+import 'features/cart/data/fake_orders_repository.dart';
+import 'features/cart/data/orders_repository.dart';
 import 'features/menu/data/fake_customer_menu_repository.dart';
 import 'features/menu/data/menu_repository.dart';
 
@@ -24,5 +26,13 @@ Future<void> main() async {
           latency: const Duration(milliseconds: 200),
         );
 
-  runApp(CustomerApp(repository: repository));
+  final CustomerOrdersRepository ordersRepository = AppConfig.useRemoteMenu
+      ? RemoteCustomerOrdersRepository(
+          ApiClient(baseUrl: AppConfig.apiBaseUrl),
+        )
+      : FakeCustomerOrdersRepository(
+          latency: const Duration(milliseconds: 600),
+        );
+
+  runApp(CustomerApp(repository: repository, ordersRepository: ordersRepository));
 }

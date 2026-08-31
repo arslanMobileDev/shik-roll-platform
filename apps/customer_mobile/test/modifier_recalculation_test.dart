@@ -1,5 +1,5 @@
 import 'package:customer_mobile/core/utils/money.dart';
-import 'package:customer_mobile/features/cart/bloc/cart_cubit.dart';
+import 'package:customer_mobile/features/cart/bloc/customer_cart_bloc.dart';
 import 'package:customer_mobile/features/menu/data/menu_models.dart';
 import 'package:customer_mobile/features/menu/view/widgets/product_details/product_details_view.dart';
 import 'package:flutter/material.dart';
@@ -81,8 +81,8 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
-        home: BlocProvider<CartCountCubit>(
-          create: (_) => CartCountCubit(),
+        home: BlocProvider<CustomerCartBloc>(
+          create: (_) => CustomerCartBloc(),
           child: Scaffold(body: ProductDetailsView(item: _item)),
         ),
       ),
@@ -100,8 +100,8 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
-        home: BlocProvider<CartCountCubit>(
-          create: (_) => CartCountCubit(),
+        home: BlocProvider<CustomerCartBloc>(
+          create: (_) => CustomerCartBloc(),
           child: Scaffold(body: ProductDetailsView(item: _item)),
         ),
       ),

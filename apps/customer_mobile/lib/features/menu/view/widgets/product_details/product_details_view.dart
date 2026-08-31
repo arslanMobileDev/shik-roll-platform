@@ -4,7 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_spacing.dart';
 import '../../../../../core/widgets/halal_status_badge.dart';
-import '../../../../cart/bloc/cart_cubit.dart';
+import '../../../../cart/bloc/cart_event.dart';
+import '../../../../cart/bloc/customer_cart_bloc.dart';
 import '../../../data/menu_models.dart';
 import 'modifier_selector.dart';
 import 'product_details_cubit.dart';
@@ -147,7 +148,12 @@ class _ProductDetailsContent extends StatelessWidget {
                   key: const ValueKey('add-to-cart-button'),
                   onPressed: state.isValid
                       ? () {
-                          context.read<CartCountCubit>().addItem();
+                          context.read<CustomerCartBloc>().add(
+                            CartItemAdded(
+                              item: item,
+                              selection: state.selection,
+                            ),
+                          );
                           Navigator.of(context).pop();
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
