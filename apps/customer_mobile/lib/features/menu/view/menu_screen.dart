@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/theme/app_spacing.dart';
-import '../../../features/cart/bloc/cart_cubit.dart';
+import '../../../features/cart/bloc/cart_event.dart';
+import '../../../features/cart/bloc/customer_cart_bloc.dart';
 import '../bloc/menu_bloc.dart';
 import '../bloc/menu_event.dart';
 import '../bloc/menu_state.dart';
@@ -122,7 +123,9 @@ class _MenuContent extends StatelessWidget {
                   return MenuItemCard(
                     item: item,
                     onAddToCart: () {
-                      context.read<CartCountCubit>().addItem();
+                      context.read<CustomerCartBloc>().add(
+                        CartItemAdded(item: item),
+                      );
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('${item.name} — в корзине')),
                       );
