@@ -10,24 +10,29 @@ import '../features/cashier/view/cashier_screen.dart';
 import '../features/catalog/bloc/catalog_bloc.dart';
 import '../features/catalog/bloc/catalog_event.dart';
 import '../features/catalog/data/catalog_repository.dart';
+import '../features/orders/data/orders_repository.dart';
 import '../features/tables/bloc/order_mode_cubit.dart';
 import 'injection.dart';
 
 /// SHIK Platform POS application (UI-806).
 class PosApp extends StatelessWidget {
-  PosApp({super.key, CatalogRepository? catalogRepository})
-    : _catalogRepository =
-          catalogRepository ?? getIt<CatalogRepository>(),
-      _router = GoRouter(
-        routes: [
-          GoRoute(
-            path: '/',
-            builder: (context, state) => const CashierScreen(),
-          ),
-        ],
-      );
+  PosApp({
+    super.key,
+    CatalogRepository? catalogRepository,
+    OrdersRepository? ordersRepository,
+  }) : _catalogRepository = catalogRepository ?? getIt<CatalogRepository>(),
+       _ordersRepository = ordersRepository ?? getIt<OrdersRepository>(),
+       _router = GoRouter(
+         routes: [
+           GoRoute(
+             path: '/',
+             builder: (context, state) => const CashierScreen(),
+           ),
+         ],
+       );
 
   final CatalogRepository _catalogRepository;
+  final OrdersRepository _ordersRepository;
   final GoRouter _router;
 
   @override
@@ -44,7 +49,9 @@ class PosApp extends StatelessWidget {
               ),
             ),
         ),
-        BlocProvider(create: (_) => CartBloc()),
+        BlocProvider(
+          create: (_) => CartBloc(ordersRepository: _ordersRepository),
+        ),
         BlocProvider(create: (_) => OrderModeCubit()),
       ],
       child: MaterialApp.router(

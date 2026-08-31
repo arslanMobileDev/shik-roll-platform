@@ -23,9 +23,7 @@ import '../../tables/view/order_mode_selector.dart';
 /// - 1024–1279 px — same layout, compact cart panel;
 /// - <1024 px — tablet fallback: catalog full width, cart via sheet.
 class CashierScreen extends StatelessWidget {
-  const CashierScreen({super.key, this.onCheckout});
-
-  final VoidCallback? onCheckout;
+  const CashierScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -70,13 +68,11 @@ class CashierScreen extends StatelessWidget {
                         left: BorderSide(color: AppColors.gray200),
                       ),
                     ),
-                    child: CartPanel(onCheckout: onCheckout),
+                    child: const CartPanel(),
                   ),
               ],
             ),
-            floatingActionButton: isCompact
-                ? TabletCartButton(onCheckout: onCheckout)
-                : null,
+            floatingActionButton: isCompact ? const TabletCartButton() : null,
           );
         },
       ),
@@ -86,9 +82,7 @@ class CashierScreen extends StatelessWidget {
 
 /// Cart access for the tablet layout (<1024 px).
 class TabletCartButton extends StatelessWidget {
-  const TabletCartButton({super.key, this.onCheckout});
-
-  final VoidCallback? onCheckout;
+  const TabletCartButton({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -117,10 +111,11 @@ class TabletCartButton extends StatelessWidget {
           providers: [
             BlocProvider.value(value: context.read<CartBloc>()),
             BlocProvider.value(value: context.read<OrderModeCubit>()),
+            BlocProvider.value(value: context.read<PosContextCubit>()),
           ],
-          child: FractionallySizedBox(
+          child: const FractionallySizedBox(
             heightFactor: 0.85,
-            child: CartPanel(onCheckout: onCheckout),
+            child: CartPanel(),
           ),
         );
       },
