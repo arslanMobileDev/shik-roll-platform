@@ -1,0 +1,40 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+
+# IntelliJ
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Android
+**/android/**/gradle-wrapper.jar
+*.aab
+*.apk
+**/android/.gradle
+**/android/key.properties
+
+# iOS
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved.*
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/*sync*
+**/ios/.sconsign.dblite
