@@ -7,6 +7,8 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/money.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/view/auth_flow.dart';
+import '../../legal/data/legal_document.dart';
+import '../../legal/view/legal_document_viewer_screen.dart';
 import '../../menu/bloc/order_type.dart';
 import '../../menu/view/widgets/order_type_toggle.dart';
 import '../../payments/view/payment_status_screen.dart';
@@ -333,23 +335,65 @@ class _OfferCheckboxState extends State<_OfferCheckbox> {
     );
   }
 
-  void _showOffer() {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Публичная оферта'),
-        content: const SingleChildScrollView(
-          child: Text(
-            'Полный текст оферты публикуется на сайте SHIK ROLL. '
-            'Оформляя заказ, вы принимаете условия продажи товаров и '
-            'даёте согласие на обработку персональных данных.',
+  void _showOffer() => showLegalDocumentSheet(context, LegalDocument.offer);
+}
+
+/// Юридическая сноска под способами оплаты, перед кнопкой подтверждения:
+/// «Оферты» и «Политикой конфиденциальности» открывают модальные окна
+/// с полными текстами документов.
+class _LegalFootnote extends StatefulWidget {
+  const _LegalFootnote();
+
+  @override
+  State<_LegalFootnote> createState() => _LegalFootnoteState();
+}
+
+class _LegalFootnoteState extends State<_LegalFootnote> {
+  late final TapGestureRecognizer _offerRecognizer = TapGestureRecognizer()
+    ..onTap = () => showLegalDocumentSheet(context, LegalDocument.offer);
+  late final TapGestureRecognizer _privacyRecognizer = TapGestureRecognizer()
+    ..onTap = () => showLegalDocumentSheet(context, LegalDocument.privacy);
+
+  @override
+  void dispose() {
+    _offerRecognizer.dispose();
+    _privacyRecognizer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const linkStyle = TextStyle(
+      color: AppColors.primary,
+      decoration: TextDecoration.underline,
+    );
+    return Text.rich(
+      key: const ValueKey('checkout-legal-footnote'),
+      textAlign: TextAlign.center,
+      TextSpan(
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: AppColors.gray600),
+        children: [
+          const TextSpan(
+            text: 'Нажимая кнопку оплаты, вы соглашаетесь с условиями ',
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Закрыть'),
+          TextSpan(
+            text: 'Оферты',
+            style: linkStyle,
+            recognizer: _offerRecognizer,
           ),
+          const TextSpan(text: ' и '),
+          TextSpan(
+            text: 'Политикой конфиденциальности',
+            style: linkStyle,
+            recognizer: _privacyRecognizer,
+          ),
+          // Финальная точка вне ссылки: спан-recognizer в самом конце
+          // текста на последней строке не получает hit-test (EOF-позиция
+          // getClosestGlyphForOffset), поэтому ссылка не должна быть
+          // последним символом абзаца.
+          const TextSpan(text: '.'),
         ],
       ),
     );
@@ -387,6 +431,8 @@ class _CheckoutBar extends StatelessWidget {
               Text(total.format(), style: theme.textTheme.titleMedium),
             ],
           ),
+          const SizedBox(height: AppSpacing.s8),
+          const _LegalFootnote(),
           const SizedBox(height: AppSpacing.s8),
           SizedBox(
             width: double.infinity,
