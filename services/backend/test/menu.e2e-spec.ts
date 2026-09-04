@@ -35,6 +35,7 @@ const prisma = new PrismaClient({ datasourceUrl: TEST_DATABASE_URL });
 async function truncateAll(): Promise<void> {
   // Order tables first: this suite shares the test database with
   // orders.e2e-spec.ts, and order rows restrict catalog deletes.
+  await prisma.payment.deleteMany();
   await prisma.orderStatusHistory.deleteMany();
   await prisma.orderItemModifier.deleteMany();
   await prisma.orderItem.deleteMany();
