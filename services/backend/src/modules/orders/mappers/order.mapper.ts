@@ -22,6 +22,7 @@ export function toOrderEntity(record: OrderRecord): OrderEntity {
     type: record.type,
     brandId: record.brandId,
     branchId: record.branchId,
+    customerId: record.customerId,
     tableNumber: record.tableNumber,
     deliveryAddress: record.deliveryAddress,
     comment: record.comment,

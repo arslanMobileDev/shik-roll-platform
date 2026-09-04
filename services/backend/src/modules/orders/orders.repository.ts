@@ -7,6 +7,7 @@ export interface OrderListFilter {
   brandId?: string;
   branchId?: string;
   status?: OrderStatus;
+  customerId?: string;
   page: number;
   limit: number;
 }
@@ -26,6 +27,7 @@ export class OrdersRepository {
       ...(filter.brandId ? { brandId: filter.brandId } : {}),
       ...(filter.branchId ? { branchId: filter.branchId } : {}),
       ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.customerId ? { customerId: filter.customerId } : {}),
     };
 
     const [records, total] = await this.prisma.$transaction([

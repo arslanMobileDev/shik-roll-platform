@@ -26,13 +26,19 @@ export class OrdersService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async list(query: OrderQueryDto): Promise<OrderPage> {
+  /**
+   * List orders. When the request carries a guest token (customerId), the
+   * result is restricted to that customer's orders — guests never see
+   * other customers' orders regardless of the query filters.
+   */
+  async list(query: OrderQueryDto, customerId?: string): Promise<OrderPage> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const { records, total } = await this.repository.list({
       brandId: query.brandId,
       branchId: query.branchId,
       status: query.status,
+      customerId,
       page,
       limit,
     });
@@ -62,10 +68,11 @@ export class OrdersService {
   /**
    * Create an order (BE-907 atomic operation). Prices, names and totals are
    * resolved on the server from the catalog — client-supplied prices are
-   * never trusted. After the transaction commits, background processing is
-   * scheduled on the 'order-processing' BullMQ queue.
+   * never trusted. When the request is authenticated as a guest, the order
+   * is bound to that customer. After the transaction commits, background
+   * processing is scheduled on the 'order-processing' BullMQ queue.
    */
-  async create(dto: CreateOrderDto): Promise<OrderEntity> {
+  async create(dto: CreateOrderDto, customerId?: string): Promise<OrderEntity> {
     const menuItemIds = dto.items.map((item) => item.menuItemId);
     const modifierIds = dto.items.flatMap(
       (item) => item.modifiers?.map((modifier) => modifier.modifierItemId) ?? [],
@@ -157,6 +164,7 @@ export class OrdersService {
       status: OrderStatus.NEW,
       brand: { connect: { id: dto.brandId } },
       branch: { connect: { id: dto.branchId } },
+      ...(customerId ? { customer: { connect: { id: customerId } } } : {}),
       tableNumber: dto.tableNumber ?? null,
       deliveryAddress: dto.deliveryAddress ?? null,
       comment: dto.comment ?? null,

@@ -64,6 +64,9 @@ export class OrderEntity {
   @ApiProperty()
   branchId!: string;
 
+  @ApiPropertyOptional({ description: 'Guest customer who placed the order (mobile app)' })
+  customerId!: string | null;
+
   @ApiPropertyOptional()
   tableNumber!: string | null;
 

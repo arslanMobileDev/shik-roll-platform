@@ -490,6 +490,7 @@ model Order {
   type            OrderType
   brandId         String      @map("brand_id") @db.Uuid
   branchId        String      @map("branch_id") @db.Uuid
+  customerId      String?     @map("customer_id") @db.Uuid // guest who placed the order (mobile app)
   tableNumber     String?     @map("table_number") // DINE_IN
   deliveryAddress String?     @map("delivery_address") // DELIVERY
   comment         String?
@@ -507,17 +508,39 @@ model Order {
   updatedBy       String?     @map("updated_by") @db.Uuid
   version         Int         @default(1)
 
-  brand   Brand                @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_orders_brands")
-  branch  Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_orders_branches")
-  items   OrderItem[]
-  history OrderStatusHistory[]
+  brand    Brand                @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_orders_brands")
+  branch   Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_orders_branches")
+  customer Customer?            @relation(fields: [customerId], references: [id], onDelete: Restrict, map: "fk_orders_customers")
+  items    OrderItem[]
+  history  OrderStatusHistory[]
 
   @@unique([orderNumber], map: "uq_orders_order_number")
   @@index([brandId], map: "idx_orders_brand_id")
   @@index([branchId], map: "idx_orders_branch_id")
+  @@index([customerId], map: "idx_orders_customer_id")
   @@index([status], map: "idx_orders_status")
   @@index([createdAt], map: "idx_orders_created_at")
   @@map("orders")
+}
+
+// ---------------------------------------------------------------------------
+// Guest customers (mobile app). Bounded context: auth.
+// A customer is auto-provisioned on the first successful OTP verification;
+// phone is the single sign-in identifier (E.164, +7XXXXXXXXXX).
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id        String   @id @default(uuid()) @db.Uuid
+  phone     String   // E.164, unique sign-in identifier
+  name      String?
+  email     String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orders Order[]
+
+  @@unique([phone], map: "uq_customers_phone")
+  @@map("customers")
 }
 
 model OrderItem {
