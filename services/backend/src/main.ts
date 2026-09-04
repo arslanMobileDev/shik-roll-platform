@@ -32,6 +32,7 @@ async function bootstrap() {
     .addTag('categories')
     .addTag('menu-items')
     .addTag('orders')
+    .addTag('payments')
     .addTag('auth')
     .addBearerAuth()
     .build();

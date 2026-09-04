@@ -513,6 +513,7 @@ model Order {
   customer Customer?            @relation(fields: [customerId], references: [id], onDelete: Restrict, map: "fk_orders_customers")
   items    OrderItem[]
   history  OrderStatusHistory[]
+  payments Payment[]
 
   @@unique([orderNumber], map: "uq_orders_order_number")
   @@index([brandId], map: "idx_orders_brand_id")
@@ -579,6 +580,49 @@ model OrderItemModifier {
   @@index([orderItemId], map: "idx_order_item_modifiers_order_item_id")
   @@index([modifierItemId], map: "idx_order_item_modifiers_modifier_id")
   @@map("order_item_modifiers")
+}
+
+// ---------------------------------------------------------------------------
+// Online payments. Bounded context: payments.
+// Payment attempts per order (1-to-many): a new attempt is created only when
+// no PENDING attempt exists and none has SUCCEEDED yet; idempotence_key is
+// unique per attempt and is sent to the provider as the Idempotence-Key.
+// Payments are financial records: append-only, no soft delete, no version.
+// Money: Decimal(10,2) in RUB (same task-authorized deviation as orders).
+// ---------------------------------------------------------------------------
+
+enum PaymentProvider {
+  YOOKASSA
+  CASH
+  TERMINAL
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  CANCELED
+}
+
+model Payment {
+  id                String          @id @default(uuid()) @db.Uuid
+  orderId           String          @map("order_id") @db.Uuid
+  provider          PaymentProvider
+  status            PaymentStatus   @default(PENDING)
+  amount            Decimal         @db.Decimal(10, 2)
+  currency          String          @default("RUB")
+  paymentUrl        String?         @map("payment_url") // redirect confirmation URL for the customer
+  externalPaymentId String?         @map("external_payment_id") // provider-side payment id (YooKassa object.id)
+  idempotenceKey    String          @map("idempotence_key")
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict, map: "fk_payments_orders")
+
+  @@unique([idempotenceKey], map: "uq_payments_idempotence_key")
+  @@index([orderId], map: "idx_payments_order_id")
+  @@index([status], map: "idx_payments_status")
+  @@index([externalPaymentId], map: "idx_payments_external_payment_id")
+  @@map("payments")
 }
 
 // Append-only audit of order status transitions (DB-608: every status change

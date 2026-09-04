@@ -32,6 +32,7 @@ const prisma = new PrismaClient({ datasourceUrl: TEST_DATABASE_URL });
 
 /** Clears every table touched by this spec in FK-safe order. */
 async function truncateAll(): Promise<void> {
+  await prisma.payment.deleteMany();
   await prisma.orderStatusHistory.deleteMany();
   await prisma.orderItemModifier.deleteMany();
   await prisma.orderItem.deleteMany();
