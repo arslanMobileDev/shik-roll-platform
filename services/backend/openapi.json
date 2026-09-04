@@ -1,6 +1,103 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/auth/otp/send": {
+      "post": {
+        "operationId": "AuthController_sendOtp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendOtpResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send a 4-digit OTP code to the guest phone (dev/test: fixed code 1234 when SMS_PROVIDER is not set)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/otp/verify": {
+      "post": {
+        "operationId": "AuthController_verifyOtp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokensResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "OTP_INVALID / OTP_EXPIRED"
+          }
+        },
+        "summary": "Verify the OTP code; auto-creates the customer on first sign-in and issues JWT access (30 days) + refresh tokens",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerEntity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED / TOKEN_INVALID"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Profile of the authenticated guest",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/menus": {
       "get": {
         "operationId": "MenuController_getMenus",
@@ -783,7 +880,7 @@
             }
           }
         },
-        "summary": "Create an order from POS or the mobile app",
+        "summary": "Create an order from POS or the mobile app; a guest Bearer token binds the order to the customer",
         "tags": [
           "orders"
         ]
@@ -860,7 +957,7 @@
             }
           }
         },
-        "summary": "List orders (brand / branch / status filters, pagination)",
+        "summary": "List orders (brand / branch / status filters, pagination); a guest Bearer token restricts the list to that customer",
         "tags": [
           "orders"
         ]
@@ -941,7 +1038,7 @@
   },
   "info": {
     "title": "SHIK Platform — Menu & Product API",
-    "description": "Menu & Product catalog and Order management API (API-706, DB-607, DB-608, BE-906, BE-907)",
+    "description": "Menu & Product catalog, Order management and guest auth API (API-706, DB-607, DB-608, BE-906, BE-907)",
     "version": "0.1.0",
     "contact": {}
   },
@@ -961,11 +1058,133 @@
     {
       "name": "orders",
       "description": ""
+    },
+    {
+      "name": "auth",
+      "description": ""
     }
   ],
   "servers": [],
   "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
     "schemas": {
+      "SendOtpDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "Guest phone in E.164 format (+7XXXXXXXXXX)",
+            "example": "+79991234567"
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "SendOtpResponse": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+79991234567"
+          },
+          "expiresInSeconds": {
+            "type": "number",
+            "description": "OTP lifetime in seconds",
+            "example": 180
+          }
+        },
+        "required": [
+          "phone",
+          "expiresInSeconds"
+        ]
+      },
+      "VerifyOtpDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "Guest phone in E.164 format (+7XXXXXXXXXX)",
+            "example": "+79991234567"
+          },
+          "code": {
+            "type": "string",
+            "description": "4-digit OTP code",
+            "example": "1234"
+          }
+        },
+        "required": [
+          "phone",
+          "code"
+        ]
+      },
+      "CustomerEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+79991234567"
+          },
+          "name": {
+            "type": "object"
+          },
+          "email": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "phone",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AuthTokensResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT access token (30 days)"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "JWT refresh token"
+          },
+          "tokenType": {
+            "type": "string",
+            "example": "Bearer"
+          },
+          "expiresInSeconds": {
+            "type": "number",
+            "description": "Access token lifetime in seconds"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/CustomerEntity"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "tokenType",
+          "expiresInSeconds",
+          "customer"
+        ]
+      },
       "MenuEntity": {
         "type": "object",
         "properties": {
@@ -2067,6 +2286,10 @@
           },
           "branchId": {
             "type": "string"
+          },
+          "customerId": {
+            "type": "object",
+            "description": "Guest customer who placed the order (mobile app)"
           },
           "tableNumber": {
             "type": "object"

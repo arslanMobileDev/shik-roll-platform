@@ -26,12 +26,14 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('SHIK Platform — Menu & Product API')
-    .setDescription('Menu & Product catalog and Order management API (API-706, DB-607, DB-608, BE-906, BE-907)')
+    .setDescription('Menu & Product catalog, Order management and guest auth API (API-706, DB-607, DB-608, BE-906, BE-907)')
     .setVersion('0.1.0')
     .addTag('menus')
     .addTag('categories')
     .addTag('menu-items')
     .addTag('orders')
+    .addTag('auth')
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
