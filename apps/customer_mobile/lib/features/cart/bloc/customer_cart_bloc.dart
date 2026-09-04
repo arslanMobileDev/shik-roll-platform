@@ -15,15 +15,17 @@ class CustomerCartBloc extends Bloc<CartEvent, CartState> {
   }
 
   void _onItemAdded(CartItemAdded event, Emitter<CartState> emit) {
+    if (event.quantity <= 0) return;
     final line = CartLine.fromSelection(
       item: event.item,
       selection: event.selection,
+      quantity: event.quantity,
     );
     final lines = [...state.lines];
     final index = lines.indexWhere((l) => l.id == line.id);
     if (index >= 0) {
       lines[index] = lines[index].copyWith(
-        quantity: lines[index].quantity + 1,
+        quantity: lines[index].quantity + event.quantity,
       );
     } else {
       lines.add(line);

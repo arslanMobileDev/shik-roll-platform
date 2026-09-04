@@ -5,6 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/money.dart';
+import '../../auth/bloc/auth_bloc.dart';
+import '../../auth/view/auth_flow.dart';
 import '../../menu/bloc/order_type.dart';
 import '../../menu/view/widgets/order_type_toggle.dart';
 import '../bloc/cart_event.dart';
@@ -393,7 +395,15 @@ class _CheckoutBar extends StatelessWidget {
     );
   }
 
-  void _submit(BuildContext context) {
+  /// Auth gate: an anonymous guest signs in via the SMS sheet first; the
+  /// cart (CustomerCartBloc) is untouched, so after the sheet closes the
+  /// submit proceeds with the Bearer token bound to the order.
+  Future<void> _submit(BuildContext context) async {
+    if (!context.read<AuthBloc>().state.isAuthenticated) {
+      final authenticated = await showAuthFlowSheet(context);
+      if (!authenticated || !context.mounted) return;
+    }
+    if (!context.mounted) return;
     context.read<CheckoutCubit>().submit(
       orderType: context.read<OrderTypeCubit>().state,
       lines: context.read<CustomerCartBloc>().state.lines,

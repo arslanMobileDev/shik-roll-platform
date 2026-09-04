@@ -49,6 +49,8 @@ DioException _badResponse(int statusCode, {Object? body}) => DioException(
 );
 
 void main() {
+  setUpAll(() => registerFallbackValue(Options()));
+
   late _MockDio dio;
   late RemoteCustomerOrdersRepository repository;
 
@@ -63,6 +65,7 @@ void main() {
         () => dio.post<Map<String, dynamic>>(
           '/orders',
           data: any(named: 'data'),
+          options: any(named: 'options'),
         ),
       ).thenAnswer(
         (_) async => _okResponse(const {
@@ -86,6 +89,7 @@ void main() {
         () => dio.post<Map<String, dynamic>>(
           '/orders',
           data: any(named: 'data'),
+          options: any(named: 'options'),
         ),
       ).thenAnswer(
         (_) async => _okResponse(const {
@@ -102,6 +106,7 @@ void main() {
         () => dio.post<Map<String, dynamic>>(
           '/orders',
           data: captureAny(named: 'data'),
+          options: any(named: 'options'),
         ),
       ).captured;
       expect(captured, hasLength(1));
@@ -113,6 +118,7 @@ void main() {
         () => dio.post<Map<String, dynamic>>(
           '/orders',
           data: any(named: 'data'),
+          options: any(named: 'options'),
         ),
       ).thenAnswer(
         (_) async => _okResponse(const {
@@ -133,6 +139,7 @@ void main() {
         () => dio.post<Map<String, dynamic>>(
           '/orders',
           data: any(named: 'data'),
+          options: any(named: 'options'),
         ),
       ).thenAnswer(
         (_) async => Response<Map<String, dynamic>>(
@@ -153,6 +160,7 @@ void main() {
         () => dio.post<Map<String, dynamic>>(
           '/orders',
           data: any(named: 'data'),
+          options: any(named: 'options'),
         ),
       ).thenAnswer(
         (_) async => _okResponse(const {'id': 'order-uuid-1'}),
@@ -175,6 +183,7 @@ void main() {
         () => dio.post<Map<String, dynamic>>(
           '/orders',
           data: any(named: 'data'),
+          options: any(named: 'options'),
         ),
       ).thenThrow(_transportError(type: DioExceptionType.connectionError));
 
@@ -195,6 +204,7 @@ void main() {
         () => dio.post<Map<String, dynamic>>(
           '/orders',
           data: any(named: 'data'),
+          options: any(named: 'options'),
         ),
       ).thenThrow(_transportError(type: DioExceptionType.receiveTimeout));
 
@@ -215,6 +225,7 @@ void main() {
         () => dio.post<Map<String, dynamic>>(
           '/orders',
           data: any(named: 'data'),
+          options: any(named: 'options'),
         ),
       ).thenThrow(_badResponse(503));
 
@@ -237,6 +248,7 @@ void main() {
         () => dio.post<Map<String, dynamic>>(
           '/orders',
           data: any(named: 'data'),
+          options: any(named: 'options'),
         ),
       ).thenThrow(
         _badResponse(400, body: {'message': 'deliveryAddress must be filled'}),
@@ -261,6 +273,7 @@ void main() {
         () => dio.post<Map<String, dynamic>>(
           '/orders',
           data: any(named: 'data'),
+          options: any(named: 'options'),
         ),
       ).thenThrow(_badResponse(422));
 
