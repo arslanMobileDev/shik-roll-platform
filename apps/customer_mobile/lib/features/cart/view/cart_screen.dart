@@ -9,6 +9,8 @@ import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/view/auth_flow.dart';
 import '../../menu/bloc/order_type.dart';
 import '../../menu/view/widgets/order_type_toggle.dart';
+import '../../payments/view/payment_status_screen.dart';
+import '../../payments/view/widgets/payment_method_selector.dart';
 import '../bloc/cart_event.dart';
 import '../bloc/cart_state.dart';
 import '../bloc/checkout_cubit.dart';
@@ -32,14 +34,23 @@ class CartScreen extends StatelessWidget {
         switch (state.status) {
           case CheckoutStatus.success:
             final order = state.placedOrder!;
+            final payment = state.payment;
             context.read<CustomerCartBloc>().add(const CartCleared());
             context.read<CheckoutCubit>().reset();
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => OrderSuccessScreen(
-                  order: order,
-                  onBackToMenu: onGoToMenu,
-                ),
+                builder: (_) => payment != null && !payment.isSucceeded
+                    // Онлайн-оплата ЮKassa: сначала эмуляция страницы оплаты.
+                    ? PaymentStatusScreen(
+                        order: order,
+                        payment: payment,
+                        onBackToMenu: onGoToMenu,
+                      )
+                    : OrderSuccessScreen(
+                        order: order,
+                        onBackToMenu: onGoToMenu,
+                        paidOnline: payment?.isSucceeded ?? false,
+                      ),
               ),
             );
           case CheckoutStatus.failure:
@@ -157,6 +168,10 @@ class _CartContent extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.s8),
                 const _OfferCheckbox(),
+                const SizedBox(height: AppSpacing.s16),
+                Text('Способ оплаты', style: theme.textTheme.titleSmall),
+                const SizedBox(height: AppSpacing.s8),
+                const PaymentMethodSelector(),
                 const SizedBox(height: AppSpacing.s16),
               ],
             ),

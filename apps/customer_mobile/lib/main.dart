@@ -13,6 +13,8 @@ import 'features/cart/data/orders_repository.dart';
 import 'features/menu/data/fake_customer_menu_repository.dart';
 import 'features/menu/data/menu_repository.dart';
 import 'features/orders/data/order_history_repository.dart';
+import 'features/payments/data/fake_payments_repository.dart';
+import 'features/payments/data/payments_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,6 +45,15 @@ Future<void> main() async {
           latency: const Duration(milliseconds: 600),
         );
 
+  final CustomerPaymentsRepository paymentsRepository = AppConfig.useRemoteMenu
+      ? RemoteCustomerPaymentsRepository(
+          ApiClient(baseUrl: AppConfig.apiBaseUrl),
+          tokenProvider,
+        )
+      : FakeCustomerPaymentsRepository(
+          latency: const Duration(milliseconds: 400),
+        );
+
   final AuthRepository authRepository = AppConfig.useRemoteMenu
       ? RemoteAuthRepository(
           ApiClient(baseUrl: AppConfig.apiBaseUrl),
@@ -62,6 +73,7 @@ Future<void> main() async {
     CustomerApp(
       repository: repository,
       ordersRepository: ordersRepository,
+      paymentsRepository: paymentsRepository,
       authRepository: authRepository,
       tokenStorage: const SecureAuthTokenStorage(),
       tokenProvider: tokenProvider,
