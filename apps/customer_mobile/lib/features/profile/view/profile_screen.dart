@@ -3,11 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/widgets/legal_links.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/bloc/auth_event.dart';
 import '../../auth/bloc/auth_state.dart';
 import '../../auth/view/auth_flow.dart';
+import '../../legal/data/legal_constants.dart';
+import '../../legal/data/legal_document.dart';
+import '../../legal/view/legal_document_viewer_screen.dart';
 
 /// Guest profile tab: identity, legal documents and logout for the
 /// authenticated guest; a login prompt for the anonymous one.
@@ -205,22 +207,54 @@ class _LegalSection extends StatelessWidget {
             child: Text('Правовая информация', style: theme.textTheme.titleSmall),
           ),
           ListTile(
-            key: const ValueKey('offer-tile'),
+            key: const ValueKey('legal-documents-tile'),
             leading: const Icon(Icons.description_outlined),
-            title: const Text(LegalDocuments.offerTitle),
+            title: const Text('Документы'),
+            subtitle: const Text('Оферта и политика конфиденциальности'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => LegalDocuments.showOffer(context),
-          ),
-          const Divider(indent: AppSpacing.s16, endIndent: AppSpacing.s16),
-          ListTile(
-            key: const ValueKey('privacy-tile'),
-            leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('Политика конфиденциальности'),
-            subtitle: const Text('Оператор — ${LegalDocuments.operatorName}'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => LegalDocuments.showPrivacy(context),
+            onTap: () => _showLegalMenu(context),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Меню выбора документа; выбранный документ открывается полным текстом.
+  void _showLegalMenu(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              key: const ValueKey('legal-menu-offer'),
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('Публичная оферта'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                Navigator.of(context).push(
+                  LegalDocumentViewerScreen.route(LegalDocument.offer),
+                );
+              },
+            ),
+            ListTile(
+              key: const ValueKey('legal-menu-privacy'),
+              leading: const Icon(Icons.privacy_tip_outlined),
+              title: const Text('Политика конфиденциальности'),
+              subtitle: const Text(
+                'Оператор — ${LegalConstants.operatorName}',
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                Navigator.of(context).push(
+                  LegalDocumentViewerScreen.route(LegalDocument.privacy),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
