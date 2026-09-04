@@ -154,12 +154,15 @@ class _ProductDetailsContent extends StatelessWidget {
                               selection: state.selection,
                             ),
                           );
-                          Navigator.of(context).pop();
+                          // Show the snackbar before popping: after pop()
+                          // this context is deactivated and ancestor lookup
+                          // would throw.
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Добавлено в корзину'),
                             ),
                           );
+                          Navigator.of(context).pop();
                         }
                       : null,
                   child: Text(
@@ -184,7 +187,13 @@ class _ProductDetailsContent extends StatelessWidget {
 }
 
 /// Opens the product sheet.
+///
+/// The sheet's route is pushed onto the Navigator above the shell's
+/// `MultiBlocProvider`, so the sheet's own context cannot see the app-wide
+/// blocs. Capture [CustomerCartBloc] from the caller and re-provide it
+/// inside the sheet for the add-to-cart button.
 void showProductDetails(BuildContext context, MenuItem item) {
+  final cartBloc = context.read<CustomerCartBloc>();
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -192,6 +201,9 @@ void showProductDetails(BuildContext context, MenuItem item) {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
-    builder: (_) => ProductDetailsView(item: item),
+    builder: (_) => BlocProvider<CustomerCartBloc>.value(
+      value: cartBloc,
+      child: ProductDetailsView(item: item),
+    ),
   );
 }
