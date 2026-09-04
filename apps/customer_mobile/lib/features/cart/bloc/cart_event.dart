@@ -13,15 +13,22 @@ sealed class CartEvent extends Equatable {
 /// Adds a dish with the selected modifiers; merging into an existing line
 /// when the same dish + modifiers combination is already in the cart.
 final class CartItemAdded extends CartEvent {
-  const CartItemAdded({required this.item, this.selection = const {}});
+  const CartItemAdded({
+    required this.item,
+    this.selection = const {},
+    this.quantity = 1,
+  });
 
   final MenuItem item;
 
   /// Modifier group id → selected option ids (may be empty for plain dishes).
   final Map<String, Set<String>> selection;
 
+  /// How many pieces to add (order history «Повторить заказ» adds more).
+  final int quantity;
+
   @override
-  List<Object?> get props => [item, selection];
+  List<Object?> get props => [item, selection, quantity];
 }
 
 /// Adjusts a line quantity by [delta] (`+1` / `-1`); reaching zero removes

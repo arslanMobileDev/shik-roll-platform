@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../core/auth/auth_token_provider.dart';
+import '../../core/auth/auth_token_storage.dart';
+import '../auth/bloc/auth_bloc.dart';
+import '../auth/bloc/auth_event.dart';
+import '../auth/data/auth_repository.dart';
 import '../cart/bloc/cart_state.dart';
 import '../cart/bloc/checkout_cubit.dart';
 import '../cart/bloc/customer_cart_bloc.dart';
@@ -11,6 +16,10 @@ import '../menu/bloc/menu_bloc.dart';
 import '../menu/bloc/menu_event.dart';
 import '../menu/data/menu_repository.dart';
 import '../menu/view/menu_screen.dart';
+import '../orders/bloc/order_history_bloc.dart';
+import '../orders/data/order_history_repository.dart';
+import '../orders/view/order_history_screen.dart';
+import '../profile/view/profile_screen.dart';
 
 /// Mobile shell with the bottom navigation: Меню, Корзина, Заказы, Профиль.
 class HomeShell extends StatefulWidget {
@@ -18,10 +27,18 @@ class HomeShell extends StatefulWidget {
     super.key,
     required this.repository,
     required this.ordersRepository,
+    required this.authRepository,
+    required this.tokenStorage,
+    required this.tokenProvider,
+    required this.orderHistoryRepository,
   });
 
   final CustomerMenuRepository repository;
   final CustomerOrdersRepository ordersRepository;
+  final AuthRepository authRepository;
+  final AuthTokenStorage tokenStorage;
+  final AuthTokenProvider tokenProvider;
+  final OrderHistoryRepository orderHistoryRepository;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -43,6 +60,17 @@ class _HomeShellState extends State<HomeShell> {
           create: (_) => MenuBloc(repository: widget.repository)
             ..add(MenuStarted()),
         ),
+        BlocProvider<AuthBloc>(
+          create: (_) => AuthBloc(
+            repository: widget.authRepository,
+            tokenStorage: widget.tokenStorage,
+            tokenProvider: widget.tokenProvider,
+          )..add(const AuthStarted()),
+        ),
+        BlocProvider<OrderHistoryBloc>(
+          create: (_) =>
+              OrderHistoryBloc(repository: widget.orderHistoryRepository),
+        ),
       ],
       child: Builder(
         builder: (context) {
@@ -52,14 +80,10 @@ class _HomeShellState extends State<HomeShell> {
               children: [
                 const MenuScreen(),
                 CartScreen(onGoToMenu: () => setState(() => _tab = 0)),
-                _PlaceholderTab(
-                  title: 'Заказы',
-                  icon: Icons.receipt_long_outlined,
+                OrderHistoryScreen(
+                  onGoToCart: () => setState(() => _tab = 1),
                 ),
-                _PlaceholderTab(
-                  title: 'Профиль',
-                  icon: Icons.person_outline,
-                ),
+                const ProfileScreen(),
               ],
             ),
             bottomNavigationBar: NavigationBar(
@@ -94,31 +118,6 @@ class _HomeShellState extends State<HomeShell> {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-class _PlaceholderTab extends StatelessWidget {
-  const _PlaceholderTab({required this.title, required this.icon});
-
-  final String title;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 48, color: Colors.grey),
-            Text(
-              '$title — скоро будет',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ],
-        ),
       ),
     );
   }

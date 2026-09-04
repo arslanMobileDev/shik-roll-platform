@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/auth/auth_token_provider.dart';
 import '../../../core/network/api_client.dart';
 import 'create_order_request.dart';
 import 'guest_order.dart';
@@ -22,9 +23,13 @@ abstract interface class CustomerOrdersRepository {
 
 /// Remote implementation over the Orders API contract.
 final class RemoteCustomerOrdersRepository implements CustomerOrdersRepository {
-  RemoteCustomerOrdersRepository(this._client);
+  RemoteCustomerOrdersRepository(this._client, [this._tokenProvider]);
 
   final ApiClient _client;
+
+  /// When a guest session is active, its Bearer token is sent along so the
+  /// backend binds the order to the customer (`customerId`).
+  final AuthTokenProvider? _tokenProvider;
 
   @override
   Future<GuestOrder> createOrder(CreateOrderRequest request) async {
@@ -32,6 +37,12 @@ final class RemoteCustomerOrdersRepository implements CustomerOrdersRepository {
       final response = await _client.dio.post<Map<String, dynamic>>(
         '/orders',
         data: request.toJson(),
+        options: Options(
+          headers: {
+            if (_tokenProvider?.authorizationHeader != null)
+              'Authorization': _tokenProvider!.authorizationHeader,
+          },
+        ),
       );
       final data = response.data;
       if (data == null) {

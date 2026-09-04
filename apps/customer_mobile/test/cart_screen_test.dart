@@ -1,4 +1,10 @@
+import 'package:customer_mobile/core/auth/auth_session.dart';
+import 'package:customer_mobile/core/auth/auth_token_provider.dart';
+import 'package:customer_mobile/core/auth/auth_token_storage.dart';
 import 'package:customer_mobile/core/utils/money.dart';
+import 'package:customer_mobile/features/auth/bloc/auth_bloc.dart';
+import 'package:customer_mobile/features/auth/bloc/auth_event.dart';
+import 'package:customer_mobile/features/auth/data/fake_auth_repository.dart';
 import 'package:customer_mobile/features/cart/bloc/cart_event.dart';
 import 'package:customer_mobile/features/cart/bloc/checkout_cubit.dart';
 import 'package:customer_mobile/features/cart/bloc/customer_cart_bloc.dart';
@@ -65,11 +71,43 @@ final _addressField = find.byKey(const ValueKey('address-field'));
 bool _submitEnabled(WidgetTester tester) =>
     tester.widget<FilledButton>(_submitButton).onPressed != null;
 
+/// AuthBloc with a persisted session restored: the guest is authenticated.
+Future<AuthBloc> _loggedInAuthBloc() async {
+  final storage = InMemoryAuthTokenStorage();
+  await storage.save(
+    const StoredAuthSession(
+      accessToken: 'test-access',
+      refreshToken: 'test-refresh',
+      customerId: 'customer-1',
+      phone: '+79991234567',
+      name: 'Тест',
+    ),
+  );
+  final bloc = AuthBloc(
+    repository: FakeAuthRepository(latency: Duration.zero),
+    tokenStorage: storage,
+    tokenProvider: AuthTokenProvider(),
+  )..add(const AuthStarted());
+  await bloc.stream.firstWhere((s) => s.isAuthenticated);
+  return bloc;
+}
+
+/// AuthBloc without a session: the guest is anonymous.
+AuthBloc _anonymousAuthBloc() {
+  final bloc = AuthBloc(
+    repository: FakeAuthRepository(latency: Duration.zero),
+    tokenStorage: InMemoryAuthTokenStorage(),
+    tokenProvider: AuthTokenProvider(),
+  )..add(const AuthStarted());
+  return bloc;
+}
+
 /// Pumps the cart tab with real blocs and a zero-latency fake checkout.
 Future<CustomerCartBloc> _pumpCart(
   WidgetTester tester, {
   CustomerOrdersRepository? ordersRepository,
   VoidCallback? onGoToMenu,
+  AuthBloc? authBloc,
 }) async {
   final cartBloc = CustomerCartBloc();
   final checkoutCubit = CheckoutCubit(
@@ -77,6 +115,7 @@ Future<CustomerCartBloc> _pumpCart(
         ordersRepository ??
         FakeCustomerOrdersRepository(latency: Duration.zero),
   );
+  final auth = authBloc ?? await _loggedInAuthBloc();
   await tester.pumpWidget(
     MaterialApp(
       home: MultiBlocProvider(
@@ -84,6 +123,7 @@ Future<CustomerCartBloc> _pumpCart(
           BlocProvider<CustomerCartBloc>.value(value: cartBloc),
           BlocProvider<CheckoutCubit>.value(value: checkoutCubit),
           BlocProvider<OrderTypeCubit>(create: (_) => OrderTypeCubit()),
+          BlocProvider<AuthBloc>.value(value: auth),
         ],
         child: Scaffold(body: CartScreen(onGoToMenu: onGoToMenu ?? () {})),
       ),
@@ -253,4 +293,54 @@ void main() {
     expect(backToMenu, isTrue);
     expect(find.text('Корзина пуста'), findsOneWidget);
   });
+
+  testWidgets(
+    'гость не авторизован: модальный вход по SMS без сброса корзины, '
+    'затем заказ уходит',
+    (tester) async {
+      final auth = _anonymousAuthBloc();
+      final cart = await _pumpCart(tester, authBloc: auth);
+      cart.add(const CartItemAdded(item: _drink));
+      await tester.pump();
+
+      await _selectPickup(tester);
+      await _acceptOffer(tester);
+
+      // Тап по «Оформить заказ» открывает модальный вход, заказ не уходит.
+      await tester.tap(_submitButton);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('phone-field')), findsOneWidget);
+      expect(cart.state.isEmpty, isFalse);
+
+      // Вводим номер и запрашиваем код.
+      await tester.enterText(
+        find.byKey(const ValueKey('phone-field')),
+        '9991234567',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('send-code-button')));
+      // Bounded pumps: дальше работает таймер повторной отправки.
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(const ValueKey('otp-field')), findsOneWidget);
+
+      // Вводим код: вход завершается, шторка закрывается, заказ уходит.
+      await tester.enterText(find.byKey(const ValueKey('otp-field')), '1234');
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Заказ #1042 принят!'), findsOneWidget);
+      expect(cart.state.isEmpty, isTrue);
+      expect(auth.state.isAuthenticated, isTrue);
+
+      // Закрываем экран поздравления, чтобы его таймер не остался висеть.
+      await tester.tap(find.byKey(const ValueKey('back-to-menu-button')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+    },
+  );
 }
