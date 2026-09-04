@@ -13,6 +13,8 @@ import 'package:customer_mobile/features/cart/data/orders_repository.dart';
 import 'package:customer_mobile/features/cart/view/cart_screen.dart';
 import 'package:customer_mobile/features/menu/bloc/order_type.dart';
 import 'package:customer_mobile/features/menu/data/menu_models.dart';
+import 'package:customer_mobile/features/payments/data/fake_payments_repository.dart';
+import 'package:customer_mobile/features/payments/data/payments_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -106,6 +108,7 @@ AuthBloc _anonymousAuthBloc() {
 Future<CustomerCartBloc> _pumpCart(
   WidgetTester tester, {
   CustomerOrdersRepository? ordersRepository,
+  CustomerPaymentsRepository? paymentsRepository,
   VoidCallback? onGoToMenu,
   AuthBloc? authBloc,
 }) async {
@@ -114,6 +117,9 @@ Future<CustomerCartBloc> _pumpCart(
     repository:
         ordersRepository ??
         FakeCustomerOrdersRepository(latency: Duration.zero),
+    paymentsRepository:
+        paymentsRepository ??
+        FakeCustomerPaymentsRepository(latency: Duration.zero),
   );
   final auth = authBloc ?? await _loggedInAuthBloc();
   await tester.pumpWidget(
@@ -272,9 +278,19 @@ void main() {
     await tester.pump();
     await tester.pump();
 
+    // Онлайн-оплата по умолчанию: экран оплаты ЮKassa с демо-ссылкой.
+    expect(find.text('Счёт на оплату выставлен'), findsOneWidget);
+    expect(find.byKey(const ValueKey('payment-url')), findsOneWidget);
+
+    // Демо-оплата завершает заказ.
+    await tester.tap(find.byKey(const ValueKey('mock-pay-button')));
+    await tester.pump();
+    await tester.pump();
+
     // Экран поздравления с номером заказа и таймером ожидания.
     expect(find.text('Заказ #1042 принят!'), findsOneWidget);
     expect(find.text('Готовим для вас'), findsOneWidget);
+    expect(find.byKey(const ValueKey('paid-online-badge')), findsOneWidget);
     expect(find.text('30:00'), findsOneWidget);
 
     // Таймер тикает.
@@ -329,6 +345,12 @@ void main() {
       await tester.enterText(find.byKey(const ValueKey('otp-field')), '1234');
       await tester.pump();
       await tester.pump();
+      await tester.pump();
+      await tester.pump();
+
+      // Онлайн-оплата по умолчанию: проходим демо-оплату ЮKassa.
+      expect(find.text('Счёт на оплату выставлен'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('mock-pay-button')));
       await tester.pump();
       await tester.pump();
 

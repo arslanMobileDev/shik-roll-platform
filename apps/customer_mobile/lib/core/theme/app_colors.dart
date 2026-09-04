@@ -12,6 +12,9 @@ abstract final class AppColors {
   static const Color primaryContainer = Color(0xFFFFDAD6);
   static const Color onPrimaryContainer = Color(0xFF410002);
 
+  /// Фирменный терракотово-оранжевый акцент логотипа SHIK ROLL.
+  static const Color brandAccent = Color(0xFFFF5722);
+
   static const Color secondary = Color(0xFF455A64);
   static const Color onSecondary = Color(0xFFFFFFFF);
   static const Color secondaryContainer = Color(0xFFCFD8DC);

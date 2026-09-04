@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../data/guest_order.dart';
 
@@ -13,12 +14,16 @@ class OrderSuccessScreen extends StatefulWidget {
     super.key,
     required this.order,
     required this.onBackToMenu,
+    this.paidOnline = false,
   });
 
   final GuestOrder order;
 
   /// Switches the shell back to the menu tab (after this route pops).
   final VoidCallback onBackToMenu;
+
+  /// Заказ уже оплачен через ЮKassa — показываем бейдж «Оплачено онлайн».
+  final bool paidOnline;
 
   @override
   State<OrderSuccessScreen> createState() => _OrderSuccessScreenState();
@@ -80,6 +85,38 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
                   color: AppColors.gray700,
                 ),
               ),
+              if (widget.paidOnline) ...[
+                const SizedBox(height: AppSpacing.s12),
+                Container(
+                  key: const ValueKey('paid-online-badge'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s12,
+                    vertical: AppSpacing.s8,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    border: Border.all(color: AppColors.success),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        size: 18,
+                        color: AppColors.success,
+                      ),
+                      const SizedBox(width: AppSpacing.s8),
+                      Text(
+                        'Оплачено онлайн (ЮKassa)',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: AppColors.success,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.s24),
               Text(
                 'Примерное время ожидания',

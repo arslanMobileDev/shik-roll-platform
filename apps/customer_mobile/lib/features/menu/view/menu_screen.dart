@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/shik_roll_logo.dart';
 import '../../../features/cart/bloc/cart_event.dart';
 import '../../../features/cart/bloc/customer_cart_bloc.dart';
 import '../bloc/menu_bloc.dart';
@@ -20,8 +22,12 @@ class MenuScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: AppColors.gray900,
+        title: const ShikRollLogo(),
+      ),
+      body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Padding(
@@ -77,6 +83,7 @@ class MenuScreen extends StatelessWidget {
     );
   }
 }
+
 
 class _MenuContent extends StatelessWidget {
   const _MenuContent({

@@ -7,6 +7,7 @@ import 'package:customer_mobile/features/cart/data/guest_order.dart';
 import 'package:customer_mobile/features/cart/data/orders_repository.dart';
 import 'package:customer_mobile/features/menu/bloc/order_type.dart';
 import 'package:customer_mobile/features/menu/data/menu_models.dart';
+import 'package:customer_mobile/features/payments/data/fake_payments_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -53,7 +54,12 @@ void main() {
   group('CheckoutCubit', () {
     blocTest<CheckoutCubit, CheckoutState>(
       'успешный submit: submitting → success с реальным номером заказа',
-      build: () => CheckoutCubit(repository: repository),
+      build: () => CheckoutCubit(
+        repository: repository,
+        paymentsRepository: FakeCustomerPaymentsRepository(
+          latency: Duration.zero,
+        ),
+      ),
       seed: () => const CheckoutState(
         address: 'ул. Пушкина, 10',
         offerAccepted: true,
@@ -75,7 +81,12 @@ void main() {
 
     blocTest<CheckoutCubit, CheckoutState>(
       'submit отправляет запрос по контракту: филиал, тип, адрес, позиции',
-      build: () => CheckoutCubit(repository: repository),
+      build: () => CheckoutCubit(
+        repository: repository,
+        paymentsRepository: FakeCustomerPaymentsRepository(
+          latency: Duration.zero,
+        ),
+      ),
       seed: () => const CheckoutState(
         address: 'ул. Пушкина, 10',
         comment: 'Без лука',
@@ -102,7 +113,12 @@ void main() {
 
     blocTest<CheckoutCubit, CheckoutState>(
       'ошибка сети: failure, корзина и форма не сброшены, сообщение видно',
-      build: () => CheckoutCubit(repository: repository),
+      build: () => CheckoutCubit(
+        repository: repository,
+        paymentsRepository: FakeCustomerPaymentsRepository(
+          latency: Duration.zero,
+        ),
+      ),
       seed: () => const CheckoutState(
         address: 'ул. Пушкина, 10',
         offerAccepted: true,
@@ -130,7 +146,12 @@ void main() {
 
     blocTest<CheckoutCubit, CheckoutState>(
       'без пункта «оферта принята» submit не уходит в сеть',
-      build: () => CheckoutCubit(repository: repository),
+      build: () => CheckoutCubit(
+        repository: repository,
+        paymentsRepository: FakeCustomerPaymentsRepository(
+          latency: Duration.zero,
+        ),
+      ),
       seed: () => const CheckoutState(address: 'ул. Пушкина, 10'),
       act: (cubit) =>
           cubit.submit(orderType: OrderType.delivery, lines: [_line]),
@@ -140,7 +161,12 @@ void main() {
 
     blocTest<CheckoutCubit, CheckoutState>(
       'доставка без адреса не отправляет заказ',
-      build: () => CheckoutCubit(repository: repository),
+      build: () => CheckoutCubit(
+        repository: repository,
+        paymentsRepository: FakeCustomerPaymentsRepository(
+          latency: Duration.zero,
+        ),
+      ),
       seed: () => const CheckoutState(offerAccepted: true),
       act: (cubit) =>
           cubit.submit(orderType: OrderType.delivery, lines: [_line]),
@@ -150,7 +176,12 @@ void main() {
 
     blocTest<CheckoutCubit, CheckoutState>(
       'самовывоз: адрес не нужен, заказ уходит без deliveryAddress',
-      build: () => CheckoutCubit(repository: repository),
+      build: () => CheckoutCubit(
+        repository: repository,
+        paymentsRepository: FakeCustomerPaymentsRepository(
+          latency: Duration.zero,
+        ),
+      ),
       seed: () => const CheckoutState(offerAccepted: true),
       act: (cubit) async {
         when(() => repository.createOrder(any()))

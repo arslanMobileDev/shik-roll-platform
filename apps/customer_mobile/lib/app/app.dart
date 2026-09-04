@@ -7,6 +7,7 @@ import '../features/auth/data/auth_repository.dart';
 import '../features/cart/data/orders_repository.dart';
 import '../features/menu/data/menu_repository.dart';
 import '../features/orders/data/order_history_repository.dart';
+import '../features/payments/data/payments_repository.dart';
 import '../features/shell/home_shell.dart';
 
 /// Root widget; theme and startup route for the guest app.
@@ -15,6 +16,7 @@ class CustomerApp extends StatelessWidget {
     super.key,
     required this.repository,
     required this.ordersRepository,
+    required this.paymentsRepository,
     required this.authRepository,
     required this.tokenStorage,
     required this.tokenProvider,
@@ -23,6 +25,7 @@ class CustomerApp extends StatelessWidget {
 
   final CustomerMenuRepository repository;
   final CustomerOrdersRepository ordersRepository;
+  final CustomerPaymentsRepository paymentsRepository;
   final AuthRepository authRepository;
   final AuthTokenStorage tokenStorage;
   final AuthTokenProvider tokenProvider;
@@ -37,6 +40,7 @@ class CustomerApp extends StatelessWidget {
       home: HomeShell(
         repository: repository,
         ordersRepository: ordersRepository,
+        paymentsRepository: paymentsRepository,
         authRepository: authRepository,
         tokenStorage: tokenStorage,
         tokenProvider: tokenProvider,
