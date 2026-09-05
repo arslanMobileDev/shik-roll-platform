@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Customer } from '@prisma/client';
+import { Customer, CustomerRole } from '@prisma/client';
 
 export class CustomerEntity {
   @ApiProperty()
@@ -14,6 +14,9 @@ export class CustomerEntity {
   @ApiPropertyOptional()
   email!: string | null;
 
+  @ApiProperty({ enum: CustomerRole, example: CustomerRole.CUSTOMER })
+  role!: CustomerRole;
+
   @ApiProperty()
   createdAt!: string;
 
@@ -25,8 +28,15 @@ export class SendOtpResponse {
   @ApiProperty({ example: '+79991234567' })
   phone!: string;
 
-  @ApiProperty({ description: 'OTP lifetime in seconds', example: 180 })
+  @ApiProperty({ description: 'OTP lifetime in seconds', example: 300 })
   expiresInSeconds!: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Fixed dev code, returned only outside production (or with DEV_OTP=true); never present when a real SMS is dispatched',
+    example: '1111',
+  })
+  devCode?: string;
 }
 
 export class AuthTokensResponse {
@@ -52,6 +62,7 @@ export function toCustomerEntity(record: Customer): CustomerEntity {
     phone: record.phone,
     name: record.name,
     email: record.email,
+    role: record.role,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   };

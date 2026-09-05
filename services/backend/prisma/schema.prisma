@@ -528,15 +528,24 @@ model Order {
 // Guest customers (mobile app). Bounded context: auth.
 // A customer is auto-provisioned on the first successful OTP verification;
 // phone is the single sign-in identifier (E.164, +7XXXXXXXXXX).
+// Phones are personal data (152-FZ): stored only in the RF-hosted database
+// and never written to plaintext logs.
 // ---------------------------------------------------------------------------
 
+// Guest account role. CUSTOMER is the only self-service role issued via OTP;
+// staff roles live in the staff bounded context (out of scope here).
+enum CustomerRole {
+  CUSTOMER
+}
+
 model Customer {
-  id        String   @id @default(uuid()) @db.Uuid
-  phone     String   // E.164, unique sign-in identifier
+  id        String       @id @default(uuid()) @db.Uuid
+  phone     String       // E.164, unique sign-in identifier
   name      String?
   email     String?
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  role      CustomerRole @default(CUSTOMER)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   orders Order[]
 

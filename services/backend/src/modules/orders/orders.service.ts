@@ -12,6 +12,7 @@ import {
   InvalidOrderStatusTransitionError,
 } from './domain/order-status-machine';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { MyOrdersQueryDto } from './dto/my-orders-query.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderEntity, OrderPage } from './entities/order.entity';
@@ -39,6 +40,30 @@ export class OrdersService {
       branchId: query.branchId,
       status: query.status,
       customerId,
+      page,
+      limit,
+    });
+    return {
+      data: records.map(toOrderEntity),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Order history of the authenticated guest (mobile app "My orders").
+   * Always scoped to the token's customer, always sorted newest first.
+   */
+  async listMine(customerId: string, query: MyOrdersQueryDto): Promise<OrderPage> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const { records, total } = await this.repository.list({
+      customerId,
+      status: query.status,
       page,
       limit,
     });

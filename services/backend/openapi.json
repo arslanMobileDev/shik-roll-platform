@@ -25,9 +25,12 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "OTP_SEND_RATE_LIMITED — one code per phone per minute"
           }
         },
-        "summary": "Send a 4-digit OTP code to the guest phone (dev/test: fixed code 1234 when SMS_PROVIDER is not set)",
+        "summary": "Send a 4-digit OTP code to the guest phone (non-production / DEV_OTP: fixed code 1111, also returned as devCode)",
         "tags": [
           "auth"
         ]
@@ -60,6 +63,9 @@
           },
           "401": {
             "description": "OTP_INVALID / OTP_EXPIRED"
+          },
+          "429": {
+            "description": "OTP_ATTEMPTS_EXCEEDED — max 5 wrong attempts per code"
           }
         },
         "summary": "Verify the OTP code; auto-creates the customer on first sign-in and issues JWT access (30 days) + refresh tokens",
@@ -963,6 +969,75 @@
         ]
       }
     },
+    "/orders/my": {
+      "get": {
+        "operationId": "OrdersController_listMine",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by order status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEW",
+                "CONFIRMED",
+                "COOKING",
+                "READY",
+                "COMPLETED",
+                "CANCELLED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHORIZED / TOKEN_INVALID"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Authenticated guest's own orders (mobile app history), newest first, paginated",
+        "tags": [
+          "orders"
+        ]
+      }
+    },
     "/orders/{id}": {
       "get": {
         "operationId": "OrdersController_getById",
@@ -1034,6 +1109,99 @@
           "orders"
         ]
       }
+    },
+    "/payments/create": {
+      "post": {
+        "operationId": "PaymentsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create an online payment session for an order; amount is the server-side order total, repeated calls reuse the pending attempt",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/payments/webhook/yookassa": {
+      "post": {
+        "operationId": "PaymentsController_yooKassaWebhook",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "processed",
+                        "ignored"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "YooKassa webhook receiver (payment.succeeded confirms the order); always 200, unknown payments are acknowledged and ignored",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/payments/order/{orderId}": {
+      "get": {
+        "operationId": "PaymentsController_getOrderPayment",
+        "parameters": [
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderPaymentStatusEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Latest payment attempt for an order (payment status check)",
+        "tags": [
+          "payments"
+        ]
+      }
     }
   },
   "info": {
@@ -1097,7 +1265,12 @@
           "expiresInSeconds": {
             "type": "number",
             "description": "OTP lifetime in seconds",
-            "example": 180
+            "example": 300
+          },
+          "devCode": {
+            "type": "string",
+            "description": "Fixed dev code, returned only outside production (or with DEV_OTP=true); never present when a real SMS is dispatched",
+            "example": "1111"
           }
         },
         "required": [
@@ -1140,6 +1313,13 @@
           "email": {
             "type": "object"
           },
+          "role": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER"
+            ],
+            "example": "CUSTOMER"
+          },
           "createdAt": {
             "type": "string"
           },
@@ -1150,6 +1330,7 @@
         "required": [
           "id",
           "phone",
+          "role",
           "createdAt",
           "updatedAt"
         ]
@@ -2392,6 +2573,100 @@
         },
         "required": [
           "status"
+        ]
+      },
+      "CreatePaymentDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "description": "Order to pay online"
+          }
+        },
+        "required": [
+          "orderId"
+        ]
+      },
+      "PaymentEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "YOOKASSA",
+              "CASH",
+              "TERMINAL"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "SUCCEEDED",
+              "CANCELED"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "description": "Payment amount in RUB (server-side order total)"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "paymentUrl": {
+            "type": "object",
+            "description": "Redirect URL the customer opens to pay"
+          },
+          "externalPaymentId": {
+            "type": "object",
+            "description": "Provider-side payment id (YooKassa object.id)"
+          },
+          "idempotenceKey": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "orderId",
+          "provider",
+          "status",
+          "amount",
+          "currency",
+          "idempotenceKey",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "OrderPaymentStatusEntity": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "payment": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaymentEntity"
+              }
+            ]
+          }
+        },
+        "required": [
+          "orderId"
         ]
       }
     }
