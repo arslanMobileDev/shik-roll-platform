@@ -628,9 +628,12 @@ model Payment {
   order Order @relation(fields: [orderId], references: [id], onDelete: Restrict, map: "fk_payments_orders")
 
   @@unique([idempotenceKey], map: "uq_payments_idempotence_key")
+  // Provider-side payment id is globally unique per attempt (task contract:
+  // providerPaymentId is nullable + unique); the unique index doubles as the
+  // webhook lookup index.
+  @@unique([externalPaymentId], map: "uq_payments_external_payment_id")
   @@index([orderId], map: "idx_payments_order_id")
   @@index([status], map: "idx_payments_status")
-  @@index([externalPaymentId], map: "idx_payments_external_payment_id")
   @@map("payments")
 }
 

@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
 
 export const ORDER_PROCESSING_QUEUE = 'order-processing';
+export const SEND_TO_KITCHEN_JOB = 'send-to-kitchen';
 
 export interface ProcessOrderJobData {
   orderId: string;
@@ -36,5 +37,20 @@ export class OrderQueuesService {
       { jobId: `process-order:${orderId}` },
     );
     this.logger.log(`Scheduled order processing for ${orderId}`);
+  }
+
+  /**
+   * Dispatch a paid order to the kitchen (payments bounded context contract:
+   * a successful online payment moves CONFIRMED -> COOKING). jobId is the
+   * order id, so repeated payment webhooks never duplicate the dispatch
+   * (idempotency, BE-907).
+   */
+  async sendToKitchen(orderId: string): Promise<void> {
+    await this.orderProcessingQueue.add(
+      SEND_TO_KITCHEN_JOB,
+      { orderId },
+      { jobId: `send-to-kitchen:${orderId}` },
+    );
+    this.logger.log(`Scheduled kitchen dispatch for ${orderId}`);
   }
 }

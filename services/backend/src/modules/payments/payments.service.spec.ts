@@ -8,6 +8,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { OrderQueuesService } from '../queues/order-queues.service';
 import { PaymentsService } from './payments.service';
 import {
   PAYMENT_PROVIDER_ADAPTER,
@@ -114,6 +115,7 @@ describe('PaymentsService', () => {
     $transaction: jest.Mock;
   };
   let adapter: { provider: PaymentProvider; createSession: jest.Mock };
+  let queues: { sendToKitchen: jest.Mock; scheduleOrderProcessing: jest.Mock };
 
   const pendingSession: PaymentSessionResult = {
     externalPaymentId: 'ext-1',
@@ -142,12 +144,17 @@ describe('PaymentsService', () => {
       provider: PaymentProvider.YOOKASSA,
       createSession: jest.fn().mockResolvedValue(pendingSession),
     };
+    queues = {
+      sendToKitchen: jest.fn().mockResolvedValue(undefined),
+      scheduleOrderProcessing: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentsService,
         { provide: PrismaService, useValue: prisma },
         { provide: PAYMENT_PROVIDER_ADAPTER, useValue: adapter },
+        { provide: OrderQueuesService, useValue: queues },
       ],
     }).compile();
 
@@ -198,6 +205,7 @@ describe('PaymentsService', () => {
       expect(result.paymentUrl).toBe(pendingSession.paymentUrl);
       // A pending payment never touches the order.
       expect(prisma.order.update).not.toHaveBeenCalled();
+      expect(queues.sendToKitchen).not.toHaveBeenCalled();
     });
 
     it('settles a synchronously succeeded session (Mock provider)', async () => {
@@ -236,6 +244,8 @@ describe('PaymentsService', () => {
           reason: 'Online payment succeeded',
         },
       });
+      // Task contract: a successful payment enqueues the kitchen dispatch.
+      expect(queues.sendToKitchen).toHaveBeenCalledWith(ORDER_ID);
     });
 
     it('returns the existing pending attempt on a repeated call (idempotent)', async () => {
@@ -333,6 +343,7 @@ describe('PaymentsService', () => {
           reason: 'Online payment succeeded',
         },
       });
+      expect(queues.sendToKitchen).toHaveBeenCalledWith(ORDER_ID);
     });
 
     it('is idempotent on duplicate payment.succeeded delivery', async () => {
@@ -345,6 +356,7 @@ describe('PaymentsService', () => {
       expect(result).toEqual({ status: 'processed' });
       expect(prisma.payment.update).not.toHaveBeenCalled();
       expect(prisma.orderStatusHistory.create).not.toHaveBeenCalled();
+      expect(queues.sendToKitchen).not.toHaveBeenCalled();
     });
 
     it('does not regress an order that already left NEW', async () => {
@@ -362,6 +374,24 @@ describe('PaymentsService', () => {
       expect(prisma.payment.update).toHaveBeenCalled();
       expect(prisma.order.update).not.toHaveBeenCalled();
       expect(prisma.orderStatusHistory.create).not.toHaveBeenCalled();
+      expect(queues.sendToKitchen).not.toHaveBeenCalled();
+    });
+
+    it('dispatches to the kitchen when the order was already CONFIRMED', async () => {
+      prisma.payment.findFirst.mockResolvedValue(makePaymentRecord());
+      prisma.payment.update.mockResolvedValue(
+        makePaymentRecord({ status: PaymentStatus.SUCCEEDED }),
+      );
+      prisma.order.findUnique.mockResolvedValue(
+        makeOrderRecord(OrderStatus.CONFIRMED),
+      );
+
+      const result = await service.handleYooKassaWebhook(succeededPayload);
+
+      expect(result).toEqual({ status: 'processed' });
+      // No second confirmation, but the paid signal still reaches the kitchen.
+      expect(prisma.order.update).not.toHaveBeenCalled();
+      expect(queues.sendToKitchen).toHaveBeenCalledWith(ORDER_ID);
     });
 
     it('cancels a pending payment on payment.canceled', async () => {
@@ -382,6 +412,7 @@ describe('PaymentsService', () => {
         data: { status: PaymentStatus.CANCELED },
       });
       expect(prisma.order.update).not.toHaveBeenCalled();
+      expect(queues.sendToKitchen).not.toHaveBeenCalled();
     });
 
     it('ignores webhooks for unknown payments', async () => {

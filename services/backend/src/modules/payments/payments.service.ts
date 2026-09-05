@@ -13,6 +13,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { OrderQueuesService } from '../queues/order-queues.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import {
   OrderPaymentStatusEntity,
@@ -40,6 +41,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     @Inject(PAYMENT_PROVIDER_ADAPTER)
     private readonly provider: PaymentProviderAdapter,
+    private readonly queues: OrderQueuesService,
   ) {}
 
   /**
@@ -215,13 +217,18 @@ export class PaymentsService {
   }
 
   /**
-   * Settle a successful payment atomically: mark the payment SUCCEEDED and,
-   * while the order is still NEW, confirm it with an audit entry in
-   * order_status_history (task contract: payment success confirms the order).
-   * One transaction — the two writes never diverge.
+   * Settle a successful payment: mark the payment SUCCEEDED and, while the
+   * order is still NEW, confirm it with an audit entry in
+   * order_status_history (task contract: payment success confirms the
+   * order). One transaction — the two writes never diverge. After commit,
+   * the paid order is dispatched to the kitchen via BullMQ (task contract:
+   * payment success enqueues kitchen processing); the queue add is
+   * deliberately outside the transaction — a rolled-back settlement must
+   * never reach the kitchen, and the dedup jobId absorbs retries.
    */
   private async applyPaymentSuccess(paymentId: string): Promise<Payment> {
-    return this.prisma.$transaction(async (tx) => {
+    let dispatchToKitchen = false;
+    const payment = await this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.update({
         where: { id: paymentId },
         data: { status: PaymentStatus.SUCCEEDED },
@@ -240,6 +247,11 @@ export class PaymentsService {
             reason: 'Online payment succeeded',
           },
         });
+        dispatchToKitchen = true;
+      } else if (order && !order.deletedAt && order.status === OrderStatus.CONFIRMED) {
+        // Already confirmed (e.g. by the POS auto-confirm path) — the
+        // kitchen still waits for the paid signal before starting.
+        dispatchToKitchen = true;
       } else if (order && order.status !== OrderStatus.NEW) {
         this.logger.warn(
           `Payment ${payment.id} succeeded but order ${order.id} is ${order.status} — status left unchanged`,
@@ -247,6 +259,10 @@ export class PaymentsService {
       }
       return payment;
     });
+    if (dispatchToKitchen) {
+      await this.queues.sendToKitchen(payment.orderId);
+    }
+    return payment;
   }
 
   /**

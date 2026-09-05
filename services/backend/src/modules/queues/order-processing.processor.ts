@@ -5,7 +5,11 @@ import { Job, Queue } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { lineTotal, orderSubtotal, orderTotal } from '../orders/domain/order-pricing';
 import { canTransition } from '../orders/domain/order-status-machine';
-import { ORDER_PROCESSING_QUEUE, ProcessOrderJobData } from './order-queues.service';
+import {
+  ORDER_PROCESSING_QUEUE,
+  ProcessOrderJobData,
+  SEND_TO_KITCHEN_JOB,
+} from './order-queues.service';
 
 const STATUS_TIMER_JOB = 'status-timer';
 
@@ -47,6 +51,9 @@ export class OrderProcessingProcessor extends WorkerHost {
     switch (job.name) {
       case 'process-order':
         await this.processOrder(job as Job<ProcessOrderJobData>);
+        return;
+      case SEND_TO_KITCHEN_JOB:
+        await this.sendToKitchen(job as Job<ProcessOrderJobData>);
         return;
       case STATUS_TIMER_JOB:
         await this.advanceStatus(job as Job<StatusTimerJobData>);
@@ -138,6 +145,32 @@ export class OrderProcessingProcessor extends WorkerHost {
         );
       }
     }
+  }
+
+  /**
+   * Kitchen dispatch for a paid order (payments contract): CONFIRMED ->
+   * COOKING, guarded by the state machine so a duplicate or late job
+   * (order already cooking, cancelled, ...) is a logged no-op.
+   */
+  private async sendToKitchen(job: Job<ProcessOrderJobData>): Promise<void> {
+    const { orderId } = job.data;
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, deletedAt: null },
+      select: { status: true },
+    });
+    if (!order) {
+      this.logger.warn(`send-to-kitchen: order ${orderId} not found, skipping`);
+      return;
+    }
+    if (!canTransition(order.status, OrderStatus.COOKING)) {
+      this.logger.log(
+        `send-to-kitchen: skipping ${order.status} -> COOKING for order ${orderId} (not allowed)`,
+      );
+      return;
+    }
+    await this.transitionWithHistory(orderId, order.status, OrderStatus.COOKING, {
+      reason: 'PAID_ONLINE',
+    });
   }
 
   private async advanceStatus(job: Job<StatusTimerJobData>): Promise<void> {
