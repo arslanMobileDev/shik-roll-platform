@@ -176,6 +176,7 @@ void main() {
         ..add(CartItemAdded(item: testMenuItem()))
         ..add(
           const CheckoutSubmitted(
+            brandId: 'brand-shik-roll',
             branchId: 'branch-central',
             orderType: OrderType.takeaway,
           ),
@@ -206,6 +207,7 @@ void main() {
         ..add(CartItemAdded(item: testMenuItem()))
         ..add(
           const CheckoutSubmitted(
+            brandId: 'brand-shik-roll',
             branchId: 'branch-central',
             orderType: OrderType.takeaway,
           ),
@@ -238,6 +240,7 @@ void main() {
 
       bloc.add(
         const CheckoutSubmitted(
+          brandId: 'brand-shik-roll',
           branchId: 'branch-central',
           orderType: OrderType.dineIn,
           tableNumber: 'Стол 3',
@@ -248,6 +251,7 @@ void main() {
       );
 
       final request = repository.lastRequest!;
+      expect(request.brandId, 'brand-shik-roll');
       expect(request.branchId, 'branch-central');
       expect(request.orderType, OrderType.dineIn);
       expect(request.tableNumber, 'Стол 3');
@@ -266,6 +270,7 @@ void main() {
 
       bloc.add(
         const CheckoutSubmitted(
+          brandId: 'brand-shik-roll',
           branchId: 'branch-central',
           orderType: OrderType.takeaway,
         ),
@@ -285,12 +290,14 @@ void main() {
 
       bloc.add(
         const CheckoutSubmitted(
+          brandId: 'brand-shik-roll',
           branchId: 'branch-central',
           orderType: OrderType.takeaway,
         ),
       );
       bloc.add(
         const CheckoutSubmitted(
+          brandId: 'brand-shik-roll',
           branchId: 'branch-central',
           orderType: OrderType.takeaway,
         ),
@@ -309,6 +316,7 @@ void main() {
 
       bloc.add(
         const CheckoutSubmitted(
+          brandId: 'brand-shik-roll',
           branchId: 'branch-central',
           orderType: OrderType.takeaway,
         ),

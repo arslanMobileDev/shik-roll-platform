@@ -54,12 +54,14 @@ final class CartCleared extends CartEvent {
 /// Submits the current cart to the Orders API (`POST /orders`).
 final class CheckoutSubmitted extends CartEvent {
   const CheckoutSubmitted({
+    required this.brandId,
     required this.branchId,
     required this.orderType,
     this.tableNumber,
     this.comment,
   });
 
+  final String brandId;
   final String branchId;
   final OrderType orderType;
 
@@ -68,7 +70,7 @@ final class CheckoutSubmitted extends CartEvent {
   final String? comment;
 
   @override
-  List<Object?> get props => [branchId, orderType, tableNumber, comment];
+  List<Object?> get props => [brandId, branchId, orderType, tableNumber, comment];
 }
 
 /// Resets checkout feedback (success dialog dismissed / error snackbar

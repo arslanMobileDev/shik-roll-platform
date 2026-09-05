@@ -137,11 +137,12 @@ class CartPanel extends StatelessWidget {
   /// and table context.
   void _submitCheckout(BuildContext context) {
     final modeState = context.read<OrderModeCubit>().state;
-    final branchId = context.read<PosContextCubit>().state.branchId;
+    final posContext = context.read<PosContextCubit>().state;
     final isDineIn = modeState.mode == OrderMode.dineIn;
     context.read<CartBloc>().add(
       CheckoutSubmitted(
-        branchId: branchId,
+        brandId: posContext.brandId,
+        branchId: posContext.branchId,
         orderType: isDineIn ? OrderType.dineIn : OrderType.takeaway,
         tableNumber: isDineIn && modeState.tableId != null
             ? _tableLabel(modeState.tableId!)

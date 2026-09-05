@@ -5,6 +5,7 @@ import '../domain/order_entity.dart';
 /// `POST /orders` payload (Orders API contract).
 final class CreateOrderRequest extends Equatable {
   const CreateOrderRequest({
+    required this.brandId,
     required this.branchId,
     required this.orderType,
     required this.items,
@@ -13,6 +14,7 @@ final class CreateOrderRequest extends Equatable {
   });
 
   final String branchId;
+  final String brandId;
   final OrderType orderType;
   final List<OrderItemRequest> items;
 
@@ -20,16 +22,24 @@ final class CreateOrderRequest extends Equatable {
   final String? tableNumber;
   final String? comment;
 
-  Map<String, dynamic> toJson() => {
-    'branchId': branchId,
-    'orderType': orderType.wireName,
-    if (tableNumber != null) 'tableNumber': tableNumber,
-    if (comment != null && comment!.isNotEmpty) 'comment': comment,
-    'items': [for (final item in items) item.toJson()],
-  };
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{
+      'branchId': branchId,
+      'brandId': brandId,
+      'type': orderType.wireName,
+      'items': [for (final item in items) item.toJson()],
+    };
+    if (tableNumber != null && tableNumber != '') {
+      map['tableNumber'] = tableNumber;
+    }
+    if (comment != null && comment != '') {
+      map['comment'] = comment;
+    }
+    return map;
+  }
 
   @override
-  List<Object?> get props => [branchId, orderType, items, tableNumber, comment];
+  List<Object?> get props => [branchId, brandId, orderType, items, tableNumber, comment];
 }
 
 /// One line of [CreateOrderRequest]: a menu item plus its modifiers.
@@ -47,7 +57,7 @@ final class OrderItemRequest extends Equatable {
   Map<String, dynamic> toJson() => {
     'menuItemId': menuItemId,
     'quantity': quantity,
-    'selectedModifiers': [for (final m in selectedModifiers) m.toJson()],
+    'modifiers': [for (final m in selectedModifiers) m.toJson()],
   };
 
   @override
