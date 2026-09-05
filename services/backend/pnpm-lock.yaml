@@ -41,6 +41,9 @@ importers:
       ioredis:
         specifier: ^6.0.0
         version: 6.0.0
+      prisma:
+        specifier: ^6.14.0
+        version: 6.19.3(typescript@5.9.3)
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -66,9 +69,6 @@ importers:
       jest:
         specifier: ^29.7.0
         version: 29.7.0(@types/node@22.20.1)
-      prisma:
-        specifier: ^6.14.0
-        version: 6.19.3(typescript@5.9.3)
       supertest:
         specifier: ^7.0.0
         version: 7.2.2
