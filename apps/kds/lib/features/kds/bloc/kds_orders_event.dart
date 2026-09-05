@@ -31,17 +31,24 @@ final class KdsOrdersPollTicked extends KdsOrdersEvent {
 
 /// One-tap cook action: «В работу» → COOKING, «Готово» → READY,
 /// «Выдано» → COMPLETED.
+///
+/// [cookId]/[shiftId] attribute the transition to the cook currently on the
+/// station (personal author in the order status audit).
 final class KdsOrderStatusChangeRequested extends KdsOrdersEvent {
   const KdsOrderStatusChangeRequested({
     required this.orderId,
     required this.status,
+    this.cookId,
+    this.shiftId,
   });
 
   final String orderId;
   final KdsOrderStatus status;
+  final String? cookId;
+  final String? shiftId;
 
   @override
-  List<Object?> get props => [orderId, status];
+  List<Object?> get props => [orderId, status, cookId, shiftId];
 }
 
 /// New-order highlight consumed by the view (sound played, flash shown).

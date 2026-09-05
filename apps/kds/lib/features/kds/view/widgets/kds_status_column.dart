@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../shift/bloc/cook_shift_cubit.dart';
 import '../../bloc/kds_orders_bloc.dart';
 import '../../bloc/kds_orders_event.dart';
 import '../../data/kds_order_models.dart';
@@ -91,17 +92,37 @@ class KdsStatusColumn extends StatelessWidget {
                       isFresh: freshOrderIds.contains(order.id),
                       isPending: pendingOrderId == order.id,
                       now: now,
-                      onAction: (next) => context.read<KdsOrdersBloc>().add(
-                        KdsOrderStatusChangeRequested(
-                          orderId: order.id,
-                          status: next,
-                        ),
-                      ),
+                      onAction: (next) => _dispatchAction(context, order, next),
                     );
                   },
                 ),
         ),
       ],
+    );
+  }
+
+  /// Attributes the transition to the station cook and, on «Выдано», bumps
+  /// their personal shift counter before the board refetches.
+  void _dispatchAction(
+    BuildContext context,
+    KdsOrder order,
+    KdsOrderStatus next,
+  ) {
+    final shiftState = context.read<CookShiftCubit>().state;
+    final cook = shiftState.currentCook;
+    if (next == KdsOrderStatus.completed && cook != null) {
+      final handedOutAt = now ?? DateTime.now();
+      context.read<CookShiftCubit>().recordOrderCompleted(
+        prepTime: handedOutAt.difference(order.createdAt),
+      );
+    }
+    context.read<KdsOrdersBloc>().add(
+      KdsOrderStatusChangeRequested(
+        orderId: order.id,
+        status: next,
+        cookId: cook?.id,
+        shiftId: shiftState.shiftId,
+      ),
     );
   }
 }

@@ -6,6 +6,7 @@ import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../shift/view/widgets/cook_shift_header.dart';
 import '../bloc/kds_orders_bloc.dart';
 import '../bloc/kds_orders_event.dart';
 import '../bloc/kds_orders_state.dart';
@@ -100,6 +101,8 @@ class KdsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Кухня — SHIK ROLL'),
         actions: [
+          const CookShiftHeader(),
+          const SizedBox(width: AppSpacing.s12),
           BlocSelector<KdsOrdersBloc, KdsOrdersState, DateTime?>(
             selector: (state) =>
                 state is KdsOrdersLoaded ? state.lastUpdatedAt : null,
