@@ -11,11 +11,19 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { AuthenticatedCustomer } from '../auth/auth.types';
 import { CurrentCustomer } from '../auth/decorators/current-customer.decorator';
-import { OptionalJwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { MyOrdersQueryDto } from './dto/my-orders-query.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderEntity, OrderPage } from './entities/order.entity';
@@ -52,6 +60,24 @@ export class OrdersController {
     @CurrentCustomer() customer?: AuthenticatedCustomer,
   ): Promise<OrderPage> {
     return this.service.list(query, customer?.id);
+  }
+
+  // Declared before @Get(':id') so the literal "my" is not captured by the
+  // UUID parameter route.
+  @Get('my')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      "Authenticated guest's own orders (mobile app history), newest first, paginated",
+  })
+  @ApiOkResponse({ type: OrderPage })
+  @ApiUnauthorizedResponse({ description: 'UNAUTHORIZED / TOKEN_INVALID' })
+  listMine(
+    @Query() query: MyOrdersQueryDto,
+    @CurrentCustomer() customer: AuthenticatedCustomer,
+  ): Promise<OrderPage> {
+    return this.service.listMine(customer.id, query);
   }
 
   @Get(':id')

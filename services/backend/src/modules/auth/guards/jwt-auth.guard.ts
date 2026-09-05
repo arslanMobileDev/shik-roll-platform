@@ -44,7 +44,8 @@ export class JwtAuthGuard implements CanActivate {
       if (payload.type !== 'access') {
         throw new Error(`Unexpected token type: ${payload.type}`);
       }
-      return { id: payload.sub, phone: payload.phone };
+      // Tokens minted before the role column existed fall back to CUSTOMER.
+      return { id: payload.sub, phone: payload.phone, role: payload.role ?? 'CUSTOMER' };
     } catch {
       throw new UnauthorizedException({
         statusCode: 401,

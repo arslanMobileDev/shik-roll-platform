@@ -12,6 +12,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -35,9 +36,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Send a 4-digit OTP code to the guest phone (dev/test: fixed code 1234 when SMS_PROVIDER is not set)',
+      'Send a 4-digit OTP code to the guest phone (non-production / DEV_OTP: fixed code 1111, also returned as devCode)',
   })
   @ApiOkResponse({ type: SendOtpResponse })
+  @ApiTooManyRequestsResponse({
+    description: 'OTP_SEND_RATE_LIMITED — one code per phone per minute',
+  })
   sendOtp(@Body() dto: SendOtpDto): Promise<SendOtpResponse> {
     return this.auth.sendOtp(dto);
   }
@@ -50,6 +54,9 @@ export class AuthController {
   })
   @ApiOkResponse({ type: AuthTokensResponse })
   @ApiUnauthorizedResponse({ description: 'OTP_INVALID / OTP_EXPIRED' })
+  @ApiTooManyRequestsResponse({
+    description: 'OTP_ATTEMPTS_EXCEEDED — max 5 wrong attempts per code',
+  })
   verifyOtp(@Body() dto: VerifyOtpDto): Promise<AuthTokensResponse> {
     return this.auth.verifyOtp(dto);
   }

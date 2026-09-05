@@ -5,18 +5,29 @@ import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { DEV_OTP_CODE, OTP_TTL_SECONDS } from '../src/modules/auth/auth.config';
+import {
+  DEV_OTP_CODE,
+  OTP_MAX_ATTEMPTS,
+  OTP_TTL_SECONDS,
+} from '../src/modules/auth/auth.config';
 
 /**
  * E2E coverage of the guest auth bounded context (phone + OTP -> JWT):
- *   - POST /auth/otp/send — phone validation, OTP issue (fixed dev code);
- *   - POST /auth/otp/verify — code check, customer auto-provisioning, token pair;
+ *   - POST /auth/otp/send — phone validation, OTP issue (fixed dev code 1111),
+ *     resend rate limit (1 code per minute per phone);
+ *   - POST /auth/otp/verify — code check, max-attempts lockout, customer
+ *     auto-provisioning, token pair;
  *   - GET /auth/me — JwtAuthGuard protection of the profile endpoint;
+ *   - GET /orders/my — the guest's own order history (auth required,
+ *     pagination, newest first);
  *   - guest scoping of GET /orders by customerId from the JWT.
  *
  * Runs against DATABASE_URL_TEST (same convention as orders.e2e-spec.ts).
- * No Redis and no SMS_PROVIDER in the test environment: the OTP store is
- * in-memory and the code is the fixed dev code '1234'.
+ * No Redis and no SMS_PROVIDER in the test environment (NODE_ENV=test):
+ * the OTP store is in-memory and the code is the fixed dev code '1111'.
+ *
+ * Rate limiting note: a phone can receive only one code per minute, so every
+ * flow below uses its own unique phone number (nextPhone()).
  */
 
 const TEST_DATABASE_URL =
@@ -25,6 +36,7 @@ const TEST_DATABASE_URL =
 
 process.env.DATABASE_URL = TEST_DATABASE_URL;
 delete process.env.SMS_PROVIDER;
+delete process.env.DEV_OTP;
 delete process.env.REDIS_URL;
 delete process.env.REDIS_HOST;
 
@@ -56,8 +68,12 @@ async function truncateAll(): Promise<void> {
   await prisma.brand.deleteMany();
 }
 
-const PHONE_A = '+79991111111';
-const PHONE_B = '+79992222222';
+/** Unique +7 phone per call — the resend cooldown is per phone. */
+let phoneSeq = 0;
+function nextPhone(): string {
+  phoneSeq += 1;
+  return `+7999${String(phoneSeq).padStart(7, '0')}`;
+}
 
 /** Registers / re-authenticates a guest and returns the access token + customer id. */
 async function signInGuest(phone: string): Promise<{ token: string; customerId: string }> {
@@ -66,6 +82,7 @@ async function signInGuest(phone: string): Promise<{ token: string; customerId: 
     .send({ phone })
     .expect(200);
   expect(res.body.expiresInSeconds).toBe(OTP_TTL_SECONDS);
+  expect(res.body.devCode).toBe(DEV_OTP_CODE);
   const verified = await globalApp
     .post('/auth/otp/verify')
     .send({ phone, code: DEV_OTP_CODE })
@@ -146,9 +163,22 @@ describe('Auth API (e2e)', () => {
   const http = () => request(app.getHttpServer());
 
   describe('POST /auth/otp/send', () => {
-    it('issues an OTP for a valid +7 phone', async () => {
-      const res = await http().post('/auth/otp/send').send({ phone: PHONE_A }).expect(200);
-      expect(res.body).toEqual({ phone: PHONE_A, expiresInSeconds: OTP_TTL_SECONDS });
+    it('issues an OTP for a valid +7 phone and returns the fixed dev code', async () => {
+      const phone = nextPhone();
+      const res = await http().post('/auth/otp/send').send({ phone }).expect(200);
+      expect(res.body).toEqual({
+        phone,
+        expiresInSeconds: OTP_TTL_SECONDS,
+        devCode: DEV_OTP_CODE,
+      });
+      expect(OTP_TTL_SECONDS).toBe(300);
+    });
+
+    it('rate limits resend: a second code within a minute is rejected (429 OTP_SEND_RATE_LIMITED)', async () => {
+      const phone = nextPhone();
+      await http().post('/auth/otp/send').send({ phone }).expect(200);
+      const res = await http().post('/auth/otp/send').send({ phone }).expect(429);
+      expect(res.body.code).toBe('OTP_SEND_RATE_LIMITED');
     });
 
     it.each([['89991111111'], ['+7999111111'], ['+799911111111'], ['+19991111111'], ['abc']])(
@@ -164,65 +194,102 @@ describe('Auth API (e2e)', () => {
     it('rejects a phone that never requested a code (401 OTP_EXPIRED)', async () => {
       const res = await http()
         .post('/auth/otp/verify')
-        .send({ phone: '+79990000000', code: DEV_OTP_CODE })
+        .send({ phone: nextPhone(), code: DEV_OTP_CODE })
         .expect(401);
       expect(res.body.code).toBe('OTP_EXPIRED');
     });
 
     it('rejects a wrong code (401 OTP_INVALID)', async () => {
-      await http().post('/auth/otp/send').send({ phone: PHONE_B }).expect(200);
+      const phone = nextPhone();
+      await http().post('/auth/otp/send').send({ phone }).expect(200);
       const res = await http()
         .post('/auth/otp/verify')
-        .send({ phone: PHONE_B, code: '0000' })
+        .send({ phone, code: '0000' })
         .expect(401);
       expect(res.body.code).toBe('OTP_INVALID');
+    });
+
+    it('locks the code out after 5 wrong attempts (429 OTP_ATTEMPTS_EXCEEDED)', async () => {
+      const phone = nextPhone();
+      await http().post('/auth/otp/send').send({ phone }).expect(200);
+      for (let attempt = 1; attempt < OTP_MAX_ATTEMPTS; attempt += 1) {
+        await http()
+          .post('/auth/otp/verify')
+          .send({ phone, code: '0000' })
+          .expect(401);
+      }
+      const res = await http()
+        .post('/auth/otp/verify')
+        .send({ phone, code: '0000' })
+        .expect(429);
+      expect(res.body.code).toBe('OTP_ATTEMPTS_EXCEEDED');
+
+      // The burned code no longer verifies even with the right value.
+      const burned = await http()
+        .post('/auth/otp/verify')
+        .send({ phone, code: DEV_OTP_CODE })
+        .expect(401);
+      expect(burned.body.code).toBe('OTP_EXPIRED');
     });
 
     it('rejects a malformed code with VALIDATION_ERROR', async () => {
       const res = await http()
         .post('/auth/otp/verify')
-        .send({ phone: PHONE_B, code: '12ab' })
+        .send({ phone: nextPhone(), code: '12ab' })
         .expect(400);
       expect(res.body.code).toBe('VALIDATION_ERROR');
     });
 
     it('verifies the code, auto-creates the customer and returns a token pair', async () => {
-      await http().post('/auth/otp/send').send({ phone: PHONE_B }).expect(200);
+      const phone = nextPhone();
+      await http().post('/auth/otp/send').send({ phone }).expect(200);
       const res = await http()
         .post('/auth/otp/verify')
-        .send({ phone: PHONE_B, code: DEV_OTP_CODE })
+        .send({ phone, code: DEV_OTP_CODE })
         .expect(200);
 
       expect(res.body.tokenType).toBe('Bearer');
       expect(res.body.accessToken).toEqual(expect.any(String));
       expect(res.body.refreshToken).toEqual(expect.any(String));
       expect(res.body.expiresInSeconds).toBe(30 * 24 * 60 * 60);
-      expect(res.body.customer).toMatchObject({ phone: PHONE_B, name: null, email: null });
+      expect(res.body.customer).toMatchObject({
+        phone,
+        name: null,
+        email: null,
+        role: 'CUSTOMER',
+      });
 
-      const stored = await prisma.customer.findUnique({ where: { phone: PHONE_B } });
+      const stored = await prisma.customer.findUnique({ where: { phone } });
       expect(stored?.id).toBe(res.body.customer.id);
+      expect(stored?.role).toBe('CUSTOMER');
     });
 
     it('rejects replay of an already verified code (401 OTP_EXPIRED)', async () => {
+      const phone = nextPhone();
+      await http().post('/auth/otp/send').send({ phone }).expect(200);
+      await http()
+        .post('/auth/otp/verify')
+        .send({ phone, code: DEV_OTP_CODE })
+        .expect(200);
       const res = await http()
         .post('/auth/otp/verify')
-        .send({ phone: PHONE_B, code: DEV_OTP_CODE })
+        .send({ phone, code: DEV_OTP_CODE })
         .expect(401);
       expect(res.body.code).toBe('OTP_EXPIRED');
     });
 
     it('reuses the existing customer on a repeat sign-in', async () => {
-      await http().post('/auth/otp/send').send({ phone: PHONE_B }).expect(200);
-      const res = await http()
-        .post('/auth/otp/verify')
-        .send({ phone: PHONE_B, code: DEV_OTP_CODE })
-        .expect(200);
+      const phone = nextPhone();
+      const customerId = (await signInGuest(phone)).customerId;
 
-      const count = await prisma.customer.count({ where: { phone: PHONE_B } });
+      // The e2e resend cooldown is 1 second (setup-e2e.ts); wait it out and
+      // sign in again — no new customer row may appear.
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      const second = await signInGuest(phone);
+
+      expect(second.customerId).toBe(customerId);
+      const count = await prisma.customer.count({ where: { phone } });
       expect(count).toBe(1);
-      // Same customer id as on the first sign-in.
-      const first = await prisma.customer.findUnique({ where: { phone: PHONE_B } });
-      expect(res.body.customer.id).toBe(first?.id);
     });
   });
 
@@ -241,10 +308,11 @@ describe('Auth API (e2e)', () => {
     });
 
     it('rejects a refresh token presented as an access token (401 TOKEN_INVALID)', async () => {
-      await http().post('/auth/otp/send').send({ phone: PHONE_A }).expect(200);
+      const phone = nextPhone();
+      await http().post('/auth/otp/send').send({ phone }).expect(200);
       const pair = await http()
         .post('/auth/otp/verify')
-        .send({ phone: PHONE_A, code: DEV_OTP_CODE })
+        .send({ phone, code: DEV_OTP_CODE })
         .expect(200);
       const res = await http()
         .get('/auth/me')
@@ -254,19 +322,119 @@ describe('Auth API (e2e)', () => {
     });
 
     it('returns the guest profile for a valid access token', async () => {
-      const { token, customerId } = await signInGuest(PHONE_A);
+      const phone = nextPhone();
+      const { token, customerId } = await signInGuest(phone);
       const res = await http()
         .get('/auth/me')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      expect(res.body).toMatchObject({ id: customerId, phone: PHONE_A });
+      expect(res.body).toMatchObject({ id: customerId, phone, role: 'CUSTOMER' });
+    });
+  });
+
+  describe('GET /orders/my', () => {
+    it('rejects a request without a token (401 UNAUTHORIZED)', async () => {
+      const res = await http().get('/orders/my').expect(401);
+      expect(res.body.code).toBe('UNAUTHORIZED');
+    });
+
+    it('rejects a garbage token (401 TOKEN_INVALID)', async () => {
+      const res = await http()
+        .get('/orders/my')
+        .set('Authorization', 'Bearer garbage')
+        .expect(401);
+      expect(res.body.code).toBe('TOKEN_INVALID');
+    });
+
+    it('returns only the caller\'s orders, newest first, with pagination meta', async () => {
+      const guestA = await signInGuest(nextPhone());
+      const guestB = await signInGuest(nextPhone());
+
+      const orderPayload = {
+        type: 'TAKEAWAY',
+        brandId,
+        branchId,
+        items: [{ menuItemId, quantity: 1 }],
+      };
+
+      // Two orders for guest A, one for guest B, one anonymous (POS).
+      const firstA = await http()
+        .post('/orders')
+        .set('Authorization', `Bearer ${guestA.token}`)
+        .send(orderPayload)
+        .expect(201);
+      const secondA = await http()
+        .post('/orders')
+        .set('Authorization', `Bearer ${guestA.token}`)
+        .send(orderPayload)
+        .expect(201);
+      await http()
+        .post('/orders')
+        .set('Authorization', `Bearer ${guestB.token}`)
+        .send(orderPayload)
+        .expect(201);
+      await http().post('/orders').send(orderPayload).expect(201);
+
+      const mine = await http()
+        .get('/orders/my')
+        .set('Authorization', `Bearer ${guestA.token}`)
+        .expect(200);
+
+      expect(mine.body.meta).toMatchObject({ page: 1, limit: 20, total: 2, totalPages: 1 });
+      expect(mine.body.data).toHaveLength(2);
+      // Newest first.
+      expect(mine.body.data[0].id).toBe(secondA.body.id);
+      expect(mine.body.data[1].id).toBe(firstA.body.id);
+      expect(
+        mine.body.data.every((order: { customerId: string }) => order.customerId === guestA.customerId),
+      ).toBe(true);
+
+      // Guest B sees only their own single order.
+      const mineB = await http()
+        .get('/orders/my')
+        .set('Authorization', `Bearer ${guestB.token}`)
+        .expect(200);
+      expect(mineB.body.meta.total).toBe(1);
+      expect(mineB.body.data[0].customerId).toBe(guestB.customerId);
+    });
+
+    it('paginates the history (page/limit)', async () => {
+      const guest = await signInGuest(nextPhone());
+      const orderPayload = {
+        type: 'TAKEAWAY',
+        brandId,
+        branchId,
+        items: [{ menuItemId, quantity: 1 }],
+      };
+      for (let index = 0; index < 3; index += 1) {
+        await http()
+          .post('/orders')
+          .set('Authorization', `Bearer ${guest.token}`)
+          .send(orderPayload)
+          .expect(201);
+      }
+
+      const page1 = await http()
+        .get('/orders/my?page=1&limit=2')
+        .set('Authorization', `Bearer ${guest.token}`)
+        .expect(200);
+      expect(page1.body.meta).toMatchObject({ page: 1, limit: 2, total: 3, totalPages: 2 });
+      expect(page1.body.data).toHaveLength(2);
+
+      const page2 = await http()
+        .get('/orders/my?page=2&limit=2')
+        .set('Authorization', `Bearer ${guest.token}`)
+        .expect(200);
+      expect(page2.body.data).toHaveLength(1);
     });
   });
 
   describe('guest scoping of /orders', () => {
     it('binds a guest-created order to the customer and scopes GET /orders to that customer', async () => {
-      const guestA = await signInGuest(PHONE_A);
-      const guestB = await signInGuest(PHONE_B);
+      const phoneA = nextPhone();
+      const phoneB = nextPhone();
+      const guestA = await signInGuest(phoneA);
+      const guestB = await signInGuest(phoneB);
 
       const orderPayload = {
         type: 'TAKEAWAY',

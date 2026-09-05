@@ -47,12 +47,25 @@ describe('JwtAuthGuard', () => {
     });
   });
 
-  it('attaches the customer identity for a valid access token', async () => {
+  it('attaches the customer identity for a valid access token (role falls back to CUSTOMER)', async () => {
     const token = await jwt.signAsync({ sub: 'c1', phone: '+79990000000', type: 'access' });
     const { context, request } = contextFor({ authorization: `Bearer ${token}` });
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
-    expect(request.customer).toEqual({ id: 'c1', phone: '+79990000000' });
+    expect(request.customer).toEqual({ id: 'c1', phone: '+79990000000', role: 'CUSTOMER' });
+  });
+
+  it('carries the role from the token payload when present', async () => {
+    const token = await jwt.signAsync({
+      sub: 'c1',
+      phone: '+79990000000',
+      role: 'CUSTOMER',
+      type: 'access',
+    });
+    const { context, request } = contextFor({ authorization: `Bearer ${token}` });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(request.customer).toEqual({ id: 'c1', phone: '+79990000000', role: 'CUSTOMER' });
   });
 });
 
@@ -80,6 +93,6 @@ describe('OptionalJwtAuthGuard', () => {
     const token = await jwt.signAsync({ sub: 'c2', phone: '+79991111111', type: 'access' });
     const { context, request } = contextFor({ authorization: `Bearer ${token}` });
     await expect(guard.canActivate(context)).resolves.toBe(true);
-    expect(request.customer).toEqual({ id: 'c2', phone: '+79991111111' });
+    expect(request.customer).toEqual({ id: 'c2', phone: '+79991111111', role: 'CUSTOMER' });
   });
 });
