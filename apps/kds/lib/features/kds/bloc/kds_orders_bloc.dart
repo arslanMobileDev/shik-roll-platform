@@ -69,6 +69,8 @@ class KdsOrdersBloc extends Bloc<KdsOrdersEvent, KdsOrdersState> {
       await repository.updateOrderStatus(
         orderId: event.orderId,
         status: event.status,
+        cookId: event.cookId,
+        shiftId: event.shiftId,
       );
       // Refetch: the server is the single source of truth and other stations
       // may have moved orders concurrently.

@@ -6,28 +6,44 @@ import 'package:kds/features/kds/bloc/kds_orders_event.dart';
 import 'package:kds/features/kds/data/kds_order_models.dart';
 import 'package:kds/features/kds/view/kds_screen.dart';
 import 'package:kds/features/kds/view/widgets/order_card.dart';
+import 'package:kds/features/shift/bloc/cook_shift_cubit.dart';
+import 'package:kds/features/shift/data/cook_shift_models.dart';
 
 import '../../../helpers/test_fixtures.dart';
 
 void main() {
-  Future<(KdsOrdersBloc, TestKdsOrdersRepository)> pumpScreen(
+  Future<(KdsOrdersBloc, TestKdsOrdersRepository, CookShiftCubit)> pumpScreen(
     WidgetTester tester, {
     List<KdsOrder> orders = const [],
+    List<ActiveCook> cooks = const [],
     void Function(List<KdsOrder>)? onNewOrders,
   }) async {
+    // Primary KDS target: tablet 1024x768 landscape (AppBreakpoints).
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     final repository = TestKdsOrdersRepository(orders: orders);
     final bloc = KdsOrdersBloc(repository: repository, pollInterval: null);
+    final shiftCubit = CookShiftCubit(
+      repository: TestCookShiftRepository(cooks: cooks),
+    );
     await tester.pumpWidget(
       MaterialApp(
-        home: BlocProvider.value(
-          value: bloc,
+        home: MultiBlocProvider(
+          providers: [
+            BlocProvider.value(value: bloc),
+            BlocProvider.value(value: shiftCubit),
+          ],
           child: KdsScreen(onNewOrders: onNewOrders, now: kNow),
         ),
       ),
     );
     bloc.add(const KdsOrdersStarted(branchId: 'branch-central'));
+    await shiftCubit.load('branch-central');
     await tester.pumpAndSettle();
-    return (bloc, repository);
+    return (bloc, repository, shiftCubit);
   }
 
   testWidgets('доска раскладывает заказы по трём колонкам', (tester) async {
@@ -69,7 +85,7 @@ void main() {
   testWidgets('тап «В работу» переводит заказ в колонку «Готовятся»', (
     tester,
   ) async {
-    final (_, repository) = await pumpScreen(
+    final (_, repository, _) = await pumpScreen(
       tester,
       orders: [
         buildOrder(
@@ -106,7 +122,7 @@ void main() {
   });
 
   testWidgets('кнопка «Обновить» перезапрашивает заказы', (tester) async {
-    final (_, repository) = await pumpScreen(tester);
+    final (_, repository, _) = await pumpScreen(tester);
     expect(find.byType(OrderCard), findsNothing);
 
     repository.orders.add(
@@ -120,7 +136,7 @@ void main() {
 
   testWidgets('новый заказ: звуковой сигнал и снэкбар', (tester) async {
     final alerted = <List<KdsOrder>>[];
-    final (bloc, repository) = await pumpScreen(
+    final (bloc, repository, _) = await pumpScreen(
       tester,
       onNewOrders: alerted.add,
     );
@@ -151,5 +167,69 @@ void main() {
       find.byKey(const Key('order-card-fresh')),
     );
     expect(cardAfter.isFresh, isFalse);
+  });
+
+  testWidgets('выбранный повар: cookId/shiftId уходят в смену статуса', (
+    tester,
+  ) async {
+    final (_, repository, shiftCubit) = await pumpScreen(
+      tester,
+      orders: [
+        buildOrder(
+          id: 'a',
+          orderNumber: '501',
+          status: KdsOrderStatus.confirmed,
+        ),
+      ],
+      cooks: [buildCook()],
+    );
+    shiftCubit.selectCook('cook-1');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('order-action-a')));
+    await tester.pumpAndSettle();
+
+    expect(repository.attributionCalls, [('a', 'cook-1', 'shift-1')]);
+  });
+
+  testWidgets('без повара: только shiftId, без cookId', (tester) async {
+    final (_, repository, _) = await pumpScreen(
+      tester,
+      orders: [
+        buildOrder(
+          id: 'a',
+          orderNumber: '502',
+          status: KdsOrderStatus.confirmed,
+        ),
+      ],
+    );
+
+    await tester.tap(find.byKey(const Key('order-action-a')));
+    await tester.pumpAndSettle();
+
+    expect(repository.attributionCalls, [('a', null, 'shift-1')]);
+  });
+
+  testWidgets('тап «Выдано» инкрементирует личный счётчик повара в шапке', (
+    tester,
+  ) async {
+    final (_, _, shiftCubit) = await pumpScreen(
+      tester,
+      orders: [
+        buildOrder(id: 'a', orderNumber: '503', status: KdsOrderStatus.ready),
+      ],
+      cooks: [buildCook(completedOrders: 7, avgPrepSeconds: 600)],
+    );
+    shiftCubit.selectCook('cook-1');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Выполнено за смену: 7 шт. · ~10 мин'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('order-action-a')));
+    await tester.pumpAndSettle();
+
+    expect(shiftCubit.state.currentCook?.completedOrders, 8);
+    // (600·7 + 300) / 8 = 562.5 → 563с ≈ 9 мин.
+    expect(find.text('Выполнено за смену: 8 шт. · ~9 мин'), findsOneWidget);
   });
 }

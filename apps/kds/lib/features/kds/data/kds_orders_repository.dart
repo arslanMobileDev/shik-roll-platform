@@ -15,9 +15,14 @@ abstract interface class KdsOrdersRepository {
   });
 
   /// `PATCH /orders/{id}/status` — state-machine-validated transition.
+  ///
+  /// [cookId]/[shiftId] identify the personal author of the action and are
+  /// recorded in the order status audit (order_status_history).
   Future<KdsOrder> updateOrderStatus({
     required String orderId,
     required KdsOrderStatus status,
+    String? cookId,
+    String? shiftId,
   });
 }
 
@@ -45,10 +50,16 @@ final class RemoteKdsOrdersRepository implements KdsOrdersRepository {
   Future<KdsOrder> updateOrderStatus({
     required String orderId,
     required KdsOrderStatus status,
+    String? cookId,
+    String? shiftId,
   }) async {
     final response = await _client.dio.patch<Map<String, dynamic>>(
       '/orders/$orderId/status',
-      data: {'status': status.wireName},
+      data: {
+        'status': status.wireName,
+        'cookId': ?cookId,
+        'shiftId': ?shiftId,
+      },
     );
     final body = response.data;
     if (body == null) {

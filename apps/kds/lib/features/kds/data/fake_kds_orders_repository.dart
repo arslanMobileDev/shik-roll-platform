@@ -104,6 +104,8 @@ final class FakeKdsOrdersRepository implements KdsOrdersRepository {
   Future<KdsOrder> updateOrderStatus({
     required String orderId,
     required KdsOrderStatus status,
+    String? cookId,
+    String? shiftId,
   }) async {
     final index = _orders.indexWhere((o) => o.id == orderId);
     if (index < 0) {
