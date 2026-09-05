@@ -11,6 +11,7 @@ import 'branch_selector.dart';
 enum BackOfficeSection {
   menu('Меню и блюда', Icons.restaurant_menu_rounded),
   stopLists('Стоп-листы', Icons.block_rounded),
+  cookShifts('Смены кухни', Icons.soup_kitchen_rounded),
   branchSettings('Настройки точки', Icons.store_mall_directory_outlined);
 
   const BackOfficeSection(this.label, this.icon);

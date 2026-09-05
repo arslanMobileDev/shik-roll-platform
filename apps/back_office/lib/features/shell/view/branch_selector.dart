@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../branch_settings/bloc/branch_settings_cubit.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../cook_shifts/bloc/cook_shifts_cubit.dart';
 import '../../menu/bloc/menu_catalog_bloc.dart';
 import '../../menu/bloc/menu_catalog_event.dart';
 import '../bloc/branch_cubit.dart';
@@ -52,6 +53,7 @@ class BranchSelector extends StatelessWidget {
             context.read<MenuCatalogBloc>().add(
               MenuCatalogRequested(branchId: branch.id),
             );
+            context.read<CookShiftsCubit>().load(branch.id);
           },
         ),
       ),
