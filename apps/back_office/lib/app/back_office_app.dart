@@ -12,6 +12,10 @@ import '../features/menu/bloc/menu_catalog_event.dart';
 import '../features/menu/data/back_office_repository.dart';
 import '../features/menu/view/menu_list_screen.dart';
 import '../features/menu/view/stop_list_screen.dart';
+import '../features/orders/bloc/orders_journal_bloc.dart';
+import '../features/orders/bloc/orders_journal_event.dart';
+import '../features/orders/data/orders_repository.dart';
+import '../features/orders/view/orders_journal_screen.dart';
 import '../features/shell/bloc/branch_cubit.dart';
 import '../features/shell/view/back_office_shell.dart';
 
@@ -21,10 +25,12 @@ class BackOfficeApp extends StatelessWidget {
     super.key,
     required this.repository,
     required this.cookShiftsRepository,
+    required this.ordersRepository,
   });
 
   final BackOfficeRepository repository;
   final CookShiftsRepository cookShiftsRepository;
+  final OrdersRepository ordersRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +53,14 @@ class BackOfficeApp extends StatelessWidget {
             create: (_) => CookShiftsCubit(repository: cookShiftsRepository)
               ..load(BranchCubit.branches.first.id),
           ),
+          BlocProvider(
+            create: (_) =>
+                OrdersJournalBloc(repository: ordersRepository)..add(
+                  OrdersJournalRequested(
+                    branchId: BranchCubit.branches.first.id,
+                  ),
+                ),
+          ),
         ],
         child: MaterialApp(
           title: 'SHIK ROLL · Back Office',
@@ -56,6 +70,7 @@ class BackOfficeApp extends StatelessWidget {
             sectionBuilder: (section) => switch (section) {
               BackOfficeSection.menu => const MenuListScreen(),
               BackOfficeSection.stopLists => const StopListScreen(),
+              BackOfficeSection.orders => const OrdersJournalScreen(),
               BackOfficeSection.cookShifts => const CookShiftsScreen(),
               BackOfficeSection.branchSettings => const BranchSettingsScreen(),
             },

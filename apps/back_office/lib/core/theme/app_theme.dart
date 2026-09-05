@@ -16,6 +16,11 @@ abstract final class AppColors {
   static const Color halalGreen = Color(0xFF1E8E4D);
   static const Color danger = Color(0xFFC62828);
   static const Color stopListBg = Color(0xFFFFF1EC);
+
+  /// Semantic status colors (order/payment badges).
+  static const Color success = Color(0xFF1E8E4D);
+  static const Color warning = Color(0xFFB26A00);
+  static const Color info = Color(0xFF1565C0);
 }
 
 abstract final class AppTheme {
