@@ -6,6 +6,7 @@ void main() {
   group('CreateOrderRequest', () {
     test('serializes to the POST /orders contract', () {
       const request = CreateOrderRequest(
+        brandId: 'brand-shik-roll',
         branchId: 'branch-central',
         orderType: OrderType.dineIn,
         tableNumber: 'Стол 3',
@@ -22,15 +23,16 @@ void main() {
       );
 
       expect(request.toJson(), {
+        'brandId': 'brand-shik-roll',
         'branchId': 'branch-central',
-        'orderType': 'DINE_IN',
+        'type': 'DINE_IN',
         'tableNumber': 'Стол 3',
         'comment': 'Без лука',
         'items': [
           {
             'menuItemId': 'item-philadelphia',
             'quantity': 2,
-            'selectedModifiers': [
+            'modifiers': [
               {'modifierItemId': 'mi-spicy', 'quantity': 1},
             ],
           },
@@ -40,13 +42,14 @@ void main() {
 
     test('omits optional fields for takeaway orders', () {
       const request = CreateOrderRequest(
+        brandId: 'brand-shik-roll',
         branchId: 'branch-central',
         orderType: OrderType.takeaway,
         items: [OrderItemRequest(menuItemId: 'item-1', quantity: 1)],
       );
 
       final json = request.toJson();
-      expect(json['orderType'], 'TAKEAWAY');
+      expect(json['type'], 'TAKEAWAY');
       expect(json.containsKey('tableNumber'), isFalse);
       expect(json.containsKey('comment'), isFalse);
     });

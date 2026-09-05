@@ -76,6 +76,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     try {
       final order = await ordersRepository.createOrder(
         CreateOrderRequest(
+          brandId: event.brandId,
           branchId: event.branchId,
           orderType: event.orderType,
           tableNumber: event.tableNumber,
