@@ -2,10 +2,15 @@
  * Payments bounded context configuration (env-driven, read once at module
  * load — same convention as the auth/queues modules).
  *
- *   PAYMENTS_PROVIDER          'yookassa' | 'mock'; when unset, YooKassa is
- *                              used only if both API keys are present,
- *                              otherwise the dev Mock provider is selected
- *   YOOKASSA_SHOP_ID           shopId of the ЮKassa shop (Банк ВТБ)
+ *   PAYMENTS_PROVIDER          'yookassa' | 'mock' explicit override; when
+ *                              unset, the Mock (sandbox) provider is forced
+ *                              whenever NODE_ENV !== 'production' — the real
+ *                              acquirer is only ever touched in production,
+ *                              and only when both API keys are present
+ *   YOOKASSA_SHOP_ID           shopId of the ЮKassa shop (Банк ВТБ) of
+ *                              ИП Хаджимуратов М. М. — the merchant of record
+ *                              on every 54-ФЗ receipt (set in the shop
+ *                              cabinet, not sent in the API payload)
  *   YOOKASSA_SECRET_KEY        secret key for Basic auth
  *   YOOKASSA_API_URL           default https://api.yookassa.ru/v3
  *   YOOKASSA_RETURN_URL        page the customer returns to after payment
@@ -29,5 +34,8 @@ export const YOOKASSA_TAX_SYSTEM_CODE = process.env.YOOKASSA_TAX_SYSTEM_CODE
 export function paymentsProviderMode(): PaymentsProviderMode {
   const explicit = process.env.PAYMENTS_PROVIDER;
   if (explicit === 'mock' || explicit === 'yookassa') return explicit;
+  // Task contract: mock/sandbox outside production, even if API keys leak
+  // into a dev/test/staging environment by accident.
+  if (process.env.NODE_ENV !== 'production') return 'mock';
   return YOOKASSA_SHOP_ID && YOOKASSA_SECRET_KEY ? 'yookassa' : 'mock';
 }
