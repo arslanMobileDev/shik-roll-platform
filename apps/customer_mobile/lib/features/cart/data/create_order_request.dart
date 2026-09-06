@@ -35,7 +35,8 @@ final class CreateOrderRequest extends Equatable {
 
   Map<String, dynamic> toJson() => {
     'branchId': branchId,
-    'orderType': orderType.wireName,
+    'brandId': '37b84f4c-0a70-4263-bfa0-cc04ba0d4b99',
+    'type': orderType.wireName,
     if (deliveryAddress != null && deliveryAddress!.isNotEmpty)
       'deliveryAddress': deliveryAddress,
     if (comment != null && comment!.isNotEmpty) 'comment': comment,
@@ -67,7 +68,7 @@ final class OrderItemRequest extends Equatable {
   Map<String, dynamic> toJson() => {
     'menuItemId': menuItemId,
     'quantity': quantity,
-    'selectedModifiers': [for (final m in selectedModifiers) m.toJson()],
+    'modifiers': [for (final m in selectedModifiers) m.toJson()],
   };
 
   @override
