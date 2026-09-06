@@ -34,7 +34,7 @@ export class OrderQueuesService {
     await this.orderProcessingQueue.add(
       'process-order',
       { orderId },
-      { jobId: `process-order:${orderId}` },
+      { jobId: `process-order-${orderId}` },
     );
     this.logger.log(`Scheduled order processing for ${orderId}`);
   }

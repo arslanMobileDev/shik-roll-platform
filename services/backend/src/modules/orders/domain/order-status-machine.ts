@@ -7,7 +7,7 @@ import { OrderStatus } from '@prisma/client';
  * COMPLETED and CANCELLED are terminal.
  */
 const TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
-  NEW: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+  NEW: [OrderStatus.CONFIRMED, OrderStatus.COOKING, OrderStatus.CANCELLED],
   CONFIRMED: [OrderStatus.COOKING, OrderStatus.CANCELLED],
   COOKING: [OrderStatus.READY, OrderStatus.CANCELLED],
   READY: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
