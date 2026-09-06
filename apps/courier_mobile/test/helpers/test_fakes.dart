@@ -16,15 +16,19 @@ const testSession = CourierSession(
 CourierOrder makeOrder({
   required String id,
   OrderStatus status = OrderStatus.ready,
+  OrderType type = OrderType.delivery,
+  PaymentMethod paymentMethod = PaymentMethod.cash,
   String? courierId,
   String branchId = 'branch-center',
+  DateTime? createdAt,
 }) {
   return CourierOrder(
     id: id,
     number: 'A-$id',
     status: status,
+    type: type,
     totalRubles: 1250,
-    paymentMethod: PaymentMethod.cash,
+    paymentMethod: paymentMethod,
     address: const DeliveryAddress(
       street: 'ул. Баумана, 58',
       apartment: '12',
@@ -36,5 +40,6 @@ CourierOrder makeOrder({
     clientComment: 'Позвонить за 5 минут, спит ребенок',
     branchId: branchId,
     courierId: courierId,
+    createdAt: createdAt ?? DateTime(2026, 9, 6, 12, 5),
   );
 }

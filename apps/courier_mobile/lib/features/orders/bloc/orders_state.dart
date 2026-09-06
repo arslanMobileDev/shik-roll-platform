@@ -4,10 +4,10 @@ import '../../../data/models/courier_order.dart';
 
 /// Which tab of the orders screen is active.
 enum OrdersTab {
-  /// READY — «К забору с кухни».
+  /// READY + COOKING — «Доступные к выдаче».
   pickup,
 
-  /// DELIVERING — «Мои текущие».
+  /// ON_WAY — «Мои в пути».
   mine,
 }
 
@@ -39,7 +39,7 @@ final class OrdersLoaded extends OrdersState {
     this.updatingOrderId,
   });
 
-  /// All active (READY + DELIVERING) orders of the branch.
+  /// All active (COOKING + READY + ON_WAY) delivery orders of the branch.
   final List<CourierOrder> orders;
   final String courierId;
   final OrdersTab tab;
@@ -47,14 +47,22 @@ final class OrdersLoaded extends OrdersState {
   /// Order currently being PATCHed (shows spinner on its card).
   final String? updatingOrderId;
 
-  /// READY orders — «К забору с кухни».
-  List<CourierOrder> get pickupOrders =>
-      orders.where((o) => o.status == OrderStatus.ready).toList();
+  /// READY + COOKING delivery orders — «Доступные к выдаче».
+  List<CourierOrder> get pickupOrders => orders
+      .where(
+        (o) =>
+            o.type == OrderType.delivery &&
+            (o.status == OrderStatus.ready || o.status == OrderStatus.cooking),
+      )
+      .toList();
 
-  /// DELIVERING orders assigned to this courier — «Мои текущие».
+  /// ON_WAY orders assigned to this courier — «Мои в пути».
   List<CourierOrder> get myOrders => orders
       .where(
-        (o) => o.status == OrderStatus.delivering && o.courierId == courierId,
+        (o) =>
+            o.type == OrderType.delivery &&
+            o.status == OrderStatus.onWay &&
+            o.courierId == courierId,
       )
       .toList();
 
@@ -65,14 +73,14 @@ final class OrdersLoaded extends OrdersState {
     List<CourierOrder>? orders,
     OrdersTab? tab,
     String? Function()? updatingOrderId,
-  }) =>
-      OrdersLoaded(
-        orders: orders ?? this.orders,
-        courierId: courierId,
-        tab: tab ?? this.tab,
-        updatingOrderId:
-            updatingOrderId != null ? updatingOrderId() : this.updatingOrderId,
-      );
+  }) => OrdersLoaded(
+    orders: orders ?? this.orders,
+    courierId: courierId,
+    tab: tab ?? this.tab,
+    updatingOrderId: updatingOrderId != null
+        ? updatingOrderId()
+        : this.updatingOrderId,
+  );
 
   @override
   List<Object?> get props => [orders, courierId, tab, updatingOrderId];

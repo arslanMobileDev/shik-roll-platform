@@ -9,8 +9,9 @@ import '../../auth/bloc/auth_cubit.dart';
 import '../bloc/orders_cubit.dart';
 import '../bloc/orders_state.dart';
 import '../widgets/courier_order_card.dart';
+import 'delivery_detail_screen.dart';
 
-/// Экран активных доставок: «К забору с кухни» / «Мои текущие».
+/// Экран активных доставок: «Доступные к выдаче» / «Мои в пути».
 class CourierOrdersScreen extends StatelessWidget {
   const CourierOrdersScreen({super.key, required this.session});
 
@@ -45,7 +46,7 @@ class _CourierOrdersView extends StatelessWidget {
               builder: (context, state) => Text(
                 state is OrdersLoaded
                     ? 'Активных: '
-                        '${state.pickupOrders.length + state.myOrders.length}'
+                          '${state.pickupOrders.length + state.myOrders.length}'
                     : '',
                 style: theme.textTheme.bodyMedium,
               ),
@@ -70,13 +71,11 @@ class _CourierOrdersView extends StatelessWidget {
         },
         builder: (context, state) {
           return switch (state) {
-            OrdersLoading() => const Center(
-                child: CircularProgressIndicator(),
-              ),
+            OrdersLoading() => const Center(child: CircularProgressIndicator()),
             OrdersFailure(message: final message) => _ErrorState(
-                message: message,
-                onRetry: () => context.read<OrdersCubit>().load(),
-              ),
+              message: message,
+              onRetry: () => context.read<OrdersCubit>().load(),
+            ),
             OrdersLoaded() => _LoadedBody(state: state),
           };
         },
@@ -103,18 +102,17 @@ class _LoadedBody extends StatelessWidget {
             segments: [
               ButtonSegment(
                 value: OrdersTab.pickup,
-                label: Text('К забору (${state.pickupOrders.length})'),
-                icon: const Icon(Icons.soup_kitchen_outlined),
+                label: Text('Доступные (${state.pickupOrders.length})'),
+                icon: const Icon(Icons.shopping_bag_outlined),
               ),
               ButtonSegment(
                 value: OrdersTab.mine,
-                label: Text('Мои текущие (${state.myOrders.length})'),
+                label: Text('Мои в пути (${state.myOrders.length})'),
                 icon: const Icon(Icons.pedal_bike),
               ),
             ],
             selected: {state.tab},
-            onSelectionChanged: (selection) =>
-                cubit.selectTab(selection.first),
+            onSelectionChanged: (selection) => cubit.selectTab(selection.first),
           ),
         ),
         Expanded(
@@ -132,6 +130,17 @@ class _OrdersList extends StatelessWidget {
   const _OrdersList({required this.state});
 
   final OrdersLoaded state;
+
+  void _openDetails(BuildContext context, String orderId) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => BlocProvider.value(
+          value: context.read<OrdersCubit>(),
+          child: DeliveryDetailScreen(orderId: orderId),
+        ),
+      ),
+    );
+  }
 
   Future<void> _confirmComplete(
     BuildContext context,
@@ -178,7 +187,7 @@ class _OrdersList extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             state.tab == OrdersTab.pickup
-                ? 'Нет заказов к забору'
+                ? 'Нет доступных заказов'
                 : 'Нет заказов в пути',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium,
@@ -197,10 +206,11 @@ class _OrdersList extends StatelessWidget {
         return CourierOrderCard(
           order: order,
           updating: state.updatingOrderId == order.id,
+          onTap: () => _openDetails(context, order.id),
           onPickup: order.status == OrderStatus.ready
               ? () => context.read<OrdersCubit>().pickupOrder(order.id)
               : null,
-          onComplete: order.status == OrderStatus.delivering
+          onComplete: order.status == OrderStatus.onWay
               ? () => _confirmComplete(context, order.id, order.number)
               : null,
         );
@@ -244,10 +254,7 @@ class _CourierDrawer extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: HalalBadge(),
-            ),
+            const Padding(padding: EdgeInsets.all(16), child: HalalBadge()),
             const Spacer(),
             Padding(
               padding: const EdgeInsets.all(16),

@@ -7,12 +7,9 @@ import 'courier_repository.dart';
 /// Any 4-digit PIN is accepted; the courier is always «Мухаммад».
 class FakeCourierRepository implements CourierRepository {
   FakeCourierRepository({List<CourierOrder>? seedOrders})
-      : _orders = List.of(seedOrders ?? _defaultOrders);
+    : _orders = List.of(seedOrders ?? _defaultOrders);
 
-  static const _demoCourier = Courier(
-    id: 'courier-muhammad',
-    name: 'Мухаммад',
-  );
+  static const _demoCourier = Courier(id: 'courier-muhammad', name: 'Мухаммад');
 
   final List<CourierOrder> _orders;
 
@@ -35,11 +32,12 @@ class FakeCourierRepository implements CourierRepository {
       clientPhone: '+79171234567',
       clientComment: 'Позвонить за 5 минут, спит ребенок',
       branchId: 'branch-center',
+      createdAt: DateTime(2026, 9, 6, 12, 5),
     ),
     CourierOrder(
       id: 'order-1002',
       number: 'A-1025',
-      status: OrderStatus.ready,
+      status: OrderStatus.cooking,
       totalRubles: 890,
       paymentMethod: PaymentMethod.onlinePaid,
       address: const DeliveryAddress(
@@ -49,6 +47,7 @@ class FakeCourierRepository implements CourierRepository {
       ),
       clientPhone: '+79177654321',
       branchId: 'branch-center',
+      createdAt: DateTime(2026, 9, 6, 12, 20),
     ),
     CourierOrder(
       id: 'order-1003',
@@ -65,11 +64,12 @@ class FakeCourierRepository implements CourierRepository {
       clientPhone: '+79061112233',
       clientComment: 'Оставить у двери, без звонка',
       branchId: 'branch-yug',
+      createdAt: DateTime(2026, 9, 6, 12, 30),
     ),
     CourierOrder(
       id: 'order-1004',
       number: 'A-1027',
-      status: OrderStatus.delivering,
+      status: OrderStatus.onWay,
       totalRubles: 1670,
       paymentMethod: PaymentMethod.onlinePaid,
       address: const DeliveryAddress(
@@ -80,6 +80,7 @@ class FakeCourierRepository implements CourierRepository {
       clientPhone: '+79870001122',
       branchId: 'branch-center',
       courierId: _demoCourier.id,
+      createdAt: DateTime(2026, 9, 6, 11, 40),
     ),
   ];
 
@@ -107,8 +108,10 @@ class FakeCourierRepository implements CourierRepository {
         .where(
           (o) =>
               o.branchId == branchId &&
-              (o.status == OrderStatus.ready ||
-                  o.status == OrderStatus.delivering),
+              o.type == OrderType.delivery &&
+              (o.status == OrderStatus.cooking ||
+                  o.status == OrderStatus.ready ||
+                  o.status == OrderStatus.onWay),
         )
         .toList();
   }

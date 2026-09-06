@@ -19,7 +19,8 @@ abstract interface class CourierRepository {
     required String phone,
   });
 
-  /// GET /couriers/orders/active?branchId=... — READY + DELIVERING orders.
+  /// GET /couriers/orders/active?branchId=... — COOKING + READY + ON_WAY
+  /// delivery orders.
   Future<List<CourierOrder>> fetchActiveOrders({required String branchId});
 
   /// PATCH /orders/{id}/status — {status, courierId}.
