@@ -12,9 +12,9 @@ class OrdersCubit extends Cubit<OrdersState> {
   OrdersCubit({
     required CourierRepository repository,
     required CourierSession session,
-  })  : _repository = repository,
-        _session = session,
-        super(const OrdersLoading());
+  }) : _repository = repository,
+       _session = session,
+       super(const OrdersLoading());
 
   final CourierRepository _repository;
   final CourierSession _session;
@@ -38,11 +38,11 @@ class OrdersCubit extends Cubit<OrdersState> {
     }
   }
 
-  /// READY -> DELIVERING («Забрал заказ»), one tap.
+  /// READY -> ON_WAY («Взять заказ»), one tap.
   Future<void> pickupOrder(String orderId) =>
-      _setStatus(orderId, OrderStatus.delivering);
+      _setStatus(orderId, OrderStatus.onWay);
 
-  /// DELIVERING -> COMPLETED («Доставлено»).
+  /// ON_WAY -> COMPLETED («Заказ доставлен»).
   Future<void> completeOrder(String orderId) =>
       _setStatus(orderId, OrderStatus.completed);
 
@@ -69,10 +69,7 @@ class OrdersCubit extends Cubit<OrdersState> {
       );
       emit(current.copyWith(orders: optimistic, updatingOrderId: () => null));
     } catch (_) {
-      emit(current.copyWith(
-        orders: previous,
-        updatingOrderId: () => null,
-      ));
+      emit(current.copyWith(orders: previous, updatingOrderId: () => null));
       emit(const OrdersFailure('Не удалось обновить статус'));
       emit(current.copyWith(orders: previous));
     }

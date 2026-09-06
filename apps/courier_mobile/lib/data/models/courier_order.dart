@@ -2,22 +2,38 @@ import 'package:equatable/equatable.dart';
 
 /// Delivery lifecycle status (matches backend contract strings).
 enum OrderStatus {
+  cooking('COOKING'),
   ready('READY'),
-  delivering('DELIVERING'),
+  onWay('ON_WAY'),
   completed('COMPLETED');
 
   const OrderStatus(this.wireName);
   final String wireName;
 
   static OrderStatus fromWire(String value) => OrderStatus.values.firstWhere(
-        (s) => s.wireName == value,
-        orElse: () => OrderStatus.ready,
-      );
+    (s) => s.wireName == value,
+    orElse: () => OrderStatus.ready,
+  );
+}
+
+/// Order type (matches backend contract strings).
+enum OrderType {
+  dineIn('DINE_IN'),
+  takeaway('TAKEAWAY'),
+  delivery('DELIVERY');
+
+  const OrderType(this.wireName);
+  final String wireName;
+
+  static OrderType fromWire(String? value) => OrderType.values.firstWhere(
+    (t) => t.wireName == value,
+    orElse: () => OrderType.delivery,
+  );
 }
 
 enum PaymentMethod {
-  cash('Наличные'),
-  onlinePaid('Онлайн оплачено');
+  cash('Требуется расчет'),
+  onlinePaid('Оплачено онлайн');
 
   const PaymentMethod(this.label);
   final String label;
@@ -69,18 +85,25 @@ class DeliveryAddress extends Equatable {
       );
 
   Map<String, dynamic> toJson() => {
-        'street': street,
-        if (apartment != null) 'apartment': apartment,
-        if (entrance != null) 'entrance': entrance,
-        if (floor != null) 'floor': floor,
-        if (intercom != null) 'intercom': intercom,
-        if (lat != null) 'lat': lat,
-        if (lon != null) 'lon': lon,
-      };
+    'street': street,
+    if (apartment != null) 'apartment': apartment,
+    if (entrance != null) 'entrance': entrance,
+    if (floor != null) 'floor': floor,
+    if (intercom != null) 'intercom': intercom,
+    if (lat != null) 'lat': lat,
+    if (lon != null) 'lon': lon,
+  };
 
   @override
-  List<Object?> get props =>
-      [street, apartment, entrance, floor, intercom, lat, lon];
+  List<Object?> get props => [
+    street,
+    apartment,
+    entrance,
+    floor,
+    intercom,
+    lat,
+    lon,
+  ];
 }
 
 /// Active delivery order as shown to the courier.
@@ -94,8 +117,10 @@ class CourierOrder extends Equatable {
     required this.address,
     required this.clientPhone,
     required this.branchId,
+    this.type = OrderType.delivery,
     this.clientComment,
     this.courierId,
+    this.createdAt,
   });
 
   final String id;
@@ -103,6 +128,7 @@ class CourierOrder extends Equatable {
   /// Human-facing order number, e.g. «A-1024».
   final String number;
   final OrderStatus status;
+  final OrderType type;
   final int totalRubles;
   final PaymentMethod paymentMethod;
   final DeliveryAddress address;
@@ -110,6 +136,9 @@ class CourierOrder extends Equatable {
   final String? clientComment;
   final String branchId;
   final String? courierId;
+
+  /// Order creation time (shown on the card).
+  final DateTime? createdAt;
 
   /// «1 250 ₽»
   String get formattedTotal {
@@ -123,11 +152,21 @@ class CourierOrder extends Equatable {
     return '${buffer.toString().trim()} ₽';
   }
 
+  /// «14:05» — creation time for the courier card.
+  String get formattedCreatedAt {
+    final at = createdAt;
+    if (at == null) return '';
+    final h = at.hour.toString().padLeft(2, '0');
+    final m = at.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
   CourierOrder copyWith({OrderStatus? status, String? courierId}) =>
       CourierOrder(
         id: id,
         number: number,
         status: status ?? this.status,
+        type: type,
         totalRubles: totalRubles,
         paymentMethod: paymentMethod,
         address: address,
@@ -135,6 +174,7 @@ class CourierOrder extends Equatable {
         clientComment: clientComment,
         branchId: branchId,
         courierId: courierId ?? this.courierId,
+        createdAt: createdAt,
       );
 
   factory CourierOrder.fromJson(Map<String, dynamic> json) {
@@ -143,8 +183,9 @@ class CourierOrder extends Equatable {
       id: json['id'] as String,
       number: json['number'] as String? ?? json['id'] as String,
       status: OrderStatus.fromWire(json['status'] as String? ?? 'READY'),
-      totalRubles:
-          (json['totalRubles'] as num? ?? json['total'] as num? ?? 0).toInt(),
+      type: OrderType.fromWire(json['type'] as String?),
+      totalRubles: (json['totalRubles'] as num? ?? json['total'] as num? ?? 0)
+          .toInt(),
       paymentMethod: PaymentMethod.fromWire(json['paymentMethod'] as String?),
       address: rawAddress is Map<String, dynamic>
           ? DeliveryAddress.fromJson(rawAddress)
@@ -153,20 +194,23 @@ class CourierOrder extends Equatable {
       clientComment: json['clientComment'] as String?,
       branchId: json['branchId'] as String? ?? '',
       courierId: json['courierId'] as String?,
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
     );
   }
 
   @override
   List<Object?> get props => [
-        id,
-        number,
-        status,
-        totalRubles,
-        paymentMethod,
-        address,
-        clientPhone,
-        clientComment,
-        branchId,
-        courierId,
-      ];
+    id,
+    number,
+    status,
+    type,
+    totalRubles,
+    paymentMethod,
+    address,
+    clientPhone,
+    clientComment,
+    branchId,
+    courierId,
+    createdAt,
+  ];
 }

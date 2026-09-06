@@ -11,14 +11,15 @@ import 'courier_repository.dart';
 /// * PATCH /orders/{id}/status {status, courierId}
 class RemoteCourierRepository implements CourierRepository {
   RemoteCourierRepository({required String baseUrl, Dio? dio})
-      : _dio = dio ??
-            Dio(
-              BaseOptions(
-                baseUrl: baseUrl,
-                connectTimeout: const Duration(seconds: 10),
-                receiveTimeout: const Duration(seconds: 15),
-              ),
-            );
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              baseUrl: baseUrl,
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 15),
+            ),
+          );
 
   final Dio _dio;
 
@@ -72,8 +73,10 @@ class RemoteCourierRepository implements CourierRepository {
         .map(CourierOrder.fromJson)
         .where(
           (o) =>
-              o.status == OrderStatus.ready ||
-              o.status == OrderStatus.delivering,
+              o.type == OrderType.delivery &&
+              (o.status == OrderStatus.cooking ||
+                  o.status == OrderStatus.ready ||
+                  o.status == OrderStatus.onWay),
         )
         .toList();
   }

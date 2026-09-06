@@ -27,8 +27,8 @@ void main() {
       expect: () => [
         const OrdersLoading(),
         isA<OrdersLoaded>()
-            .having((s) => s.pickupOrders.length, 'ready orders', 2)
-            .having((s) => s.myOrders.length, 'my delivering orders', 1),
+            .having((s) => s.pickupOrders.length, 'ready+cooking orders', 2)
+            .having((s) => s.myOrders.length, 'my on-the-way orders', 1),
       ],
     );
 
@@ -42,14 +42,11 @@ void main() {
         return OrdersCubit(repository: repo, session: testSession);
       },
       act: (cubit) => cubit.load(),
-      expect: () => [
-        const OrdersLoading(),
-        isA<OrdersFailure>(),
-      ],
+      expect: () => [const OrdersLoading(), isA<OrdersFailure>()],
     );
 
     blocTest<OrdersCubit, OrdersState>(
-      'pickupOrder moves READY order to «Мои текущие»',
+      'pickupOrder moves READY order to «Мои в пути»',
       build: () => OrdersCubit(
         repository: FakeCourierRepository(),
         session: testSession,
@@ -72,7 +69,7 @@ void main() {
     );
 
     blocTest<OrdersCubit, OrdersState>(
-      'completeOrder removes DELIVERING order from active list',
+      'completeOrder removes ON_WAY order from active list',
       build: () => OrdersCubit(
         repository: FakeCourierRepository(),
         session: testSession,
@@ -114,6 +111,40 @@ void main() {
     );
 
     blocTest<OrdersCubit, OrdersState>(
+      'pickup tab includes COOKING and excludes non-DELIVERY orders',
+      build: () => OrdersCubit(
+        repository: FakeCourierRepository(
+          seedOrders: [
+            makeOrder(id: '1', status: OrderStatus.ready),
+            makeOrder(id: '2', status: OrderStatus.cooking),
+            makeOrder(
+              id: '3',
+              status: OrderStatus.ready,
+              type: OrderType.takeaway,
+            ),
+            makeOrder(
+              id: '4',
+              status: OrderStatus.onWay,
+              courierId: testCourier.id,
+            ),
+          ],
+        ),
+        session: testSession,
+      ),
+      act: (cubit) => cubit.load(),
+      skip: 1,
+      expect: () => [
+        isA<OrdersLoaded>()
+            .having(
+              (s) => s.pickupOrders.map((o) => o.id).toList(),
+              'available',
+              ['1', '2'],
+            )
+            .having((s) => s.myOrders.length, 'mine', 1),
+      ],
+    );
+
+    blocTest<OrdersCubit, OrdersState>(
       'failed status update rolls back and emits failure',
       build: () {
         final repo = _MockCourierRepository();
@@ -139,7 +170,7 @@ void main() {
         isA<OrdersLoaded>().having(
           (s) => s.orders.first.status,
           'optimistic',
-          OrderStatus.delivering,
+          OrderStatus.onWay,
         ),
         isA<OrdersLoaded>()
             .having((s) => s.orders.first.status, 'rollback', OrderStatus.ready)
