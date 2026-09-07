@@ -5,10 +5,13 @@ import 'package:customer_mobile/features/auth/bloc/auth_event.dart';
 import 'package:customer_mobile/features/auth/data/fake_auth_repository.dart';
 import 'package:customer_mobile/features/legal/data/legal_constants.dart';
 import 'package:customer_mobile/features/legal/view/legal_document_viewer_screen.dart';
+import 'package:customer_mobile/features/profile/bloc/user_settings_cubit.dart';
 import 'package:customer_mobile/features/profile/view/profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'fake_user_settings_repository.dart';
 
 final _documentsTile = find.byKey(const ValueKey('legal-documents-tile'));
 final _menuOffer = find.byKey(const ValueKey('legal-menu-offer'));
@@ -23,11 +26,17 @@ Future<void> _pumpProfile(WidgetTester tester) async {
   )..add(const AuthStarted());
   addTearDown(authBloc.close);
 
+  final settingsCubit = UserSettingsCubit(FakeUserSettingsRepository());
+  addTearDown(settingsCubit.close);
+
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
-        body: BlocProvider<AuthBloc>.value(
-          value: authBloc,
+        body: MultiBlocProvider(
+          providers: [
+            BlocProvider<AuthBloc>.value(value: authBloc),
+            BlocProvider<UserSettingsCubit>.value(value: settingsCubit),
+          ],
           child: const ProfileScreen(),
         ),
       ),
