@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderStatus, OrderType, Prisma, ProductStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CouriersEventsService } from '../couriers/couriers-events.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
 import { OrdersRepository } from './orders.repository';
 import { OrdersService } from './orders.service';
@@ -80,6 +81,7 @@ describe('OrdersService', () => {
     menuItem: { findMany: jest.Mock };
     modifierItem: { findMany: jest.Mock };
   };
+  let couriersEvents: { emitOrderEvent: jest.Mock };
 
   beforeEach(async () => {
     repository = {
@@ -101,10 +103,12 @@ describe('OrdersService', () => {
         { provide: OrdersRepository, useValue: repository },
         { provide: OrderQueuesService, useValue: queues },
         { provide: PrismaService, useValue: prisma },
+        { provide: CouriersEventsService, useValue: { emitOrderEvent: jest.fn() } },
       ],
     }).compile();
 
     service = module.get(OrdersService);
+    couriersEvents = module.get(CouriersEventsService);
   });
 
   describe('list', () => {
@@ -243,8 +247,44 @@ describe('OrdersService', () => {
         OrderStatus.CONFIRMED,
         '88888888-8888-8888-8888-888888888888',
         undefined,
+        undefined,
       );
       expect(result.status).toBe(OrderStatus.CONFIRMED);
+    });
+
+    it('emits a courier SSE event after transition', async () => {
+      repository.findById.mockResolvedValue(makeOrderRecord(OrderStatus.NEW));
+      repository.transitionStatus.mockResolvedValue(makeOrderRecord(OrderStatus.CONFIRMED));
+
+      await service.updateStatus(ORDER_ID, { status: OrderStatus.CONFIRMED });
+
+      expect(couriersEvents.emitOrderEvent).toHaveBeenCalledTimes(1);
+      expect(couriersEvents.emitOrderEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderId: ORDER_ID,
+          status: OrderStatus.CONFIRMED,
+          branchId: BRANCH_ID,
+        }),
+      );
+    });
+
+    it('forwards courierId to the repository', async () => {
+      repository.findById.mockResolvedValue(makeOrderRecord(OrderStatus.READY));
+      repository.transitionStatus.mockResolvedValue(makeOrderRecord(OrderStatus.ON_WAY));
+
+      await service.updateStatus(ORDER_ID, {
+        status: OrderStatus.ON_WAY,
+        courierId: '99999999-9999-9999-9999-999999999999',
+      });
+
+      expect(repository.transitionStatus).toHaveBeenCalledWith(
+        ORDER_ID,
+        OrderStatus.READY,
+        OrderStatus.ON_WAY,
+        undefined,
+        undefined,
+        '99999999-9999-9999-9999-999999999999',
+      );
     });
 
     it('rejects invalid transitions with INVALID_ORDER_STATUS_TRANSITION', async () => {

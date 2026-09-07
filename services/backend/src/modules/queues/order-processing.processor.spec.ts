@@ -60,10 +60,29 @@ describe('OrderProcessingProcessor — send-to-kitchen', () => {
     });
   });
 
+  it('moves a NEW order straight to COOKING (fast path for paid online)', async () => {
+    prisma.order.findFirst.mockResolvedValue({ status: OrderStatus.NEW });
+
+    await processor.process(job());
+
+    expect(prisma.order.update).toHaveBeenCalledWith({
+      where: { id: ORDER_ID },
+      data: { status: OrderStatus.COOKING, version: { increment: 1 } },
+    });
+    expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+      data: {
+        orderId: ORDER_ID,
+        previousStatus: OrderStatus.NEW,
+        newStatus: OrderStatus.COOKING,
+        reason: 'PAID_ONLINE',
+      },
+    });
+  });
+
   it.each([
-    OrderStatus.NEW,
     OrderStatus.COOKING,
     OrderStatus.READY,
+    OrderStatus.ON_WAY,
     OrderStatus.COMPLETED,
     OrderStatus.CANCELLED,
   ])('skips the transition when the order is %s', async (status) => {
