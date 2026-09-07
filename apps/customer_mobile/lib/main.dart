@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/app.dart';
 import 'core/auth/auth_token_provider.dart';
@@ -15,6 +16,7 @@ import 'features/menu/data/menu_repository.dart';
 import 'features/orders/data/order_history_repository.dart';
 import 'features/payments/data/fake_payments_repository.dart';
 import 'features/payments/data/payments_repository.dart';
+import 'features/profile/data/user_settings_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,6 +71,11 @@ Future<void> main() async {
         )
       : FakeOrderHistoryRepository();
 
+  // Локальные UI-настройки гостя (ADR-1616).
+  final userSettingsRepository = SharedPreferencesUserSettingsRepository(
+    await SharedPreferences.getInstance(),
+  );
+
   runApp(
     CustomerApp(
       repository: repository,
@@ -78,6 +85,7 @@ Future<void> main() async {
       tokenStorage: const SecureAuthTokenStorage(),
       tokenProvider: tokenProvider,
       orderHistoryRepository: orderHistoryRepository,
+      userSettingsRepository: userSettingsRepository,
     ),
   );
 }

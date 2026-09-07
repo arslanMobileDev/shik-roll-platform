@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../../../profile/bloc/user_settings_cubit.dart';
+import '../../../profile/domain/delivery_vehicle.dart';
 
 enum OrderStatus {
   confirmed,
@@ -14,19 +18,6 @@ enum OrderStatus {
     if (s.contains('COMPLET') || s.contains('DONE') || s.contains('ДОСТАВ')) return OrderStatus.completed;
     return OrderStatus.confirmed;
   }
-}
-
-enum DeliveryVehicle {
-  yellowScooter('Жёлтый скутер', 'assets/icons/delivery_scooter.webp', '🛵'),
-  redCar('Красный авто', 'assets/icons/delivery_car.webp', '🚗'),
-  rocket('Ракета-доставка', 'assets/icons/delivery_rocket.webp', '🚀'),
-  skateboard('Скейтборд', 'assets/icons/delivery_skateboard.webp', '🛹');
-
-  final String label;
-  final String imageUrl;
-  final String fallbackEmoji;
-
-  const DeliveryVehicle(this.label, this.imageUrl, this.fallbackEmoji);
 }
 
 class OrderStatusTracker extends StatefulWidget {
@@ -59,7 +50,6 @@ class OrderStatusTracker extends StatefulWidget {
 }
 
 class _OrderStatusTrackerState extends State<OrderStatusTracker> {
-  DeliveryVehicle _selectedVehicle = DeliveryVehicle.yellowScooter;
   bool _didPrecacheVehicles = false;
 
   static const double _vehicleImageCacheSize = 256;
@@ -117,44 +107,6 @@ class _OrderStatusTrackerState extends State<OrderStatusTracker> {
     );
   }
 
-  void _showVehiclePicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Выберите транспорт курьера',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              ...DeliveryVehicle.values.map((v) {
-                final isSelected = v == _selectedVehicle;
-                return ListTile(
-                  leading: _buildVehicleImage(v.imageUrl, v.fallbackEmoji, 36),
-                  title: Text(v.label),
-                  trailing: isSelected ? const Icon(Icons.check, color: Color(0xFFFF5200)) : null,
-                  onTap: () {
-                    setState(() {
-                      _selectedVehicle = v;
-                    });
-                    Navigator.pop(ctx);
-                  },
-                );
-              }),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   int get currentStep {
     switch (widget.status) {
       case OrderStatus.confirmed:
@@ -170,6 +122,11 @@ class _OrderStatusTrackerState extends State<OrderStatusTracker> {
 
   @override
   Widget build(BuildContext context) {
+    // Глобальный «скин» доставки из настроек гостя (ADR-1616); до завершения
+    // UserSettingsCubit.load() действует дефолт yellowScooter.
+    final vehicle = context.select<UserSettingsCubit, DeliveryVehicle>(
+      (cubit) => cubit.state.selectedCourierVehicle,
+    );
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -237,27 +194,7 @@ class _OrderStatusTrackerState extends State<OrderStatusTracker> {
             ),
             child: Row(
               children: [
-                GestureDetector(
-                  onTap: _showVehiclePicker,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      _buildVehicleImage(_selectedVehicle.imageUrl, _selectedVehicle.fallbackEmoji, 46),
-                      Positioned(
-                        right: -2,
-                        bottom: -2,
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFFF5200),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.edit, size: 10, color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                _buildVehicleImage(vehicle.imageUrl, vehicle.fallbackEmoji, 46),
                 const SizedBox(width: 14),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,

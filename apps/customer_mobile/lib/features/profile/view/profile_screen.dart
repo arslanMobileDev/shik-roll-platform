@@ -10,6 +10,7 @@ import '../../auth/view/auth_flow.dart';
 import '../../legal/data/legal_constants.dart';
 import '../../legal/data/legal_document.dart';
 import '../../legal/view/legal_document_viewer_screen.dart';
+import 'widgets/delivery_style_section.dart';
 
 /// Guest profile tab: identity, legal documents and logout for the
 /// authenticated guest; a login prompt for the anonymous one.
@@ -31,6 +32,10 @@ class ProfileScreen extends StatelessWidget {
                 _ProfileCard(state: state)
               else
                 const _LoginCard(),
+              const SizedBox(height: AppSpacing.s16),
+              // Стиль доставки — UI-предпочтение, не привязано к аккаунту
+              // и доступно также анонимному гостю (ADR-1616).
+              const DeliveryStyleSection(),
               const SizedBox(height: AppSpacing.s16),
               const _LegalSection(),
               if (state.isAuthenticated) ...[
