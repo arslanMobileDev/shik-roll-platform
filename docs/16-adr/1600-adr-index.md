@@ -5,7 +5,7 @@ Document Name: ARCHITECTURE DECISION RECORDS INDEX
 
 Book: Enterprise Architecture Decision Records
 
-Version: 1.1.0
+Version: 1.2.0
 
 Status: APPROVED
 
@@ -15,7 +15,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: August 2026
+Last Updated: September 2026
 
 Classification: Internal
 ---
@@ -101,6 +101,9 @@ APPROVED означает, что индекс утвержден как дей�
 | ADR-1611 | Cloud Run for MVP and Kubernetes Evolution | SUPERSEDED | docs/16-adr/1611-adr-cloud-run-mvp-kubernetes-evolution.md |
 | ADR-1612 | Object Storage Provider Model | ACCEPTED | docs/16-adr/1612-adr-object-storage-provider-model.md |
 | ADR-1613 | Timeweb Cloud MVP Infrastructure | ACCEPTED | docs/16-adr/1613-adr-timeweb-cloud-mvp-infrastructure.md |
+| ADR-1614 | Loyalty Service | ACCEPTED | docs/16-adr/1614-adr-loyalty-service.md |
+| ADR-1615 | Realtime Order Timeline | ACCEPTED | docs/16-adr/1615-adr-realtime-order-timeline.md |
+| ADR-1616 | Customer User Settings | ACCEPTED | docs/16-adr/1616-adr-customer-user-settings.md |
 
 ---
 

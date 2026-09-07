@@ -5,7 +5,7 @@ Document Name: DOCUMENT REGISTRY
 
 Book: Enterprise Architecture Governance
 
-Version: 1.8.0
+Version: 1.9.0
 
 Status: APPROVED
 
@@ -15,7 +15,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: August 2026
+Last Updated: September 2026
 
 Classification: Internal
 ---
@@ -69,7 +69,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | Document ID | Document Name | Book | Status | Version | Last Updated | Path |
 |---|---|---|---|---|---|---|
 | ADR-006 | Unified Communication Automation Center | — | ACCEPTED | 1.0.0 | July 2026 | `docs/03-product/COMMUNICATION_AUTOMATION_CENTER.md` |
-| ADR-1600 | ARCHITECTURE DECISION RECORDS INDEX | Enterprise Architecture Decision Records | APPROVED | 1.1.0 | August 2026 | `docs/16-adr/1600-adr-index.md` |
+| ADR-1600 | ARCHITECTURE DECISION RECORDS INDEX | Enterprise Architecture Decision Records | APPROVED | 1.2.0 | September 2026 | `docs/16-adr/1600-adr-index.md` |
 | ADR-1601 | ARCHITECTURE DECISION RECORDS OVERVIEW | Enterprise Architecture Decision Records | APPROVED | 1.0.0 | July 2026 | `docs/16-adr/1601-adr-overview.md` |
 | ADR-1602 | ADR — MONOREPO ARCHITECTURE | Enterprise Architecture Decision Records | ACCEPTED | 1.0.0 | July 2026 | `docs/16-adr/1602-adr-monorepo-architecture.md` |
 | ADR-1603 | ADR — EVENT-DRIVEN ARCHITECTURE | Enterprise Architecture Decision Records | ACCEPTED | 1.0.0 | July 2026 | `docs/16-adr/1603-adr-event-driven-architecture.md` |
@@ -83,6 +83,9 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | ADR-1611 | ADR — CLOUD RUN FOR MVP AND KUBERNETES EVOLUTION | Enterprise Architecture Decision Records | SUPERSEDED | 1.1.0 | August 2026 | `docs/16-adr/1611-adr-cloud-run-mvp-kubernetes-evolution.md` |
 | ADR-1612 | ADR — OBJECT STORAGE PROVIDER MODEL | Enterprise Architecture Decision Records | ACCEPTED | 1.1.0 | August 2026 | `docs/16-adr/1612-adr-object-storage-provider-model.md` |
 | ADR-1613 | ADR — TIMEWEB CLOUD MVP INFRASTRUCTURE | Enterprise Architecture Decision Records | ACCEPTED | 1.0.0 | August 2026 | `docs/16-adr/1613-adr-timeweb-cloud-mvp-infrastructure.md` |
+| ADR-1614 | ADR - LOYALTY SERVICE | Enterprise Architecture Decision Records | ACCEPTED | 1.0.0 | September 2026 | `docs/16-adr/1614-adr-loyalty-service.md` |
+| ADR-1615 | ADR - REALTIME ORDER TIMELINE | Enterprise Architecture Decision Records | ACCEPTED | 1.0.0 | September 2026 | `docs/16-adr/1615-adr-realtime-order-timeline.md` |
+| ADR-1616 | ADR - CUSTOMER USER SETTINGS | Enterprise Architecture Decision Records | ACCEPTED | 1.0.0 | September 2026 | `docs/16-adr/1616-adr-customer-user-settings.md` |
 | AI-1401 | AI & AUTOMATION OVERVIEW | AI & Automation Specification | APPROVED | 1.0.0 | July 2026 | `docs/14-ai/1401-ai-automation-overview.md` |
 | AI-1402 | AI GATEWAY ARCHITECTURE | AI & Automation Specification | APPROVED | 1.0.0 | July 2026 | `docs/14-ai/1402-ai-gateway-architecture.md` |
 | AI-1403 | AI AGENTS ARCHITECTURE | AI & Automation Specification | APPROVED | 1.0.0 | July 2026 | `docs/14-ai/1403-ai-agents-architecture.md` |
@@ -191,7 +194,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | GOV-2704 | TECHNOLOGY LIFECYCLE MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.1.0 | August 2026 | `docs/27-enterprise-architecture-governance/2704-technology-lifecycle-management.md` |
 | GOV-2705 | TECHNICAL DEBT MANAGEMENT | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2705-technical-debt-management.md` |
 | GOV-2706 | ENTERPRISE ARCHITECTURE ROADMAP | Enterprise Architecture Governance | APPROVED | 1.0.0 | July 2026 | `docs/27-enterprise-architecture-governance/2706-enterprise-architecture-roadmap.md` |
-| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.8.0 | August 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
+| GOV-2707 | DOCUMENT REGISTRY | Enterprise Architecture Governance | APPROVED | 1.9.0 | September 2026 | `docs/27-enterprise-architecture-governance/2707-document-registry.md` |
 | INT-1001 | INTEGRATION OVERVIEW | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1001-integration-overview.md` |
 | INT-1002 | PAYMENT GATEWAY INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1002-payment-gateway-integrations.md` |
 | INT-1003 | MAPS & GEOLOCATION INTEGRATIONS | Integration Specification | APPROVED | 1.0.0 | July 2026 | `docs/10-integrations/1003-maps-geolocation-integrations.md` |

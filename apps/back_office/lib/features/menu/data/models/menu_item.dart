@@ -14,10 +14,18 @@ enum MenuCategory {
 
   final String label;
 
-  static MenuCategory fromJson(String value) => MenuCategory.values.firstWhere(
-    (c) => c.name == value,
-    orElse: () => MenuCategory.rolls,
-  );
+  static MenuCategory fromJson(dynamic value) {
+    final String raw = switch (value) {
+      final String str => str,
+      final Map<String, dynamic> map => map['name'] as String? ?? map['slug'] as String? ?? '',
+      _ => '',
+    }.toLowerCase().trim();
+
+    return MenuCategory.values.firstWhere(
+      (c) => c.name.toLowerCase() == raw || c.label.toLowerCase() == raw,
+      orElse: () => MenuCategory.rolls,
+    );
+  }
 }
 
 /// A single catalog position.
@@ -65,24 +73,40 @@ final class MenuItem extends Equatable {
     );
   }
 
-  /// Tolerant decoder: accepts `price` (rubles, num) or `priceMinor`
-  /// (kopecks, int), and `isAvailable` or inverted `isStopped`.
+  /// Tolerant decoder: handles backend objects, numbers, and strings
   factory MenuItem.fromJson(Map<String, dynamic> json) {
-    final price = switch (json) {
-      {'priceMinor': final int minor} => Money(minor),
-      {'price': final num rubles} => Money.fromRubles(rubles.toDouble()),
-      _ => Money.zero,
+    final dynamic priceRaw = json['price'];
+    final Money price = switch (priceRaw) {
+      final num rubles => Money.fromRubles(rubles.toDouble()),
+      final Map<String, dynamic> map => switch (map['effective'] ?? map['branch'] ?? map['base']) {
+          final num r => Money.fromRubles(r.toDouble()),
+          _ => Money.zero,
+        },
+      _ => switch (json['priceMinor']) {
+          final int minor => Money(minor),
+          _ => Money.zero,
+        },
     };
-    final stopped = json['isStopped'] as bool?;
+
+    final stopped = switch (json['stopList']) {
+      final Map<String, dynamic> sl => sl['isActive'] as bool?,
+      _ => json['isStopped'] as bool?,
+    };
+
+    final bool available = switch (json['availability']) {
+      final Map<String, dynamic> av => av['isAvailable'] as bool? ?? true,
+      _ => json['available'] as bool? ?? !(stopped ?? false),
+    };
+
     return MenuItem(
       id: json['id'] as String,
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
-      category: MenuCategory.fromJson(json['category'] as String? ?? ''),
+      category: MenuCategory.fromJson(json['category']),
       price: price,
       imageUrl: json['imageUrl'] as String?,
       isHalal: json['isHalal'] as bool? ?? true,
-      isAvailable: json['isAvailable'] as bool? ?? !(stopped ?? false),
+      isAvailable: available,
     );
   }
 

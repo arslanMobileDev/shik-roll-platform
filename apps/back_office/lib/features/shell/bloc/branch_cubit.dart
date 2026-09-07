@@ -13,15 +13,14 @@ final class Branch extends Equatable {
 }
 
 /// Active branch selection for the top bar [BranchSelector].
-///
-/// Demo directory of branches; a branches endpoint will replace the
-/// static list once exposed by the API contract.
 final class BranchCubit extends Cubit<Branch> {
   BranchCubit() : super(branches.first);
 
   static const List<Branch> branches = [
-    Branch(id: 'branch-center', name: 'SHIK ROLL · Центр'),
-    Branch(id: 'branch-north', name: 'SHIK ROLL · Север'),
+    Branch(
+      id: '47ad77ce-acf4-4778-a185-974d3a4a2413',
+      name: 'SHIK ROLL · Центр',
+    ),
   ];
 
   void select(Branch branch) => emit(branch);

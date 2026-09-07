@@ -1,7 +1,7 @@
 ---
 Document Type: Decision Summary
 Status: ACTIVE
-Last Updated: August 2026
+Last Updated: September 2026
 Classification: Internal
 ---
 
@@ -42,6 +42,9 @@ Classification: Internal
 | Personal Data Responsibility | Владелец проекта остается оператором ПД; ответ провайдера является частью оценки инфраструктуры, но не юридическим разрешением на production | ACCEPTED BOUNDARY | [ADR-1613](docs/16-adr/1613-adr-timeweb-cloud-mvp-infrastructure.md), [CMP-1907](docs/19-compliance/1907-legal-requirements-regulatory-compliance.md) |
 | Communication Automation | Единый provider-neutral Communication Automation Center | ACCEPTED | [ADR-006](docs/03-product/COMMUNICATION_AUTOMATION_CENTER.md) |
 | AI Architecture | AI-First platform principles | ACCEPTED | [ADR-1610](docs/16-adr/1610-adr-ai-first-platform-architecture.md) |
+| Loyalty Service | Неизменяемый bonus ledger, атомарная balance projection, списание до 30% и cashback после `COMPLETED` / client `DELIVERED` | ACCEPTED | [ADR-1614](docs/16-adr/1614-adr-loyalty-service.md) |
+| Realtime Order Timeline | BullMQ Worker → Redis Pub/Sub → SSE/WebSocket adapter → Customer Mobile Bloc; backend statuses проецируются в client timeline | ACCEPTED | [ADR-1615](docs/16-adr/1615-adr-realtime-order-timeline.md) |
+| Customer User Settings | `shared_preferences` через repository и `UserSettingsCubit`; ключ `selected_courier_vehicle` | ACCEPTED | [ADR-1616](docs/16-adr/1616-adr-customer-user-settings.md) |
 
 ---
 
@@ -92,6 +95,12 @@ ADR-1611 Cloud Run for MVP and Kubernetes Evolution
 ADR-1612 Object Storage Provider Model
 
 ADR-1613 Timeweb Cloud MVP Infrastructure
+
+ADR-1614 Loyalty Service
+
+ADR-1615 Realtime Order Timeline
+
+ADR-1616 Customer User Settings
 
 GOV-2707 Document Registry
 

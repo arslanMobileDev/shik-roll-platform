@@ -11,6 +11,7 @@ final class ApiClient {
           connectTimeout: ApiConfig.connectTimeout,
           receiveTimeout: ApiConfig.receiveTimeout,
           headers: const {'Content-Type': 'application/json'},
+          validateStatus: (status) => status != null && status < 400,
         ),
       );
 

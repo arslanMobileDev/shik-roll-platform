@@ -15,12 +15,22 @@ final class RemoteBackOfficeRepository implements BackOfficeRepository {
   @override
   Future<List<MenuItem>> fetchMenuItems({required String branchId}) async {
     try {
-      final response = await _dio.get<List<dynamic>>(
+      final response = await _dio.get<dynamic>(
         '/menu-items',
         queryParameters: {'branchId': branchId},
       );
-      final data = response.data ?? const <dynamic>[];
-      return data
+      
+      final dynamic raw = response.data;
+      final List<dynamic> itemsList;
+      if (raw is Map<String, dynamic> && raw['data'] is List) {
+        itemsList = raw['data'] as List<dynamic>;
+      } else if (raw is List) {
+        itemsList = raw;
+      } else {
+        itemsList = const <dynamic>[];
+      }
+
+      return itemsList
           .whereType<Map<String, dynamic>>()
           .map(MenuItem.fromJson)
           .toList(growable: false);
@@ -36,7 +46,11 @@ final class RemoteBackOfficeRepository implements BackOfficeRepository {
         '/menu-items',
         data: draft.toJson(),
       );
-      return MenuItem.fromJson(response.data ?? const <String, dynamic>{});
+      final data = response.data ?? const <String, dynamic>{};
+      final itemMap = data.containsKey('data') && data['data'] is Map<String, dynamic>
+          ? data['data'] as Map<String, dynamic>
+          : data;
+      return MenuItem.fromJson(itemMap);
     } on DioException catch (e) {
       throw BackOfficeApiException(_describe(e));
     }
@@ -49,7 +63,11 @@ final class RemoteBackOfficeRepository implements BackOfficeRepository {
         '/menu-items/${item.id}',
         data: item.toJson(),
       );
-      return MenuItem.fromJson(response.data ?? const <String, dynamic>{});
+      final data = response.data ?? const <String, dynamic>{};
+      final itemMap = data.containsKey('data') && data['data'] is Map<String, dynamic>
+          ? data['data'] as Map<String, dynamic>
+          : data;
+      return MenuItem.fromJson(itemMap);
     } on DioException catch (e) {
       throw BackOfficeApiException(_describe(e));
     }

@@ -1,22 +1,18 @@
 /// Runtime configuration for the POS app, supplied via `--dart-define`.
-///
-/// When [apiBaseUrl] is empty the app runs against an in-memory demo
-/// catalog, which keeps the cashier screen usable for development and
-/// widget tests without a backend.
 abstract final class PosConfig {
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: '',
+    defaultValue: 'http://localhost:3000',
   );
 
   static const String defaultBrandId = String.fromEnvironment(
     'BRAND_ID',
-    defaultValue: 'brand-shik-roll',
+    defaultValue: '37b84f4c-0a70-4263-bfa0-cc04ba0d4b99',
   );
 
   static const String defaultBranchId = String.fromEnvironment(
     'BRANCH_ID',
-    defaultValue: 'branch-central',
+    defaultValue: '47ad77ce-acf4-4778-a185-974d3a4a2413',
   );
 }
 
@@ -45,10 +41,6 @@ final class TableOption {
 }
 
 /// Static POS context options.
-///
-/// The Menu & Product API contract (openapi.json) exposes no brand, branch
-/// or table listing endpoints yet, so the selectors are fed from
-/// configuration until those endpoints land.
 abstract final class PosDirectory {
   static const List<BrandOption> brands = [
     BrandOption(id: PosConfig.defaultBrandId, name: 'SHIK ROLL'),
@@ -56,7 +48,6 @@ abstract final class PosDirectory {
 
   static const List<BranchOption> branches = [
     BranchOption(id: PosConfig.defaultBranchId, name: 'Центральный'),
-    BranchOption(id: 'branch-north', name: 'Северный'),
   ];
 
   static final List<TableOption> tables = [
