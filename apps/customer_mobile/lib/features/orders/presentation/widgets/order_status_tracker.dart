@@ -17,10 +17,10 @@ enum OrderStatus {
 }
 
 enum DeliveryVehicle {
-  yellowScooter('Жёлтый скутер', 'assets/icons/delivery_scooter.png', '🛵'),
-  redCar('Красный авто', 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Automobile.png', '🚗'),
-  rocket('Ракета-доставка', 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Rocket.png', '🚀'),
-  skateboard('Скейтборд', 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Skateboard.png', '🛹');
+  yellowScooter('Жёлтый скутер', 'assets/icons/delivery_scooter.webp', '🛵'),
+  redCar('Красный авто', 'assets/icons/delivery_car.webp', '🚗'),
+  rocket('Ракета-доставка', 'assets/icons/delivery_rocket.webp', '🚀'),
+  skateboard('Скейтборд', 'assets/icons/delivery_skateboard.webp', '🛹');
 
   final String label;
   final String imageUrl;
@@ -60,6 +60,37 @@ class OrderStatusTracker extends StatefulWidget {
 
 class _OrderStatusTrackerState extends State<OrderStatusTracker> {
   DeliveryVehicle _selectedVehicle = DeliveryVehicle.yellowScooter;
+  bool _didPrecacheVehicles = false;
+
+  static const double _vehicleImageCacheSize = 256;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didPrecacheVehicles) return;
+    _didPrecacheVehicles = true;
+    // Прогреваем кэш всех иконок транспорта после первого кадра,
+    // чтобы переключение в селекторе было мгновенным и без джанка.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final v in DeliveryVehicle.values) {
+        final provider = v.imageUrl.startsWith('assets/')
+            ? ResizeImage(
+                AssetImage(v.imageUrl),
+                width: _vehicleImageCacheSize.toInt(),
+                height: _vehicleImageCacheSize.toInt(),
+              )
+            : ResizeImage(
+                NetworkImage(v.imageUrl),
+                width: _vehicleImageCacheSize.toInt(),
+                height: _vehicleImageCacheSize.toInt(),
+              );
+        // Ошибку прогрева глотаем: промах кэша не критичен —
+        // Image отрендерит errorBuilder с эмодзи-фолбэком.
+        precacheImage(provider, context).onError((_, _) {});
+      }
+    });
+  }
 
   Widget _buildVehicleImage(String url, String fallbackEmoji, double size) {
     if (url.startsWith('assets/')) {
@@ -68,6 +99,9 @@ class _OrderStatusTrackerState extends State<OrderStatusTracker> {
         width: size,
         height: size,
         fit: BoxFit.contain,
+        cacheWidth: _vehicleImageCacheSize.toInt(),
+        cacheHeight: _vehicleImageCacheSize.toInt(),
+        gaplessPlayback: true,
         errorBuilder: (_, e, s) => Text(fallbackEmoji, style: TextStyle(fontSize: size * 0.7)),
       );
     }
@@ -76,6 +110,9 @@ class _OrderStatusTrackerState extends State<OrderStatusTracker> {
       width: size,
       height: size,
       fit: BoxFit.contain,
+      cacheWidth: _vehicleImageCacheSize.toInt(),
+      cacheHeight: _vehicleImageCacheSize.toInt(),
+      gaplessPlayback: true,
       errorBuilder: (_, e, s) => Text(fallbackEmoji, style: TextStyle(fontSize: size * 0.7)),
     );
   }
