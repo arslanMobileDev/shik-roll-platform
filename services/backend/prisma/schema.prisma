@@ -479,6 +479,7 @@ enum OrderStatus {
   CONFIRMED
   COOKING
   READY
+  ON_WAY
   COMPLETED
   CANCELLED
 }
@@ -513,6 +514,8 @@ model Order {
   customer Customer?            @relation(fields: [customerId], references: [id], onDelete: Restrict, map: "fk_orders_customers")
   items    OrderItem[]
   history  OrderStatusHistory[]
+  courierId      String?   @map("courier_id") @db.Uuid
+  courier        Courier?  @relation(fields: [courierId], references: [id], onDelete: SetNull, map: "fk_orders_couriers")
   payments Payment[]
 
   @@unique([orderNumber], map: "uq_orders_order_number")
@@ -520,6 +523,7 @@ model Order {
   @@index([branchId], map: "idx_orders_branch_id")
   @@index([customerId], map: "idx_orders_customer_id")
   @@index([status], map: "idx_orders_status")
+  @@index([courierId], map: "idx_orders_courier_id")
   @@index([createdAt], map: "idx_orders_created_at")
   @@map("orders")
 }
@@ -652,4 +656,21 @@ model OrderStatusHistory {
 
   @@index([orderId], map: "idx_order_status_history_order_id")
   @@map("order_status_history")
+}
+
+
+model Courier {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  phone       String   @unique
+  pinHash     String   @map("pin_hash")
+  brandId     String   @map("brand_id") @db.Uuid
+  branchId    String   @map("branch_id") @db.Uuid
+  isAvailable Boolean  @default(true) @map("is_available")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orders      Order[]
+
+  @@map("couriers")
 }

@@ -18,6 +18,7 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderEntity, OrderPage } from './entities/order.entity';
 import { toOrderEntity } from './mappers/order.mapper';
 import { OrdersRepository } from './orders.repository';
+import { CouriersEventsService } from '../couriers/couriers-events.service';
 
 @Injectable()
 export class OrdersService {
@@ -25,6 +26,7 @@ export class OrdersService {
     private readonly repository: OrdersRepository,
     private readonly queues: OrderQueuesService,
     private readonly prisma: PrismaService,
+    private readonly couriersEvents: CouriersEventsService,
   ) {}
 
   /**
@@ -236,7 +238,19 @@ export class OrdersService {
       dto.status,
       dto.changedBy,
       dto.reason,
+      dto.courierId,
     );
+    this.couriersEvents.emitOrderEvent({
+      orderId: updated.id,
+      orderNumber: updated.orderNumber,
+      status: updated.status,
+      branchId: updated.branchId,
+      courierId: updated.courierId,
+      deliveryAddress: updated.deliveryAddress,
+      totalRubles: Math.round(Number(updated.totalAmount)),
+      timestamp: new Date().toISOString(),
+    });
+
     return toOrderEntity(updated);
   }
 

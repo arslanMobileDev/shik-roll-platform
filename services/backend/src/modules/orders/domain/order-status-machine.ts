@@ -1,22 +1,24 @@
 import { OrderStatus } from '@prisma/client';
 
 /**
- * Order lifecycle state machine (task contract):
- *   NEW -> CONFIRMED -> COOKING -> READY -> COMPLETED
- *   NEW | CONFIRMED | COOKING | READY -> CANCELLED
+ * Order lifecycle state machine:
+ *   NEW -> CONFIRMED -> COOKING -> READY -> ON_WAY -> COMPLETED
+ *   READY -> COMPLETED (for takeaway / dine-in)
+ *   NEW | CONFIRMED | COOKING | READY | ON_WAY -> CANCELLED
  * COMPLETED and CANCELLED are terminal.
  */
 const TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   NEW: [OrderStatus.CONFIRMED, OrderStatus.COOKING, OrderStatus.CANCELLED],
   CONFIRMED: [OrderStatus.COOKING, OrderStatus.CANCELLED],
   COOKING: [OrderStatus.READY, OrderStatus.CANCELLED],
-  READY: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+  READY: [OrderStatus.ON_WAY, OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+  ON_WAY: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
   COMPLETED: [],
   CANCELLED: [],
 };
 
 export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
-  return TRANSITIONS[from].includes(to);
+  return TRANSITIONS[from]?.includes(to) ?? false;
 }
 
 export function assertTransition(from: OrderStatus, to: OrderStatus): void {

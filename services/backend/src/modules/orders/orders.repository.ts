@@ -62,6 +62,7 @@ export class OrdersRepository {
     to: OrderStatus,
     changedBy: string | undefined,
     reason: string | undefined,
+    courierId?: string | undefined,
   ): Promise<OrderRecord> {
     const terminalPatch: Prisma.OrderUncheckedUpdateInput = {};
     if (to === OrderStatus.COMPLETED) terminalPatch.completedAt = new Date();
@@ -75,6 +76,7 @@ export class OrdersRepository {
         where: { id },
         data: {
           status: to,
+          ...(courierId !== undefined ? { courierId } : {}),
           ...terminalPatch,
           version: { increment: 1 },
         },

@@ -12,6 +12,11 @@ export class UpdateOrderStatusDto {
   @IsUUID()
   changedBy?: string;
 
+  @ApiPropertyOptional({ description: 'Courier ID assigned to this order' })
+  @IsOptional()
+  @IsUUID()
+  courierId?: string;
+
   @ApiPropertyOptional({ description: 'Reason, e.g. cancellation cause' })
   @IsOptional()
   @IsString()
