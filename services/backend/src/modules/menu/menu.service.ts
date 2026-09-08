@@ -157,6 +157,11 @@ export class MenuService {
     return this.getItemById(id, dto.branchId);
   }
 
+  async getStopList(branchId: string) {
+    await this.assertBranchExists(branchId);
+    return this.repository.findStopListByBranch(branchId);
+  }
+
   async updateStopList(id: string, dto: UpdateStopListDto): Promise<MenuItemEntity> {
     const item = await this.repository.findMenuItemById(id);
     if (!item) {

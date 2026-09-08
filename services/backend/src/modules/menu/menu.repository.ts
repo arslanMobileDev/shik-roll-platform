@@ -393,4 +393,22 @@ export class MenuRepository {
     }
     return false;
   }
+
+  async findStopListByBranch(branchId: string) {
+    return this.prisma.stopListEntry.findMany({
+      where: { branchId, isActive: true },
+      include: {
+        menuItem: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            categoryId: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: { startsAt: 'desc' },
+    });
+  }
 }

@@ -120,6 +120,7 @@ export class OrdersService {
       },
       include: {
         prices: { where: { branchId: dto.branchId } },
+        stopList: { where: { branchId: dto.branchId, isActive: true } },
       },
     });
     const menuItemById = new Map(menuItems.map((item) => [item.id, item]));
@@ -133,11 +134,19 @@ export class OrdersService {
 
     // Validate all lines before writing anything.
     for (const item of dto.items) {
-      if (!menuItemById.has(item.menuItemId)) {
+      const menuItem = menuItemById.get(item.menuItemId);
+      if (!menuItem) {
         throw new BadRequestException({
           statusCode: 400,
           code: 'PRODUCT_UNAVAILABLE',
           message: `Menu item ${item.menuItemId} is not available`,
+        });
+      }
+      if (menuItem.stopList && menuItem.stopList.length > 0) {
+        throw new BadRequestException({
+          statusCode: 400,
+          code: 'PRODUCT_IN_STOP_LIST',
+          message: `Menu item ${item.menuItemId} is currently on the branch stop list`,
         });
       }
       for (const modifier of item.modifiers ?? []) {

@@ -176,6 +176,13 @@ export class MenuController {
     return this.service.updateAvailability(id, dto);
   }
 
+  @Get('stop-list')
+  @ApiTags('menu-items')
+  @ApiOperation({ summary: 'List all active stop list entries for a branch' })
+  getStopList(@Query('branchId', ParseUUIDPipe) branchId: string) {
+    return this.service.getStopList(branchId);
+  }
+
   @Patch('menu-items/:id/stop-list')
   @ApiTags('menu-items')
   @ApiOperation({ summary: 'Add the item to or remove it from the branch stop list' })
