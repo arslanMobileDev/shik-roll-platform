@@ -103,7 +103,7 @@ Read-only проверка `scripts/check-doc-terminology.py` должна по�
 | API-706 | MENU & PRODUCT API | API Specification | APPROVED | 1.2.0 | July 2026 | `docs/07-api/706-menu-product-api.md` |
 | API-707 | ORDER API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/707-order-api.md` |
 | API-708 | PAYMENT API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/708-payment-api.md` |
-| API-709 | KITCHEN API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/709-kitchen-api.md` |
+| API-709 | KITCHEN API | API Specification | APPROVED | 1.0.0 | September 2026 | `docs/07-api/709-kitchen-api.md` |
 | API-710 | DELIVERY API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/710-delivery-api.md` |
 | API-711 | INVENTORY API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/711-inventory-api.md` |
 | API-712 | EMPLOYEE API | API Specification | APPROVED | 1.0.0 | July 2026 | `docs/07-api/712-employee-api.md` |
