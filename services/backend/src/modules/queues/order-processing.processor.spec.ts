@@ -27,6 +27,10 @@ describe('OrderProcessingProcessor — send-to-kitchen', () => {
   let loyalty: { earnCashback: jest.Mock; refundOnCancel: jest.Mock };
 
   beforeEach(async () => {
+    // ADR-1618: the send-to-kitchen transition runs only under the dev-harness
+    // status emulation flag; one test below explicitly clears it.
+    process.env.KDS_STATUS_EMULATION_ENABLED = 'true';
+
     prisma = {
       order: { findFirst: jest.fn(), update: jest.fn().mockResolvedValue({}) },
       orderStatusHistory: { create: jest.fn().mockResolvedValue({}) },
@@ -62,7 +66,11 @@ describe('OrderProcessingProcessor — send-to-kitchen', () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.order.update).toHaveBeenCalledWith({
       where: { id: ORDER_ID },
-      data: { status: OrderStatus.COOKING, version: { increment: 1 } },
+      data: {
+        status: OrderStatus.COOKING,
+        cookingStartedAt: expect.any(Date),
+        version: { increment: 1 },
+      },
     });
     expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
       data: {
@@ -74,23 +82,15 @@ describe('OrderProcessingProcessor — send-to-kitchen', () => {
     });
   });
 
-  it('moves a NEW order straight to COOKING (fast path for paid online)', async () => {
+  // ADR-1618: no NEW -> COOKING bypass — an order always passes CONFIRMED,
+  // and the kitchen terminal owns the move into COOKING.
+  it('skips a NEW order (no NEW -> COOKING bypass)', async () => {
     prisma.order.findFirst.mockResolvedValue({ status: OrderStatus.NEW });
 
     await processor.process(job());
 
-    expect(prisma.order.update).toHaveBeenCalledWith({
-      where: { id: ORDER_ID },
-      data: { status: OrderStatus.COOKING, version: { increment: 1 } },
-    });
-    expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
-      data: {
-        orderId: ORDER_ID,
-        previousStatus: OrderStatus.NEW,
-        newStatus: OrderStatus.COOKING,
-        reason: 'PAID_ONLINE',
-      },
-    });
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.orderStatusHistory.create).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -114,6 +114,21 @@ describe('OrderProcessingProcessor — send-to-kitchen', () => {
     await processor.process(job());
 
     expect(prisma.order.update).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op when KDS status emulation is disabled (ADR-1618)', async () => {
+    delete process.env.KDS_STATUS_EMULATION_ENABLED;
+    prisma.order.findFirst.mockResolvedValue({ status: OrderStatus.CONFIRMED });
+
+    await processor.process(job());
+
+    expect(prisma.order.findFirst).not.toHaveBeenCalled();
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.orderStatusHistory.create).not.toHaveBeenCalled();
+  });
+
+  afterEach(() => {
+    delete process.env.KDS_STATUS_EMULATION_ENABLED;
   });
 });
 
@@ -209,5 +224,42 @@ describe('OrderProcessingProcessor — process-order (loyalty hooks, ADR-1614)',
 
     expect(loyalty.refundOnCancel).not.toHaveBeenCalled();
     expect(loyalty.earnCashback).not.toHaveBeenCalled();
+  });
+
+  it('confirms a NEW order WITHOUT scheduling status timers when emulation is off (ADR-1618)', async () => {
+    delete process.env.KDS_STATUS_EMULATION_ENABLED;
+    prisma.order.findFirst.mockResolvedValue(makeOrder({ status: OrderStatus.NEW }));
+
+    await processor.process(job());
+
+    // AUTO_CONFIRM still happens — production flow ends at CONFIRMED.
+    expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+      data: {
+        orderId: ORDER_ID,
+        previousStatus: OrderStatus.NEW,
+        newStatus: OrderStatus.CONFIRMED,
+        reason: 'AUTO_CONFIRM',
+      },
+    });
+    // ...and COOKING/READY timers are NOT scheduled.
+    expect(queue.add).not.toHaveBeenCalled();
+  });
+
+  it('schedules the COOKING/READY timers after AUTO_CONFIRM when emulation is on', async () => {
+    process.env.KDS_STATUS_EMULATION_ENABLED = 'true';
+    prisma.order.findFirst.mockResolvedValue(makeOrder({ status: OrderStatus.NEW }));
+
+    await processor.process(job());
+
+    const timerJobs = queue.add.mock.calls.filter((call) => call[0] === 'status-timer');
+    expect(timerJobs).toHaveLength(2);
+    expect(timerJobs.map((call) => call[1])).toEqual([
+      { orderId: ORDER_ID, to: OrderStatus.COOKING },
+      { orderId: ORDER_ID, to: OrderStatus.READY },
+    ]);
+  });
+
+  afterEach(() => {
+    delete process.env.KDS_STATUS_EMULATION_ENABLED;
   });
 });

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kds/core/storage/kitchen_session_store.dart';
+import 'package:kds/features/auth/bloc/kitchen_auth_cubit.dart';
 import 'package:kds/features/kds/bloc/kds_orders_bloc.dart';
 import 'package:kds/features/kds/bloc/kds_orders_event.dart';
 import 'package:kds/features/kds/data/kds_order_models.dart';
+import 'package:kds/features/kds/data/kitchen_events_client.dart';
 import 'package:kds/features/kds/view/kds_screen.dart';
 import 'package:kds/features/kds/view/widgets/order_card.dart';
 import 'package:kds/features/shift/bloc/cook_shift_cubit.dart';
@@ -12,11 +15,20 @@ import 'package:kds/features/shift/data/cook_shift_models.dart';
 import '../../../helpers/test_fixtures.dart';
 
 void main() {
-  Future<(KdsOrdersBloc, TestKdsOrdersRepository, CookShiftCubit)> pumpScreen(
+  Future<
+    (
+      KdsOrdersBloc,
+      TestKdsOrdersRepository,
+      CookShiftCubit,
+      KitchenAuthCubit,
+      TestKitchenEventsClient,
+      TestKitchenAlertService,
+    )
+  >
+  pumpScreen(
     WidgetTester tester, {
     List<KdsOrder> orders = const [],
     List<ActiveCook> cooks = const [],
-    void Function(List<KdsOrder>)? onNewOrders,
   }) async {
     // Primary KDS target: tablet 1024x768 landscape (AppBreakpoints).
     tester.view.physicalSize = const Size(1024, 768);
@@ -25,9 +37,21 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final repository = TestKdsOrdersRepository(orders: orders);
-    final bloc = KdsOrdersBloc(repository: repository, pollInterval: null);
+    final eventsClient = TestKitchenEventsClient();
+    final alertService = TestKitchenAlertService();
+    final bloc = KdsOrdersBloc(
+      repository: repository,
+      eventsClient: eventsClient,
+      pollInterval: null,
+      now: () => kNow,
+    );
     final shiftCubit = CookShiftCubit(
       repository: TestCookShiftRepository(cooks: cooks),
+    );
+    final authCubit = KitchenAuthCubit(
+      repository: TestKitchenAuthRepository(),
+      storage: TestKitchenTokenStorage(),
+      sessionStore: KitchenSessionStore(),
     );
     await tester.pumpWidget(
       MaterialApp(
@@ -35,42 +59,50 @@ void main() {
           providers: [
             BlocProvider.value(value: bloc),
             BlocProvider.value(value: shiftCubit),
+            BlocProvider.value(value: authCubit),
           ],
-          child: KdsScreen(onNewOrders: onNewOrders, now: kNow),
+          child: KdsScreen(alertService: alertService, now: kNow),
         ),
       ),
     );
-    bloc.add(const KdsOrdersStarted(branchId: 'branch-central'));
+    bloc.add(const KdsOrdersStarted());
     await shiftCubit.load('branch-central');
     await tester.pumpAndSettle();
-    return (bloc, repository, shiftCubit);
+    return (bloc, repository, shiftCubit, authCubit, eventsClient, alertService);
   }
 
   testWidgets('доска раскладывает заказы по трём колонкам', (tester) async {
     await pumpScreen(
       tester,
       orders: [
+        buildOrder(id: 'q', orderNumber: '101'),
+        buildOrder(id: 'c', orderNumber: '102'),
         buildOrder(
-          id: 'q',
-          orderNumber: '101',
-          status: KdsOrderStatus.newOrder,
+          id: 'k',
+          orderNumber: '103',
+          status: KdsOrderStatus.cooking,
+          cookingStartedAt: kNow.subtract(const Duration(minutes: 4)),
         ),
         buildOrder(
-          id: 'c',
-          orderNumber: '102',
-          status: KdsOrderStatus.confirmed,
+          id: 'r',
+          orderNumber: '104',
+          status: KdsOrderStatus.ready,
+          readyAt: kNow.subtract(const Duration(minutes: 2)),
         ),
-        buildOrder(id: 'k', orderNumber: '103', status: KdsOrderStatus.cooking),
-        buildOrder(id: 'r', orderNumber: '104', status: KdsOrderStatus.ready),
         buildOrder(
           id: 'd',
           orderNumber: '105',
           status: KdsOrderStatus.completed,
         ),
+        buildOrder(
+          id: 'n',
+          orderNumber: '106',
+          status: KdsOrderStatus.newOrder,
+        ),
       ],
     );
 
-    expect(find.text('В очереди'), findsOneWidget);
+    expect(find.text('Новые'), findsOneWidget);
     expect(find.text('Готовятся'), findsOneWidget);
     expect(find.text('Готовы'), findsOneWidget);
     // Счётчики в заголовках колонок: 2 / 1 / 1.
@@ -78,55 +110,60 @@ void main() {
     expect(find.text('1'), findsNWidgets(2));
     expect(find.text('#101'), findsOneWidget);
     expect(find.text('#104'), findsOneWidget);
-    // COMPLETED на доске не показывается.
+    // COMPLETED и NEW на доске не показываются (ADR-1618).
     expect(find.text('#105'), findsNothing);
+    expect(find.text('#106'), findsNothing);
   });
 
-  testWidgets('тап «В работу» переводит заказ в колонку «Готовятся»', (
+  testWidgets('тап «Начать готовить» переводит заказ в «Готовятся»', (
     tester,
   ) async {
-    final (_, repository, _) = await pumpScreen(
+    final (_, repository, _, _, _, _) = await pumpScreen(
+      tester,
+      orders: [buildOrder(id: 'a', orderNumber: '201', version: 3)],
+    );
+
+    expect(find.text('Начать готовить'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('order-action-a')));
+    await tester.pumpAndSettle();
+
+    expect(repository.statusCalls, [('a', KdsOrderStatus.cooking, 3)]);
+    // Карточка предлагает следующее действие колонки «Готовятся».
+    expect(find.text('Готово'), findsOneWidget);
+    expect(find.text('Начать готовить'), findsNothing);
+  });
+
+  testWidgets('тап «Готово» переводит заказ в «Готовы», заказ остаётся', (
+    tester,
+  ) async {
+    final (_, repository, _, _, _, _) = await pumpScreen(
       tester,
       orders: [
         buildOrder(
           id: 'a',
-          orderNumber: '201',
-          status: KdsOrderStatus.newOrder,
+          orderNumber: '202',
+          status: KdsOrderStatus.cooking,
+          cookingStartedAt: kNow.subtract(const Duration(minutes: 6)),
         ),
       ],
     );
 
-    expect(find.text('В работу'), findsOneWidget);
     await tester.tap(find.byKey(const Key('order-action-a')));
     await tester.pumpAndSettle();
 
-    expect(repository.statusCalls, [('a', KdsOrderStatus.cooking)]);
-    // Карточка предлагает следующее действие колонки «Готовятся».
-    expect(find.text('Готово'), findsOneWidget);
-    expect(find.text('В работу'), findsNothing);
-  });
-
-  testWidgets('тап «Выдано» убирает заказ с доски', (tester) async {
-    await pumpScreen(
-      tester,
-      orders: [
-        buildOrder(id: 'a', orderNumber: '202', status: KdsOrderStatus.ready),
-      ],
-    );
-
-    await tester.tap(find.byKey(const Key('order-action-a')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('#202'), findsNothing);
-    expect(find.byType(OrderCard), findsNothing);
+    expect(repository.statusCalls, [('a', KdsOrderStatus.ready, 1)]);
+    // Заказ готов, но остаётся на доске: выдачу закрывают POS/курьер.
+    expect(find.text('#202'), findsOneWidget);
+    expect(find.text('Выдано'), findsNothing);
+    expect(find.byKey(const Key('order-action-a')), findsNothing);
   });
 
   testWidgets('кнопка «Обновить» перезапрашивает заказы', (tester) async {
-    final (_, repository, _) = await pumpScreen(tester);
+    final (_, repository, _, _, _, _) = await pumpScreen(tester);
     expect(find.byType(OrderCard), findsNothing);
 
     repository.orders.add(
-      buildOrder(id: 'n', orderNumber: '301', status: KdsOrderStatus.newOrder),
+      buildOrder(id: 'n', orderNumber: '301'),
     );
     await tester.tap(find.byKey(const Key('kds-refresh-button')));
     await tester.pumpAndSettle();
@@ -134,25 +171,23 @@ void main() {
     expect(find.text('#301'), findsOneWidget);
   });
 
-  testWidgets('новый заказ: звуковой сигнал и снэкбар', (tester) async {
-    final alerted = <List<KdsOrder>>[];
-    final (bloc, repository, _) = await pumpScreen(
+  testWidgets('новый заказ по SSE: звуковой сигнал и снэкбар', (tester) async {
+    final (bloc, _, _, _, eventsClient, alertService) = await pumpScreen(
       tester,
-      onNewOrders: alerted.add,
     );
 
-    repository.orders.add(
-      buildOrder(
-        id: 'fresh',
-        orderNumber: '401',
-        status: KdsOrderStatus.newOrder,
+    eventsClient.emitSignal(const KitchenStreamConnected());
+    await tester.pump();
+    eventsClient.emitSignal(
+      KitchenOrderUpserted(
+        order: buildOrder(id: 'fresh', orderNumber: '401', version: 1),
+        orderVersion: 1,
+        eventId: 'evt-401-1',
       ),
     );
-    bloc.add(const KdsOrdersPollTicked());
     await tester.pumpAndSettle();
 
-    expect(alerted, hasLength(1));
-    expect(alerted.single.map((o) => o.id), ['fresh']);
+    expect(alertService.notifyCounts, [1]);
     expect(find.text('Новый заказ: #401'), findsOneWidget);
     // Карточка подсвечена.
     final card = tester.widget<OrderCard>(
@@ -163,24 +198,49 @@ void main() {
     // «OK» снимает подсветку.
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
+    expect(bloc.state.freshOrderIds, isEmpty);
     final cardAfter = tester.widget<OrderCard>(
       find.byKey(const Key('order-card-fresh')),
     );
     expect(cardAfter.isFresh, isFalse);
   });
 
+  testWidgets('индикатор соединения: connecting → live', (tester) async {
+    final (_, _, _, _, eventsClient, _) = await pumpScreen(tester);
+
+    expect(
+      find.byKey(
+        const Key('kds-connection-KdsConnectionStatus.connecting'),
+      ),
+      findsOneWidget,
+    );
+
+    eventsClient.emitSignal(const KitchenStreamConnected());
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('kds-connection-KdsConnectionStatus.live')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('mute-переключатель глушит звук станции', (tester) async {
+    final (_, _, _, _, _, alertService) = await pumpScreen(tester);
+
+    expect(alertService.muted, isFalse);
+    await tester.tap(find.byKey(const Key('kds-mute-toggle')));
+    await tester.pumpAndSettle();
+
+    expect(alertService.muted, isTrue);
+    expect(find.byIcon(Icons.volume_off), findsOneWidget);
+  });
+
   testWidgets('выбранный повар: cookId/shiftId уходят в смену статуса', (
     tester,
   ) async {
-    final (_, repository, shiftCubit) = await pumpScreen(
+    final (_, repository, shiftCubit, _, _, _) = await pumpScreen(
       tester,
-      orders: [
-        buildOrder(
-          id: 'a',
-          orderNumber: '501',
-          status: KdsOrderStatus.confirmed,
-        ),
-      ],
+      orders: [buildOrder(id: 'a', orderNumber: '501')],
       cooks: [buildCook()],
     );
     shiftCubit.selectCook('cook-1');
@@ -193,15 +253,9 @@ void main() {
   });
 
   testWidgets('без повара: только shiftId, без cookId', (tester) async {
-    final (_, repository, _) = await pumpScreen(
+    final (_, repository, _, _, _, _) = await pumpScreen(
       tester,
-      orders: [
-        buildOrder(
-          id: 'a',
-          orderNumber: '502',
-          status: KdsOrderStatus.confirmed,
-        ),
-      ],
+      orders: [buildOrder(id: 'a', orderNumber: '502')],
     );
 
     await tester.tap(find.byKey(const Key('order-action-a')));
@@ -210,26 +264,12 @@ void main() {
     expect(repository.attributionCalls, [('a', null, 'shift-1')]);
   });
 
-  testWidgets('тап «Выдано» инкрементирует личный счётчик повара в шапке', (
-    tester,
-  ) async {
-    final (_, _, shiftCubit) = await pumpScreen(
-      tester,
-      orders: [
-        buildOrder(id: 'a', orderNumber: '503', status: KdsOrderStatus.ready),
-      ],
-      cooks: [buildCook(completedOrders: 7, avgPrepSeconds: 600)],
-    );
-    shiftCubit.selectCook('cook-1');
+  testWidgets('logout из шапки разлогинивает терминал', (tester) async {
+    final (_, _, _, authCubit, _, _) = await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const Key('kds-logout-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Выполнено за смену: 7 шт. · ~10 мин'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('order-action-a')));
-    await tester.pumpAndSettle();
-
-    expect(shiftCubit.state.currentCook?.completedOrders, 8);
-    // (600·7 + 300) / 8 = 562.5 → 563с ≈ 9 мин.
-    expect(find.text('Выполнено за смену: 8 шт. · ~9 мин'), findsOneWidget);
+    expect(authCubit.state, isA<KitchenUnauthenticated>());
   });
 }

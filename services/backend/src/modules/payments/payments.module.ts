@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { KitchenModule } from '../kitchen/kitchen.module';
 import { paymentsProviderMode } from './payments.config';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
@@ -12,6 +13,7 @@ import { YooKassaProvider } from './providers/yookassa.provider';
  * YOOKASSA_SHOP_ID/YOOKASSA_SECRET_KEY), the dev Mock otherwise.
  */
 @Module({
+  imports: [KitchenModule],
   controllers: [PaymentsController],
   providers: [
     PaymentsService,

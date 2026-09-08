@@ -6,6 +6,7 @@ import {
   HttpException,
   Injectable,
   NotFoundException,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -22,6 +23,7 @@ import {
 } from './couriers.config';
 import { AuthenticatedCourier, CourierTokenPayload } from './couriers.types';
 import { CouriersEventsService } from './couriers-events.service';
+import { KitchenEventsService } from '../kitchen/kitchen-events.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 
 /** bcrypt hashes carry a version prefix ($2a$/$2b$/$2y$); anything else is a legacy plaintext row. */
@@ -39,6 +41,9 @@ export class CouriersService {
     private readonly jwt: JwtService,
     private readonly events: CouriersEventsService,
     private readonly loyalty: LoyaltyService,
+    // Optional so unit specs can construct the service without the kitchen
+    // bounded context; always present in the wired app.
+    @Optional() private readonly kitchenEvents?: KitchenEventsService,
   ) {}
 
   async authenticateByPin(dto: CourierPinAuthDto) {
@@ -168,6 +173,9 @@ export class CouriersService {
         : await this.transitionOwnOrder(courier, order, dto.status);
 
     this.emitOrderChanged(updated);
+    // Kitchen POS (ADR-1618): a courier taking the order ON_WAY (or
+    // completing it) removes it from the branch kitchen board.
+    await this.kitchenEvents?.publishOrderChanged(updated.id);
 
     // Loyalty (ADR-1614): same idempotent cashback rule as the staff endpoint.
     if (updated.status === OrderStatus.COMPLETED) {

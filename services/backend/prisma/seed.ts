@@ -13,6 +13,7 @@
  * The seed is idempotent (upsert by unique keys) so `prisma db seed` and
  * `prisma migrate reset` can re-run safely.
  */
+import * as bcrypt from 'bcryptjs';
 import { PrismaClient, MenuStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -25,6 +26,14 @@ const BRAND = {
 const DEV_BRANCH = {
   code: 'DEV-01',
   name: 'SHIK ROLL Dev Branch',
+};
+
+// Kitchen POS dev terminal (ADR-1618). Dev-only PIN; production terminals are
+// provisioned by ops with per-terminal PINs, never through this seed.
+const DEV_KITCHEN_TERMINAL = {
+  code: 'KDS-01',
+  name: 'Kitchen Terminal 1',
+  pin: '1234',
 };
 
 const CERTIFICATION_TAGS = [
@@ -91,6 +100,18 @@ async function main() {
     where: { brandId_branchId: { brandId: brand.id, branchId: branch.id } },
     update: {},
     create: { brandId: brand.id, branchId: branch.id },
+  });
+
+  // Kitchen POS terminal (ADR-1618): the KDS app signs in as this terminal.
+  await prisma.kitchenTerminal.upsert({
+    where: { code: DEV_KITCHEN_TERMINAL.code },
+    update: { name: DEV_KITCHEN_TERMINAL.name, branchId: branch.id, isActive: true },
+    create: {
+      code: DEV_KITCHEN_TERMINAL.code,
+      name: DEV_KITCHEN_TERMINAL.name,
+      pinHash: await bcrypt.hash(DEV_KITCHEN_TERMINAL.pin, 10),
+      branchId: branch.id,
+    },
   });
 
   const existingMenu = await prisma.menu.findFirst({
@@ -174,6 +195,7 @@ async function main() {
     categories: await prisma.category.count(),
     menuItems: await prisma.menuItem.count(),
     certificationTags: await prisma.certificationTag.count(),
+    kitchenTerminals: await prisma.kitchenTerminal.count(),
   };
   console.log('Seed finished:', counts);
 }

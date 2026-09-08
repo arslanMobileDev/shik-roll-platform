@@ -10,7 +10,7 @@ import '../../bloc/kds_orders_event.dart';
 import '../../data/kds_order_models.dart';
 import 'order_card.dart';
 
-/// UI-804 — one board column («В очереди» / «Готовятся» / «Готовы»).
+/// UI-804 / ADR-1618 — one board column («Новые» / «Готовятся» / «Готовы»).
 class KdsStatusColumn extends StatelessWidget {
   const KdsStatusColumn({
     super.key,
@@ -18,7 +18,8 @@ class KdsStatusColumn extends StatelessWidget {
     required this.accent,
     required this.orders,
     this.freshOrderIds = const {},
-    this.pendingOrderId,
+    this.mutatingOrderIds = const {},
+    this.clockOffset = Duration.zero,
     this.now,
   });
 
@@ -27,8 +28,11 @@ class KdsStatusColumn extends StatelessWidget {
   final List<KdsOrder> orders;
   final Set<String> freshOrderIds;
 
-  /// Order currently transitioning — its card shows the in-progress state.
-  final String? pendingOrderId;
+  /// Orders with a status transition in flight — their cards are blocked.
+  final Set<String> mutatingOrderIds;
+
+  /// Server-clock correction, forwarded to order cards.
+  final Duration clockOffset;
 
   /// Fixed clock for tests, forwarded to order cards.
   final DateTime? now;
@@ -90,7 +94,8 @@ class KdsStatusColumn extends StatelessWidget {
                       key: Key('order-card-${order.id}'),
                       order: order,
                       isFresh: freshOrderIds.contains(order.id),
-                      isPending: pendingOrderId == order.id,
+                      isPending: mutatingOrderIds.contains(order.id),
+                      clockOffset: clockOffset,
                       now: now,
                       onAction: (next) => _dispatchAction(context, order, next),
                     );
@@ -101,26 +106,20 @@ class KdsStatusColumn extends StatelessWidget {
     );
   }
 
-  /// Attributes the transition to the station cook and, on «Выдано», bumps
-  /// their personal shift counter before the board refetches.
+  /// Dispatches a kitchen-owned transition (CONFIRMED → COOKING or
+  /// COOKING → READY) attributed to the station cook. Handout is not a
+  /// kitchen action, so no shift-counter bookkeeping happens here.
   void _dispatchAction(
     BuildContext context,
     KdsOrder order,
     KdsOrderStatus next,
   ) {
     final shiftState = context.read<CookShiftCubit>().state;
-    final cook = shiftState.currentCook;
-    if (next == KdsOrderStatus.completed && cook != null) {
-      final handedOutAt = now ?? DateTime.now();
-      context.read<CookShiftCubit>().recordOrderCompleted(
-        prepTime: handedOutAt.difference(order.createdAt),
-      );
-    }
     context.read<KdsOrdersBloc>().add(
       KdsOrderStatusChangeRequested(
         orderId: order.id,
         status: next,
-        cookId: cook?.id,
+        cookId: shiftState.currentCook?.id,
         shiftId: shiftState.shiftId,
       ),
     );

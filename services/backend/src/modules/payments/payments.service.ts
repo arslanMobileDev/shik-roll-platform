@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
@@ -13,6 +14,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { KitchenEventsService } from '../kitchen/kitchen-events.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import {
@@ -42,6 +44,9 @@ export class PaymentsService {
     @Inject(PAYMENT_PROVIDER_ADAPTER)
     private readonly provider: PaymentProviderAdapter,
     private readonly queues: OrderQueuesService,
+    // Optional so unit specs can construct the service without the kitchen
+    // bounded context; always present in the wired app.
+    @Optional() private readonly kitchenEvents?: KitchenEventsService,
   ) {}
 
   /**
@@ -237,7 +242,11 @@ export class PaymentsService {
       if (order && !order.deletedAt && order.status === OrderStatus.NEW) {
         await tx.order.update({
           where: { id: order.id },
-          data: { status: OrderStatus.CONFIRMED, version: { increment: 1 } },
+          data: {
+            status: OrderStatus.CONFIRMED,
+            confirmedAt: new Date(),
+            version: { increment: 1 },
+          },
         });
         await tx.orderStatusHistory.create({
           data: {
@@ -261,6 +270,9 @@ export class PaymentsService {
     });
     if (dispatchToKitchen) {
       await this.queues.sendToKitchen(payment.orderId);
+      // Kitchen POS (ADR-1618): a paid order is CONFIRMED — publish it to the
+      // branch board. (SEND_TO_KITCHEN_JOB stays as the dev-emulation hook.)
+      await this.kitchenEvents?.publishOrderChanged(payment.orderId);
     }
     return payment;
   }

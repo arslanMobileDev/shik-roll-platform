@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/audio/kitchen_alert_service.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../auth/bloc/kitchen_auth_cubit.dart';
 import '../../shift/view/widgets/cook_shift_header.dart';
 import '../bloc/kds_orders_bloc.dart';
 import '../bloc/kds_orders_event.dart';
@@ -13,17 +14,18 @@ import '../bloc/kds_orders_state.dart';
 import '../data/kds_order_models.dart';
 import 'widgets/kds_status_column.dart';
 
-/// UI-804 — kitchen display board.
+/// UI-804 / ADR-1618 — kitchen display board.
 ///
-/// Three status columns («В очереди» → «Готовятся» → «Готовы»), auto-refresh
-/// via [KdsOrdersBloc] polling, manual refresh in the header and audio/visual
-/// feedback when new orders arrive.
+/// Three status columns («Новые» → «Готовятся» → «Готовы»), live updates over
+/// the kitchen SSE stream with a visible connection indicator, audio/visual
+/// feedback for newly CONFIRMED orders and kitchen-owned transitions only
+/// (handout belongs to POS/courier).
 class KdsScreen extends StatelessWidget {
-  const KdsScreen({super.key, this.onNewOrders, this.now});
+  const KdsScreen({super.key, this.alertService, this.now});
 
-  /// Override for the new-order audio alert (tests inject a spy; production
-  /// plays the system alert sound).
-  final void Function(List<KdsOrder> freshOrders)? onNewOrders;
+  /// New-order audio alert (tests inject a spy; production wires the
+  /// audioplayers-backed service from the app graph).
+  final KitchenAlertService? alertService;
 
   /// Fixed clock for deterministic delay timers in tests.
   final DateTime? now;
@@ -70,12 +72,7 @@ class KdsScreen extends StatelessWidget {
         const <KdsOrder>[];
     if (fresh.isEmpty) return;
 
-    final alerter = onNewOrders;
-    if (alerter != null) {
-      alerter(fresh);
-    } else {
-      SystemSound.play(SystemSoundType.alert);
-    }
+    alertService?.notifyNewOrders(fresh.length);
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -103,6 +100,11 @@ class KdsScreen extends StatelessWidget {
         actions: [
           const CookShiftHeader(),
           const SizedBox(width: AppSpacing.s12),
+          if (alertService case final alerts?) ...[
+            _SoundUnlockButton(alertService: alerts),
+            _MuteToggle(alertService: alerts),
+          ],
+          const _ConnectionIndicator(),
           BlocSelector<KdsOrdersBloc, KdsOrdersState, DateTime?>(
             selector: (state) =>
                 state is KdsOrdersLoaded ? state.lastUpdatedAt : null,
@@ -128,6 +130,12 @@ class KdsScreen extends StatelessWidget {
             onPressed: () =>
                 context.read<KdsOrdersBloc>().add(const KdsOrdersRefreshed()),
           ),
+          IconButton(
+            key: const Key('kds-logout-button'),
+            tooltip: 'Выйти из терминала',
+            icon: const Icon(Icons.logout),
+            onPressed: () => context.read<KitchenAuthCubit>().logout(),
+          ),
           const SizedBox(width: AppSpacing.s8),
         ],
       ),
@@ -147,6 +155,94 @@ class KdsScreen extends StatelessWidget {
   }
 }
 
+/// Live/polling/offline transport indicator (ADR-1618 recovery contract).
+class _ConnectionIndicator extends StatelessWidget {
+  const _ConnectionIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocSelector<KdsOrdersBloc, KdsOrdersState, KdsConnectionStatus>(
+      selector: (state) => state.connection,
+      builder: (context, connection) {
+        final (icon, color, tooltip) = switch (connection) {
+          KdsConnectionStatus.live => (
+            Icons.wifi,
+            AppColors.success,
+            'Онлайн: поток обновлений активен',
+          ),
+          KdsConnectionStatus.connecting => (
+            Icons.sync,
+            AppColors.warning,
+            'Подключаемся к потоку обновлений…',
+          ),
+          KdsConnectionStatus.polling => (
+            Icons.sync_problem,
+            AppColors.warning,
+            'Поток недоступен: обновление каждые 15 секунд',
+          ),
+        };
+        return Tooltip(
+          message: tooltip,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
+            child: Icon(
+              key: Key('kds-connection-$connection'),
+              icon,
+              size: 20,
+              color: color,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Station sound toggle with a visible mute state.
+class _MuteToggle extends StatelessWidget {
+  const _MuteToggle({required this.alertService});
+
+  final KitchenAlertService alertService;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: alertService.mutedListenable,
+      builder: (context, muted, _) => IconButton(
+        key: const Key('kds-mute-toggle'),
+        tooltip: muted ? 'Включить звук заказов' : 'Выключить звук заказов',
+        icon: Icon(muted ? Icons.volume_off : Icons.volume_up),
+        color: muted ? AppColors.gray500 : null,
+        onPressed: () => alertService.setMuted(!muted),
+      ),
+    );
+  }
+}
+
+/// Web autoplay unlock: visible only until a gesture primes the audio
+/// pipeline (ADR-1618 sound contract).
+class _SoundUnlockButton extends StatelessWidget {
+  const _SoundUnlockButton({required this.alertService});
+
+  final KitchenAlertService alertService;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: alertService.needsUnlockListenable,
+      builder: (context, needsUnlock, _) {
+        if (!needsUnlock) return const SizedBox.shrink();
+        return TextButton.icon(
+          key: const Key('kds-sound-unlock'),
+          onPressed: alertService.unlock,
+          icon: const Icon(Icons.music_off, size: 18),
+          label: const Text('Включить звук'),
+        );
+      },
+    );
+  }
+}
+
 class _KdsBoard extends StatelessWidget {
   const _KdsBoard({required this.state, this.now});
 
@@ -156,20 +252,18 @@ class _KdsBoard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final orders = state.orders ?? const <KdsOrder>[];
-    final queued = orders.where((o) => o.isQueued).toList();
+    final fresh = orders
+        .where((o) => o.status == KdsOrderStatus.confirmed)
+        .toList();
     final cooking = orders
         .where((o) => o.status == KdsOrderStatus.cooking)
         .toList();
     final ready = orders
         .where((o) => o.status == KdsOrderStatus.ready)
         .toList();
-    final pendingOrderId = switch (state) {
-      KdsOrdersActionInProgress(:final pendingOrderId) => pendingOrderId,
-      _ => null,
-    };
 
     final columns = <(String, Color, List<KdsOrder>)>[
-      ('В очереди', AppColors.info, queued),
+      ('Новые', AppColors.info, fresh),
       ('Готовятся', AppColors.warning, cooking),
       ('Готовы', AppColors.success, ready),
     ];
@@ -200,7 +294,8 @@ class _KdsBoard extends StatelessWidget {
                             accent: accent,
                             orders: list,
                             freshOrderIds: state.freshOrderIds,
-                            pendingOrderId: pendingOrderId,
+                            mutatingOrderIds: state.mutatingOrderIds,
+                            clockOffset: state.serverClockOffset,
                             now: now,
                           ),
                         ),
@@ -224,7 +319,8 @@ class _KdsBoard extends StatelessWidget {
                     accent: accent,
                     orders: list,
                     freshOrderIds: state.freshOrderIds,
-                    pendingOrderId: pendingOrderId,
+                    mutatingOrderIds: state.mutatingOrderIds,
+                    clockOffset: state.serverClockOffset,
                     now: now,
                   ),
                 ),

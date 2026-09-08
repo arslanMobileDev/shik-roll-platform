@@ -11,7 +11,6 @@ describe('order status state machine', () => {
 
   it.each([
     [NEW, CONFIRMED],
-    [NEW, COOKING], // fast path for paid online orders (send-to-kitchen job)
     [NEW, CANCELLED],
     [CONFIRMED, COOKING],
     [CONFIRMED, CANCELLED],
@@ -28,6 +27,8 @@ describe('order status state machine', () => {
   });
 
   it.each([
+    // ADR-1618: no NEW -> COOKING bypass — the kitchen owns CONFIRMED -> COOKING.
+    [NEW, COOKING],
     [NEW, READY],
     [NEW, ON_WAY],
     [NEW, COMPLETED],
