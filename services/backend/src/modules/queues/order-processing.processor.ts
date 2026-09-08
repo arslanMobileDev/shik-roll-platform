@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OrderStatus, Prisma } from '@prisma/client';
 import { Job, Queue } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 import { lineTotal, orderSubtotal, orderTotal } from '../orders/domain/order-pricing';
 import { canTransition } from '../orders/domain/order-status-machine';
 import {
@@ -41,6 +42,7 @@ export class OrderProcessingProcessor extends WorkerHost {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly loyalty: LoyaltyService,
     @InjectQueue(ORDER_PROCESSING_QUEUE)
     private readonly queue: Queue<ProcessOrderJobData | StatusTimerJobData>,
   ) {
@@ -117,7 +119,9 @@ export class OrderProcessingProcessor extends WorkerHost {
       })),
     }));
     const subtotal = orderSubtotal(pricedItems);
-    const total = orderTotal(subtotal);
+    // The payable total keeps the checkout bonus discount (ADR-1614):
+    // recalculation must never give back the points already spent.
+    const total = orderTotal(subtotal.minus(order.bonusDiscountAmount));
 
     await this.prisma.$transaction([
       ...order.items.map((item, index) =>
@@ -221,5 +225,14 @@ export class OrderProcessingProcessor extends WorkerHost {
       }),
     ]);
     this.logger.log(`Order ${orderId}: ${from} -> ${to} (${options.reason ?? 'n/a'})`);
+
+    // Loyalty (ADR-1614): a worker-driven terminal transition follows the same
+    // rules as the operator path — COMPLETED accrues cashback, CANCELLED
+    // (e.g. stop-listed checkout) refunds the spent points. Idempotent.
+    if (to === OrderStatus.COMPLETED) {
+      await this.loyalty.earnCashback(orderId);
+    } else if (to === OrderStatus.CANCELLED) {
+      await this.loyalty.refundOnCancel(orderId);
+    }
   }
 }

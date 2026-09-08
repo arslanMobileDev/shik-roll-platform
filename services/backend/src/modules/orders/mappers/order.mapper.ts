@@ -27,6 +27,8 @@ export function toOrderEntity(record: OrderRecord): OrderEntity {
     deliveryAddress: record.deliveryAddress,
     comment: record.comment,
     subtotalAmount: record.subtotalAmount.toNumber(),
+    bonusDiscountAmount: record.bonusDiscountAmount.toNumber(),
+    appliedBonusPoints: record.appliedBonusPoints,
     totalAmount: record.totalAmount.toNumber(),
     currency: record.currency,
     estimatedReadyAt: iso(record.estimatedReadyAt),

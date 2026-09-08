@@ -1,5 +1,6 @@
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
 import { Global, Logger, Module } from '@nestjs/common';
+import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { OrderProcessingProcessor } from './order-processing.processor';
 import { OrderQueuesService, ORDER_PROCESSING_QUEUE } from './order-queues.service';
 
@@ -41,9 +42,11 @@ export class QueuesModule {
 
     return {
       module: QueuesModule,
+      // LoyaltyModule backs the worker's cashback/refund hooks (ADR-1614).
       imports: disabled
-        ? []
+        ? [LoyaltyModule]
         : [
+            LoyaltyModule,
             BullModule.forRoot({
               connection: buildRedisConnection(),
               defaultJobOptions: {
