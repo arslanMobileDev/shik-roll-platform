@@ -504,6 +504,7 @@ model Order {
   totalAmount     Decimal     @default(0) @map("total_amount") @db.Decimal(10, 2)
   currency        String      @default("RUB")
   estimatedReadyAt DateTime?  @map("estimated_ready_at") @db.Timestamptz(6)
+  confirmedAt     DateTime?   @map("confirmed_at") @db.Timestamptz(6)
   completedAt     DateTime?   @map("completed_at") @db.Timestamptz(6)
   cancelledAt     DateTime?   @map("cancelled_at") @db.Timestamptz(6)
   cancelReason    String?     @map("cancel_reason")

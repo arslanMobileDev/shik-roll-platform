@@ -20,6 +20,7 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderEntity, OrderPage } from './entities/order.entity';
 import { OrderRecord, toOrderEntity } from './mappers/order.mapper';
 import { OrdersRepository } from './orders.repository';
+import { OrdersEventsService } from './orders-events.service';
 import {
   CouriersEventsService,
   OrderTrackingEvent,
@@ -33,6 +34,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly couriersEvents: CouriersEventsService,
     private readonly loyalty: LoyaltyService,
+    private readonly ordersEvents: OrdersEventsService,
   ) {}
 
   /**
@@ -252,6 +254,14 @@ export class OrdersService {
         : await this.repository.create(data);
 
     await this.queues.scheduleOrderProcessing(record.id);
+    this.ordersEvents.emitKdsEvent({
+      eventType: "ORDER_CREATED",
+      orderId: record.id,
+      orderNumber: record.orderNumber,
+      branchId: record.branchId,
+      status: record.status,
+      timestamp: new Date().toISOString(),
+    });
     return toOrderEntity(record);
   }
 
@@ -302,6 +312,14 @@ export class OrdersService {
       timestamp: new Date().toISOString(),
     });
     this.couriersEvents.emitOrderTrackingEvent(this.toTrackingEvent(updated));
+    this.ordersEvents.emitKdsEvent({
+      eventType: "ORDER_STATUS_CHANGED",
+      orderId: updated.id,
+      orderNumber: updated.orderNumber,
+      branchId: updated.branchId,
+      status: updated.status,
+      timestamp: new Date().toISOString(),
+    });
 
     // Loyalty (ADR-1614): cashback accrues exactly once on the transition to
     // COMPLETED; a cancellation refunds the points spent at checkout. Both
@@ -357,5 +375,8 @@ export class OrdersService {
     ].join('');
     const branchPrefix = branchId.slice(0, 4).toUpperCase();
     return `${branchPrefix}-${yyyymmdd}-${String(sequence + 1).padStart(4, '0')}`;
+  }
+  getKdsStream(branchId: string): Observable<MessageEvent> {
+    return this.ordersEvents.getKdsStream(branchId);
   }
 }

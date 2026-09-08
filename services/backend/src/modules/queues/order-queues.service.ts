@@ -12,8 +12,8 @@ export interface ProcessOrderJobData {
 /**
  * Background processing of orders (BE-902: background work goes to BullMQ,
  * never inline in the request path). The 'order-processing' queue handles:
- * server-side totals recalculation, stop-list verification and the emulated
- * status timers that advance an order through its lifecycle.
+ * server-side totals recalculation and stop-list verification. Legacy
+ * automatic status timers are opt-in via ORDER_AUTO_STATUS_ADVANCE_ENABLED.
  */
 @Injectable()
 export class OrderQueuesService {
@@ -25,10 +25,10 @@ export class OrderQueuesService {
   ) {}
 
   /**
-   * Enqueue post-creation processing: totals recalculation, stop-list check,
-   * then schedule the emulated lifecycle timers (NEW -> CONFIRMED -> COOKING
-   * -> READY). jobId is the order id, so re-creating the same order never
-   * duplicates background work (idempotency, BE-907).
+   * Enqueue post-creation totals recalculation and stop-list checks. In the
+   * default manual mode this job does not advance the kitchen status. jobId
+   * is the order id, so re-creating the same order never duplicates
+   * background work (idempotency, BE-907).
    */
   async scheduleOrderProcessing(orderId: string): Promise<void> {
     await this.orderProcessingQueue.add(
@@ -40,10 +40,9 @@ export class OrderQueuesService {
   }
 
   /**
-   * Dispatch a paid order to the kitchen (payments bounded context contract:
-   * a successful online payment moves CONFIRMED -> COOKING). jobId is the
-   * order id, so repeated payment webhooks never duplicate the dispatch
-   * (idempotency, BE-907).
+   * Dispatch a paid order to the kitchen. In manual mode the worker records
+   * the dispatch without advancing the status; the cook starts work through
+   * PATCH /orders/:id/status. jobId keeps repeated webhooks idempotent.
    */
   async sendToKitchen(orderId: string): Promise<void> {
     await this.orderProcessingQueue.add(

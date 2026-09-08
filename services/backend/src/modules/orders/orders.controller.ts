@@ -82,6 +82,17 @@ export class OrdersController {
     return this.service.listMine(customer.id, query);
   }
 
+  /**
+   * KDS live stream (ADR-1620): SSE stream for kitchen orders filtered by branch.
+   */
+  @Sse('kds/stream')
+  @ApiOperation({ summary: 'SSE stream of order events for KDS by branch' })
+  streamKdsOrders(
+    @Query('branchId') branchId: string,
+  ): Observable<MessageEvent> {
+    return this.service.getKdsStream(branchId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get an order by id' })
   @ApiOkResponse({ type: OrderEntity })

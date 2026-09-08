@@ -27,6 +27,7 @@ describe('OrderProcessingProcessor — send-to-kitchen', () => {
   let loyalty: { earnCashback: jest.Mock; refundOnCancel: jest.Mock };
 
   beforeEach(async () => {
+    delete process.env.ORDER_AUTO_STATUS_ADVANCE_ENABLED;
     prisma = {
       order: { findFirst: jest.fn(), update: jest.fn().mockResolvedValue({}) },
       orderStatusHistory: { create: jest.fn().mockResolvedValue({}) },
@@ -54,42 +55,33 @@ describe('OrderProcessingProcessor — send-to-kitchen', () => {
   const job = () =>
     ({ name: SEND_TO_KITCHEN_JOB, data: { orderId: ORDER_ID } }) as never;
 
-  it('moves a CONFIRMED (paid) order to COOKING with an audit entry', async () => {
+  it('keeps a CONFIRMED paid order unchanged in manual mode', async () => {
     prisma.order.findFirst.mockResolvedValue({ status: OrderStatus.CONFIRMED });
 
     await processor.process(job());
 
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(prisma.order.update).toHaveBeenCalledWith({
-      where: { id: ORDER_ID },
-      data: { status: OrderStatus.COOKING, version: { increment: 1 } },
-    });
-    expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
-      data: {
-        orderId: ORDER_ID,
-        previousStatus: OrderStatus.CONFIRMED,
-        newStatus: OrderStatus.COOKING,
-        reason: 'PAID_ONLINE',
-      },
-    });
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.orderStatusHistory.create).not.toHaveBeenCalled();
   });
 
-  it('moves a NEW order straight to COOKING (fast path for paid online)', async () => {
+  it('keeps a NEW paid order unchanged in manual mode', async () => {
     prisma.order.findFirst.mockResolvedValue({ status: OrderStatus.NEW });
+
+    await processor.process(job());
+
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.orderStatusHistory.create).not.toHaveBeenCalled();
+  });
+
+  it('supports the legacy paid-order transition only when explicitly enabled', async () => {
+    process.env.ORDER_AUTO_STATUS_ADVANCE_ENABLED = 'true';
+    prisma.order.findFirst.mockResolvedValue({ status: OrderStatus.CONFIRMED });
 
     await processor.process(job());
 
     expect(prisma.order.update).toHaveBeenCalledWith({
       where: { id: ORDER_ID },
       data: { status: OrderStatus.COOKING, version: { increment: 1 } },
-    });
-    expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
-      data: {
-        orderId: ORDER_ID,
-        previousStatus: OrderStatus.NEW,
-        newStatus: OrderStatus.COOKING,
-        reason: 'PAID_ONLINE',
-      },
     });
   });
 
@@ -151,6 +143,7 @@ describe('OrderProcessingProcessor — process-order (loyalty hooks, ADR-1614)',
   });
 
   beforeEach(async () => {
+    delete process.env.ORDER_AUTO_STATUS_ADVANCE_ENABLED;
     prisma = {
       order: { findFirst: jest.fn(), update: jest.fn().mockResolvedValue({}) },
       orderItem: { update: jest.fn().mockResolvedValue({}) },
@@ -209,5 +202,14 @@ describe('OrderProcessingProcessor — process-order (loyalty hooks, ADR-1614)',
 
     expect(loyalty.refundOnCancel).not.toHaveBeenCalled();
     expect(loyalty.earnCashback).not.toHaveBeenCalled();
+  });
+
+  it('does not schedule status timers for a NEW order in manual mode', async () => {
+    prisma.order.findFirst.mockResolvedValue(makeOrder({ status: OrderStatus.NEW }));
+
+    await processor.process(job());
+
+    expect(queue.add).not.toHaveBeenCalled();
+    expect(prisma.orderStatusHistory.create).not.toHaveBeenCalled();
   });
 });

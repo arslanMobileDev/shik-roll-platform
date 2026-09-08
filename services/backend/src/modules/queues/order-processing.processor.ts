@@ -14,6 +14,14 @@ import {
 
 const STATUS_TIMER_JOB = 'status-timer';
 
+/**
+ * Legacy development automation is opt-in. Kitchen order statuses are manual
+ * by default and are changed through PATCH /orders/:id/status.
+ */
+export function automaticOrderStatusTransitionsEnabled(): boolean {
+  return process.env.ORDER_AUTO_STATUS_ADVANCE_ENABLED === 'true';
+}
+
 export interface StatusTimerJobData {
   orderId: string;
   to: OrderStatus;
@@ -136,7 +144,13 @@ export class OrderProcessingProcessor extends WorkerHost {
       }),
     ]);
 
-    // 3. Confirm the order and schedule the emulated lifecycle timers.
+    // 3. Legacy dev harness only: confirm and schedule lifecycle timers.
+    // Production/default mode leaves kitchen status changes to the cook.
+    if (!automaticOrderStatusTransitionsEnabled()) {
+      this.logger.log(`process-order: manual status mode for order ${orderId}`);
+      return;
+    }
+
     if (order.status === OrderStatus.NEW) {
       await this.transitionWithHistory(orderId, OrderStatus.NEW, OrderStatus.CONFIRMED, {
         reason: 'AUTO_CONFIRM',
@@ -158,6 +172,11 @@ export class OrderProcessingProcessor extends WorkerHost {
    */
   private async sendToKitchen(job: Job<ProcessOrderJobData>): Promise<void> {
     const { orderId } = job.data;
+    if (!automaticOrderStatusTransitionsEnabled()) {
+      this.logger.log(`send-to-kitchen: manual status mode for order ${orderId}`);
+      return;
+    }
+
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, deletedAt: null },
       select: { status: true },
@@ -179,6 +198,11 @@ export class OrderProcessingProcessor extends WorkerHost {
 
   private async advanceStatus(job: Job<StatusTimerJobData>): Promise<void> {
     const { orderId, to } = job.data;
+    if (!automaticOrderStatusTransitionsEnabled()) {
+      this.logger.log(`status-timer: manual status mode for order ${orderId}`);
+      return;
+    }
+
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, deletedAt: null },
       select: { status: true },

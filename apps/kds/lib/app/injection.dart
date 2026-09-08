@@ -11,9 +11,8 @@ final GetIt getIt = GetIt.instance;
 
 /// Registers app-level dependencies.
 ///
-/// With `API_BASE_URL` unset the KDS runs against [FakeKdsOrdersRepository]
-/// and [FakeCookShiftRepository] (demo data); otherwise it talks to the
-/// Orders API (API-702) and the cooks API.
+/// The KDS talks to the configured backend by default. Supplying an empty
+/// `API_BASE_URL` explicitly enables the in-memory demo repositories.
 void setupInjection() {
   if (!getIt.isRegistered<KdsOrdersRepository>()) {
     getIt.registerLazySingleton<KdsOrdersRepository>(() {

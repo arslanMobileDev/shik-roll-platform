@@ -115,4 +115,6 @@ final class FakeKdsOrdersRepository implements KdsOrdersRepository {
     _orders = [..._orders]..[index] = updated;
     return updated;
   }
+  @override
+  Stream<void> watchOrders(String branchId) => const Stream.empty();
 }

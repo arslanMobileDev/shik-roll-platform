@@ -1,11 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:dio/dio.dart';
+
 import '../../../core/network/api_client.dart';
 import 'kds_order_models.dart';
 
 /// Source of kitchen orders (API-702 `OrdersController`).
-///
-/// The board fetches one page of branch orders without a `status` filter and
-/// buckets them client-side — the API accepts a single status per request,
-/// while the board shows NEW+CONFIRMED, COOKING and READY at once.
 abstract interface class KdsOrdersRepository {
   /// `GET /orders?branchId=…&page=…&limit=…`
   Future<List<KdsOrder>> fetchOrders({
@@ -14,16 +14,16 @@ abstract interface class KdsOrdersRepository {
     int limit = 50,
   });
 
-  /// `PATCH /orders/{id}/status` — state-machine-validated transition.
-  ///
-  /// [cookId]/[shiftId] identify the personal author of the action and are
-  /// recorded in the order status audit (order_status_history).
+  /// `PATCH /orders/{id}/status`
   Future<KdsOrder> updateOrderStatus({
     required String orderId,
     required KdsOrderStatus status,
     String? cookId,
     String? shiftId,
   });
+
+  /// SSE stream: `GET /orders/kds/stream?branchId=…`
+  Stream<void> watchOrders(String branchId);
 }
 
 /// Remote implementation against the live Orders API.
@@ -57,8 +57,8 @@ final class RemoteKdsOrdersRepository implements KdsOrdersRepository {
       '/orders/$orderId/status',
       data: {
         'status': status.wireName,
-        'cookId': ?cookId,
-        'shiftId': ?shiftId,
+        'cookId': cookId,
+        'shiftId': shiftId,
       },
     );
     final body = response.data;
@@ -66,5 +66,40 @@ final class RemoteKdsOrdersRepository implements KdsOrdersRepository {
       throw StateError('Empty response for order $orderId status update');
     }
     return KdsOrder.fromJson(body);
+  }
+
+  @override
+  Stream<void> watchOrders(String branchId) async* {
+    while (true) {
+      try {
+        final response = await _client.dio.get<ResponseBody>(
+          '/orders/kds/stream',
+          queryParameters: {'branchId': branchId},
+          options: Options(
+            responseType: ResponseType.stream,
+            headers: {'Accept': 'text/event-stream'},
+            receiveTimeout: Duration.zero,
+          ),
+        );
+
+        final stream = response.data?.stream;
+        if (stream == null) {
+          await Future<void>.delayed(const Duration(seconds: 3));
+          continue;
+        }
+
+        await for (final line in stream
+            .cast<List<int>>()
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())) {
+          if (line.startsWith('data:')) {
+            yield null;
+          }
+        }
+      } catch (_) {
+        // Fallback delay on connection drop before reconnecting
+        await Future<void>.delayed(const Duration(seconds: 3));
+      }
+    }
   }
 }

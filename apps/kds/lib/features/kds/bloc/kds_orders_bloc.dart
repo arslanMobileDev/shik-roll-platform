@@ -7,11 +7,7 @@ import '../data/kds_orders_repository.dart';
 import 'kds_orders_event.dart';
 import 'kds_orders_state.dart';
 
-/// Kitchen board: active orders for a branch with periodic polling.
-///
-/// The bloc owns all board logic — fetching, FIFO sorting, new-order
-/// detection and status transitions. Widgets only render state and dispatch
-/// events.
+/// Kitchen board: active orders for a branch with periodic polling and real-time SSE stream.
 class KdsOrdersBloc extends Bloc<KdsOrdersEvent, KdsOrdersState> {
   KdsOrdersBloc({
     required this.repository,
@@ -30,10 +26,10 @@ class KdsOrdersBloc extends Bloc<KdsOrdersEvent, KdsOrdersState> {
   final Duration? pollInterval;
 
   Timer? _pollTimer;
+  StreamSubscription<void>? _sseSubscription;
   String? _branchId;
 
-  /// Ids the board has already shown — the diff against a fresh fetch marks
-  /// newly arrived orders for audio/visual feedback.
+  /// Ids the board has already shown.
   final Set<String> _seenOrderIds = {};
 
   Future<void> _onStarted(
@@ -42,6 +38,7 @@ class KdsOrdersBloc extends Bloc<KdsOrdersEvent, KdsOrdersState> {
   ) async {
     _branchId = event.branchId;
     _startPolling();
+    _startSseSubscription(event.branchId);
     await _load(emit, showLoading: true);
   }
 
@@ -72,8 +69,6 @@ class KdsOrdersBloc extends Bloc<KdsOrdersEvent, KdsOrdersState> {
         cookId: event.cookId,
         shiftId: event.shiftId,
       );
-      // Refetch: the server is the single source of truth and other stations
-      // may have moved orders concurrently.
       await _load(emit, showLoading: false);
     } catch (e) {
       emit(
@@ -116,8 +111,6 @@ class KdsOrdersBloc extends Bloc<KdsOrdersEvent, KdsOrdersState> {
         ..clear()
         ..addAll(orders.map((o) => o.id));
 
-      // A poll failure with data on screen must not blank the board; only a
-      // failed initial load surfaces the Error state.
       emit(
         KdsOrdersLoaded(
           orders: orders,
@@ -132,7 +125,6 @@ class KdsOrdersBloc extends Bloc<KdsOrdersEvent, KdsOrdersState> {
     }
   }
 
-  /// Kitchen board shows active orders oldest-first (FIFO).
   List<KdsOrder> _sortedActive(List<KdsOrder> orders) {
     final active = orders.where((o) => o.isActive).toList();
     active.sort((a, b) => a.createdAt.compareTo(b.createdAt));
@@ -148,9 +140,20 @@ class KdsOrdersBloc extends Bloc<KdsOrdersEvent, KdsOrdersState> {
     );
   }
 
+  void _startSseSubscription(String branchId) {
+    _sseSubscription?.cancel();
+    _sseSubscription = repository.watchOrders(branchId).listen(
+      (_) => add(const KdsOrdersPollTicked()),
+      onError: (_) {
+        // Ошибки стрима не ломают работу, fallback-поллинг подстраховывает
+      },
+    );
+  }
+
   @override
   Future<void> close() {
     _pollTimer?.cancel();
+    _sseSubscription?.cancel();
     return super.close();
   }
 }

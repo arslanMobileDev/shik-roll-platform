@@ -88,6 +88,9 @@ final class TestKdsOrdersRepository implements KdsOrdersRepository {
     orders = [...orders]..[index] = updated;
     return updated;
   }
+
+  @override
+  Stream<void> watchOrders(String branchId) => const Stream.empty();
 }
 
 ActiveCook buildCook({
