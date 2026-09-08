@@ -7,8 +7,9 @@ import '../../../data/models/courier_order.dart';
 import '../bloc/orders_cubit.dart';
 import '../bloc/orders_state.dart';
 
-/// Детали доставки: полный адрес, комментарий клиента, звонок,
-/// «Взять заказ» (READY -> ON_WAY) и «Заказ доставлен» (ON_WAY -> COMPLETED).
+/// Детали доставки (ADR-1617): полный адрес, комментарий клиента, звонок и
+/// действия «Взять доставку» (claim READY), «В пути» (READY -> ON_WAY),
+/// «Доставлен» (ON_WAY -> COMPLETED).
 class DeliveryDetailScreen extends StatelessWidget {
   const DeliveryDetailScreen({super.key, required this.orderId});
 
@@ -47,18 +48,26 @@ class DeliveryDetailScreen extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        final updating =
-            state is OrdersLoaded && state.updatingOrderId == order.id;
-        return _DeliveryDetailView(order: order, updating: updating);
+        final loaded = state as OrdersLoaded;
+        return _DeliveryDetailView(
+          order: order,
+          courierId: loaded.courierId,
+          updating: loaded.mutatingOrderId == order.id,
+        );
       },
     );
   }
 }
 
 class _DeliveryDetailView extends StatelessWidget {
-  const _DeliveryDetailView({required this.order, required this.updating});
+  const _DeliveryDetailView({
+    required this.order,
+    required this.courierId,
+    required this.updating,
+  });
 
   final CourierOrder order;
+  final String courierId;
   final bool updating;
 
   Future<void> _confirmComplete(BuildContext context) async {
@@ -81,7 +90,7 @@ class _DeliveryDetailView extends StatelessWidget {
       ),
     );
     if (confirmed == true && context.mounted) {
-      context.read<OrdersCubit>().completeOrder(order.id);
+      context.read<OrdersCubit>().completeDelivery(order.id);
     }
   }
 
@@ -179,6 +188,7 @@ class _DeliveryDetailView extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: _ActionButton(
             order: order,
+            courierId: courierId,
             updating: updating,
             onComplete: () => _confirmComplete(context),
           ),
@@ -191,11 +201,13 @@ class _DeliveryDetailView extends StatelessWidget {
 class _ActionButton extends StatelessWidget {
   const _ActionButton({
     required this.order,
+    required this.courierId,
     required this.updating,
     required this.onComplete,
   });
 
   final CourierOrder order;
+  final String courierId;
   final bool updating;
   final VoidCallback onComplete;
 
@@ -204,19 +216,31 @@ class _ActionButton extends StatelessWidget {
     if (updating) {
       return const Center(child: CircularProgressIndicator());
     }
+    final cubit = context.read<OrdersCubit>();
+    final isOwn = order.courierId == courierId;
+
     return switch (order.status) {
       OrderStatus.cooking => FilledButton.tonalIcon(
         onPressed: null,
         icon: const Icon(Icons.soup_kitchen_outlined),
         label: const Text('Ещё готовится'),
       ),
-      OrderStatus.ready => FilledButton.icon(
-        key: Key('detail_take_${order.id}'),
-        onPressed: () => context.read<OrdersCubit>().pickupOrder(order.id),
+      // Неназначенный READY: «Взять доставку» (claim).
+      OrderStatus.ready when order.courierId == null => FilledButton.icon(
+        key: Key('detail_claim_${order.id}'),
+        onPressed: () => cubit.claim(order.id),
         icon: const Icon(Icons.shopping_bag_outlined),
-        label: const Text('Взять заказ'),
+        label: const Text('Взять доставку'),
       ),
-      OrderStatus.onWay => FilledButton.icon(
+      // Собственный READY: «В пути».
+      OrderStatus.ready when isOwn => FilledButton.icon(
+        key: Key('detail_start_${order.id}'),
+        onPressed: () => cubit.startDelivery(order.id),
+        icon: const Icon(Icons.pedal_bike),
+        label: const Text('В пути'),
+      ),
+      // Собственный ON_WAY: «Доставлен» с подтверждением.
+      OrderStatus.onWay when isOwn => FilledButton.icon(
         key: Key('detail_complete_${order.id}'),
         style: FilledButton.styleFrom(
           backgroundColor: ShikColors.success,
@@ -225,9 +249,9 @@ class _ActionButton extends StatelessWidget {
         ),
         onPressed: onComplete,
         icon: const Icon(Icons.check_circle_outline),
-        label: const Text('Заказ доставлен'),
+        label: const Text('Доставлен'),
       ),
-      OrderStatus.completed => const SizedBox.shrink(),
+      _ => const SizedBox.shrink(),
     };
   }
 }

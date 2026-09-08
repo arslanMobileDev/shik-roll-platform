@@ -1,24 +1,32 @@
 import 'package:courier_mobile/app.dart';
 import 'package:courier_mobile/core/storage/courier_auth_storage.dart';
+import 'package:courier_mobile/core/storage/courier_token_storage.dart';
 import 'package:courier_mobile/data/repositories/fake_courier_repository.dart';
 import 'package:courier_mobile/features/auth/view/courier_login_screen.dart';
+import 'package:courier_mobile/features/location/data/courier_location_repository.dart';
 import 'package:courier_mobile/features/orders/view/courier_orders_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../helpers/test_fakes.dart';
 
 Future<CourierApp> buildApp() async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
   return CourierApp(
     repository: FakeCourierRepository(),
+    locationRepository: FakeCourierLocationRepository(),
     storage: CourierAuthStorage(prefs),
+    tokenStorage: InMemoryCourierTokenStorage(),
+    locationSource: FakeLocationSource(),
   );
 }
 
 void main() {
-  testWidgets('login screen renders phone, PIN, branch and Halal badge',
-      (tester) async {
+  testWidgets('login screen renders phone, PIN and Halal badge', (
+    tester,
+  ) async {
     final app = await buildApp();
     await tester.pumpWidget(app);
     await tester.pumpAndSettle();
@@ -28,12 +36,14 @@ void main() {
     expect(find.text('100% Halal'), findsOneWidget);
     expect(find.byKey(const Key('login_phone_field')), findsOneWidget);
     expect(find.byKey(const Key('login_pin_field')), findsOneWidget);
-    expect(find.byKey(const Key('login_branch_dropdown')), findsOneWidget);
     expect(find.byKey(const Key('login_submit_button')), findsOneWidget);
+    // ADR-1617: the branch comes from the JWT — there is no picker.
+    expect(find.byKey(const Key('login_branch_dropdown')), findsNothing);
   });
 
-  testWidgets('invalid PIN shows validation error and stays on login',
-      (tester) async {
+  testWidgets('invalid PIN shows validation error and stays on login', (
+    tester,
+  ) async {
     final app = await buildApp();
     await tester.pumpWidget(app);
     await tester.pumpAndSettle();
@@ -51,8 +61,9 @@ void main() {
     expect(find.byType(CourierOrdersScreen), findsNothing);
   });
 
-  testWidgets('successful PIN login navigates to orders screen',
-      (tester) async {
+  testWidgets('successful PIN login navigates to orders screen', (
+    tester,
+  ) async {
     final app = await buildApp();
     await tester.pumpWidget(app);
     await tester.pumpAndSettle();

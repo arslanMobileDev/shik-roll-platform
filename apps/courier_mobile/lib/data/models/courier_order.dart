@@ -14,6 +14,15 @@ enum OrderStatus {
     (s) => s.wireName == value,
     orElse: () => OrderStatus.ready,
   );
+
+  /// Null-safe parse for SSE events: unknown/lifecycle-final statuses
+  /// (CANCELLED, NEW, ...) return null instead of a fallback.
+  static OrderStatus? tryFromWire(String value) {
+    for (final status in OrderStatus.values) {
+      if (status.wireName == value) return status;
+    }
+    return null;
+  }
 }
 
 /// Order type (matches backend contract strings).
@@ -161,7 +170,10 @@ class CourierOrder extends Equatable {
     return '$h:$m';
   }
 
-  CourierOrder copyWith({OrderStatus? status, String? courierId}) =>
+  CourierOrder copyWith({
+    OrderStatus? status,
+    String? Function()? courierId,
+  }) =>
       CourierOrder(
         id: id,
         number: number,
@@ -173,7 +185,7 @@ class CourierOrder extends Equatable {
         clientPhone: clientPhone,
         clientComment: clientComment,
         branchId: branchId,
-        courierId: courierId ?? this.courierId,
+        courierId: courierId != null ? courierId() : this.courierId,
         createdAt: createdAt,
       );
 

@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/constants/shik_branches.dart';
 import '../../../core/theme/halal_badge.dart';
-import '../../../data/models/branch.dart';
 import '../bloc/auth_cubit.dart';
 import '../bloc/auth_state.dart';
 
-/// Быстрый вход курьера: телефон + 4-значный PIN + выбор филиала.
+/// Быстрый вход курьера: телефон + 4-значный PIN.
+/// Филиал не выбирается — identity и branch возвращает сервер (ADR-1617).
 class CourierLoginScreen extends StatefulWidget {
   const CourierLoginScreen({super.key});
 
@@ -21,7 +20,6 @@ class _CourierLoginScreenState extends State<CourierLoginScreen> {
   final _pinController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  Branch _selectedBranch = shikBranches.first;
   String? _errorText;
 
   @override
@@ -37,7 +35,6 @@ class _CourierLoginScreenState extends State<CourierLoginScreen> {
     context.read<AuthCubit>().login(
           pin: _pinController.text.trim(),
           phone: _phoneController.text.trim(),
-          branch: _selectedBranch,
         );
   }
 
@@ -118,28 +115,6 @@ class _CourierLoginScreenState extends State<CourierLoginScreen> {
                         ),
                         validator: (value) =>
                             (value ?? '').length == 4 ? null : 'PIN — 4 цифры',
-                      ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<Branch>(
-                        key: const Key('login_branch_dropdown'),
-                        initialValue: _selectedBranch,
-                        decoration: const InputDecoration(
-                          labelText: 'Точка',
-                          prefixIcon: Icon(Icons.store),
-                        ),
-                        items: shikBranches
-                            .map(
-                              (b) => DropdownMenuItem(
-                                value: b,
-                                child: Text(b.name),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (branch) {
-                          if (branch != null) {
-                            setState(() => _selectedBranch = branch);
-                          }
-                        },
                       ),
                       if (_errorText != null) ...[
                         const SizedBox(height: 16),

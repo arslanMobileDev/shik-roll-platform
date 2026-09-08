@@ -2,13 +2,25 @@ import 'package:equatable/equatable.dart';
 
 import '../../../data/models/courier_order.dart';
 
-/// Which tab of the orders screen is active.
+/// Вкладки экрана заказов (ADR-1617).
 enum OrdersTab {
-  /// READY + COOKING — «Доступные к выдаче».
-  pickup,
+  /// «Доступные заказы филиала» — неназначенные delivery в COOKING/READY.
+  available,
 
-  /// ON_WAY — «Мои в пути».
+  /// «Мой активный заказ» — собственный заказ в READY или ON_WAY.
   mine,
+}
+
+/// Состояние realtime-подключения (SSE / polling fallback).
+enum RealtimeConnectionState {
+  /// SSE (пере)подключается.
+  connecting,
+
+  /// SSE live.
+  live,
+
+  /// SSE недоступен — polling каждые 30 секунд в foreground.
+  polling,
 }
 
 sealed class OrdersState extends Equatable {
@@ -35,8 +47,9 @@ final class OrdersLoaded extends OrdersState {
   const OrdersLoaded({
     required this.orders,
     required this.courierId,
-    this.tab = OrdersTab.pickup,
-    this.updatingOrderId,
+    this.tab = OrdersTab.available,
+    this.mutatingOrderId,
+    this.realtime = RealtimeConnectionState.connecting,
   });
 
   /// All active (COOKING + READY + ON_WAY) delivery orders of the branch.
@@ -44,44 +57,59 @@ final class OrdersLoaded extends OrdersState {
   final String courierId;
   final OrdersTab tab;
 
-  /// Order currently being PATCHed (shows spinner on its card).
-  final String? updatingOrderId;
+  /// Order currently being mutated (its buttons are blocked).
+  final String? mutatingOrderId;
 
-  /// READY + COOKING delivery orders — «Доступные к выдаче».
-  List<CourierOrder> get pickupOrders => orders
+  /// SSE/polling connection indicator state.
+  final RealtimeConnectionState realtime;
+
+  /// «Доступные заказы филиала»: unassigned delivery orders in
+  /// COOKING or READY; claim is allowed only for READY.
+  List<CourierOrder> get availableOrders => orders
       .where(
         (o) =>
             o.type == OrderType.delivery &&
+            o.courierId == null &&
             (o.status == OrderStatus.ready || o.status == OrderStatus.cooking),
       )
       .toList();
 
-  /// ON_WAY orders assigned to this courier — «Мои в пути».
+  /// «Мой активный заказ»: own assigned order in READY or ON_WAY.
   List<CourierOrder> get myOrders => orders
       .where(
         (o) =>
             o.type == OrderType.delivery &&
-            o.status == OrderStatus.onWay &&
-            o.courierId == courierId,
+            o.courierId == courierId &&
+            (o.status == OrderStatus.ready || o.status == OrderStatus.onWay),
       )
       .toList();
 
+  /// Own order currently out for delivery — drives location tracking.
+  CourierOrder? get myOnWayOrder {
+    for (final order in myOrders) {
+      if (order.status == OrderStatus.onWay) return order;
+    }
+    return null;
+  }
+
   List<CourierOrder> ordersFor(OrdersTab t) =>
-      t == OrdersTab.pickup ? pickupOrders : myOrders;
+      t == OrdersTab.available ? availableOrders : myOrders;
 
   OrdersLoaded copyWith({
     List<CourierOrder>? orders,
     OrdersTab? tab,
-    String? Function()? updatingOrderId,
+    String? Function()? mutatingOrderId,
+    RealtimeConnectionState? realtime,
   }) => OrdersLoaded(
     orders: orders ?? this.orders,
     courierId: courierId,
     tab: tab ?? this.tab,
-    updatingOrderId: updatingOrderId != null
-        ? updatingOrderId()
-        : this.updatingOrderId,
+    mutatingOrderId: mutatingOrderId != null
+        ? mutatingOrderId()
+        : this.mutatingOrderId,
+    realtime: realtime ?? this.realtime,
   );
 
   @override
-  List<Object?> get props => [orders, courierId, tab, updatingOrderId];
+  List<Object?> get props => [orders, courierId, tab, mutatingOrderId, realtime];
 }

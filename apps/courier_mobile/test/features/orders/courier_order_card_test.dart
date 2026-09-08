@@ -7,7 +7,8 @@ import '../../helpers/test_fakes.dart';
 
 Widget buildCard(
   CourierOrder order, {
-  VoidCallback? onPickup,
+  VoidCallback? onClaim,
+  VoidCallback? onStart,
   VoidCallback? onComplete,
   VoidCallback? onTap,
 }) {
@@ -17,7 +18,8 @@ Widget buildCard(
         child: CourierOrderCard(
           order: order,
           updating: false,
-          onPickup: onPickup,
+          onClaim: onClaim,
+          onStart: onStart,
           onComplete: onComplete,
           onTap: onTap,
         ),
@@ -50,13 +52,28 @@ void main() {
     expect(find.text('Требуется расчет'), findsNothing);
   });
 
-  testWidgets('READY order fires «Взять заказ» callback', (tester) async {
+  testWidgets('unassigned READY order fires the claim callback', (
+    tester,
+  ) async {
     var tapped = false;
     await tester.pumpWidget(
-      buildCard(makeOrder(id: '1'), onPickup: () => tapped = true),
+      buildCard(makeOrder(id: '1'), onClaim: () => tapped = true),
     );
 
-    await tester.tap(find.text('Взять заказ'));
+    await tester.tap(find.text('Взять доставку'));
+    expect(tapped, isTrue);
+  });
+
+  testWidgets('own READY order fires the start callback', (tester) async {
+    var tapped = false;
+    await tester.pumpWidget(
+      buildCard(
+        makeOrder(id: '1', courierId: testCourier.id),
+        onStart: () => tapped = true,
+      ),
+    );
+
+    await tester.tap(find.text('В пути'));
     expect(tapped, isTrue);
   });
 
@@ -68,20 +85,24 @@ void main() {
     );
 
     expect(find.text('Ещё готовится'), findsOneWidget);
-    expect(find.text('Взять заказ'), findsNothing);
-    expect(find.text('Заказ доставлен'), findsNothing);
+    expect(find.text('Взять доставку'), findsNothing);
+    expect(find.text('Доставлен'), findsNothing);
   });
 
-  testWidgets('ON_WAY order fires «Заказ доставлен» callback', (tester) async {
+  testWidgets('own ON_WAY order fires the complete callback', (tester) async {
     var tapped = false;
     await tester.pumpWidget(
       buildCard(
-        makeOrder(id: '1', status: OrderStatus.onWay),
+        makeOrder(
+          id: '1',
+          status: OrderStatus.onWay,
+          courierId: testCourier.id,
+        ),
         onComplete: () => tapped = true,
       ),
     );
 
-    await tester.tap(find.text('Заказ доставлен'));
+    await tester.tap(find.text('Доставлен'));
     expect(tapped, isTrue);
   });
 
