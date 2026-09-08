@@ -45,6 +45,7 @@ Classification: Internal
 | Loyalty Service | Неизменяемый bonus ledger, атомарная balance projection, списание до 30% и cashback после `COMPLETED` / client `DELIVERED` | ACCEPTED | [ADR-1614](docs/16-adr/1614-adr-loyalty-service.md) |
 | Realtime Order Timeline | BullMQ Worker → Redis Pub/Sub → SSE/WebSocket adapter → Customer Mobile Bloc; backend statuses проецируются в client timeline | ACCEPTED | [ADR-1615](docs/16-adr/1615-adr-realtime-order-timeline.md) |
 | Customer User Settings | `shared_preferences` через repository и `UserSettingsCubit`; ключ `selected_courier_vehicle` | ACCEPTED | [ADR-1616](docs/16-adr/1616-adr-customer-user-settings.md) |
+| Courier Mobile Architecture | `flutter_bloc`, JWT в `flutter_secure_storage`, единый Dio auth interceptor, SSE с polling fallback и location tracking только для собственного `ON_WAY` заказа | ACCEPTED | [ADR-1617](docs/16-adr/1617-adr-courier-mobile-architecture.md) |
 
 ---
 
@@ -101,6 +102,8 @@ ADR-1614 Loyalty Service
 ADR-1615 Realtime Order Timeline
 
 ADR-1616 Customer User Settings
+
+ADR-1617 Courier Mobile Architecture
 
 GOV-2707 Document Registry
 

@@ -5,20 +5,33 @@ import '../../../core/utils/launchers.dart';
 import '../../../data/models/courier_order.dart';
 
 /// Карточка заказа доставки: номер, время создания, сумма, адрес, действия.
+///
+/// Действия по ADR-1617: «Взять доставку» (claim READY), «В пути»
+/// (startDelivery), «Доставлен» (completeDelivery). Пока заказ мутирует,
+/// его кнопки блокируются.
 class CourierOrderCard extends StatelessWidget {
   const CourierOrderCard({
     super.key,
     required this.order,
     required this.updating,
-    this.onPickup,
+    this.onClaim,
+    this.onStart,
     this.onComplete,
     this.onTap,
   });
 
   final CourierOrder order;
   final bool updating;
-  final VoidCallback? onPickup;
+
+  /// «Взять доставку» — неназначенный READY.
+  final VoidCallback? onClaim;
+
+  /// «В пути» — собственный READY.
+  final VoidCallback? onStart;
+
+  /// «Доставлен» — собственный ON_WAY.
   final VoidCallback? onComplete;
+
   final VoidCallback? onTap;
 
   @override
@@ -161,39 +174,81 @@ class CourierOrderCard extends StatelessWidget {
                     child: CircularProgressIndicator(),
                   ),
                 )
-              else if (order.status == OrderStatus.cooking)
-                FilledButton.tonalIcon(
-                  onPressed: null,
-                  icon: const Icon(Icons.soup_kitchen_outlined),
-                  label: const Text('Ещё готовится'),
-                )
-              else if (order.status == OrderStatus.ready && onPickup != null)
-                FilledButton.icon(
-                  key: Key('pickup_${order.id}'),
-                  onPressed: onPickup,
-                  icon: const Icon(Icons.shopping_bag_outlined),
-                  label: const Text('Взять заказ'),
-                )
-              else if (order.status == OrderStatus.onWay && onComplete != null)
-                FilledButton.icon(
-                  key: Key('complete_${order.id}'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: ShikColors.success,
-                    minimumSize: const Size.fromHeight(64),
-                    textStyle: const TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  onPressed: onComplete,
-                  icon: const Icon(Icons.check_circle_outline, size: 28),
-                  label: const Text('Заказ доставлен'),
+              else
+                _ActionArea(
+                  order: order,
+                  onClaim: onClaim,
+                  onStart: onStart,
+                  onComplete: onComplete,
                 ),
             ],
           ),
         ),
       ),
     );
+  }
+}
+
+class _ActionArea extends StatelessWidget {
+  const _ActionArea({
+    required this.order,
+    this.onClaim,
+    this.onStart,
+    this.onComplete,
+  });
+
+  final CourierOrder order;
+  final VoidCallback? onClaim;
+  final VoidCallback? onStart;
+  final VoidCallback? onComplete;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (order.status) {
+      case OrderStatus.cooking:
+        return FilledButton.tonalIcon(
+          onPressed: null,
+          icon: const Icon(Icons.soup_kitchen_outlined),
+          label: const Text('Ещё готовится'),
+        );
+      case OrderStatus.ready:
+        if (onStart != null) {
+          // Own claimed order — start the delivery.
+          return FilledButton.icon(
+            key: Key('start_${order.id}'),
+            onPressed: onStart,
+            icon: const Icon(Icons.pedal_bike),
+            label: const Text('В пути'),
+          );
+        }
+        if (onClaim != null) {
+          return FilledButton.icon(
+            key: Key('claim_${order.id}'),
+            onPressed: onClaim,
+            icon: const Icon(Icons.shopping_bag_outlined),
+            label: const Text('Взять доставку'),
+          );
+        }
+        return const SizedBox.shrink();
+      case OrderStatus.onWay:
+        if (onComplete == null) return const SizedBox.shrink();
+        return FilledButton.icon(
+          key: Key('complete_${order.id}'),
+          style: FilledButton.styleFrom(
+            backgroundColor: ShikColors.success,
+            minimumSize: const Size.fromHeight(64),
+            textStyle: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          onPressed: onComplete,
+          icon: const Icon(Icons.check_circle_outline, size: 28),
+          label: const Text('Доставлен'),
+        );
+      case OrderStatus.completed:
+        return const SizedBox.shrink();
+    }
   }
 }
 

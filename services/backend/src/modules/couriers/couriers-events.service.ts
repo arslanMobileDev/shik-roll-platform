@@ -28,13 +28,41 @@ export interface OrderTrackingEvent {
   timestamp: string;
 }
 
+/**
+ * Accepted courier location fix (ADR-1617). Published in-memory only —
+ * persistence/retention for dispatch maps is a separate data-retention
+ * decision; raw coordinates are never logged.
+ */
+export interface CourierLocationEvent {
+  orderId: string;
+  courierId: string;
+  branchId: string;
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number;
+  capturedAt: string;
+}
+
 @Injectable()
 export class CouriersEventsService {
   private readonly events$ = new Subject<CourierOrderEvent>();
   private readonly trackingEvents$ = new Subject<OrderTrackingEvent>();
+  private readonly locationEvents$ = new Subject<CourierLocationEvent>();
 
   emitOrderEvent(event: CourierOrderEvent) {
     this.events$.next(event);
+  }
+
+  /** Publish an accepted courier location fix (branch-scoped consumers). */
+  emitCourierLocation(event: CourierLocationEvent) {
+    this.locationEvents$.next(event);
+  }
+
+  /** Live courier fixes of one branch (dispatcher map, future consumers). */
+  getCourierLocationStream(branchId: string): Observable<CourierLocationEvent> {
+    return this.locationEvents$
+      .asObservable()
+      .pipe(filter((evt) => evt.branchId === branchId));
   }
 
   getOrderStream(branchId?: string): Observable<MessageEvent> {

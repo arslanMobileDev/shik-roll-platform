@@ -4,6 +4,10 @@ import 'branch.dart';
 import 'courier.dart';
 
 /// Courier session: JWT token + courier profile + active branch.
+///
+/// ADR-1617: the token is a runtime-only field. `toJson` never serializes it
+/// and `fromJson` receives it separately (from secure storage), so the
+/// SharedPreferences profile never contains the JWT.
 class CourierSession extends Equatable {
   const CourierSession({
     required this.token,
@@ -24,15 +28,18 @@ class CourierSession extends Equatable {
         phone: phone ?? this.phone,
       );
 
-  factory CourierSession.fromJson(Map<String, dynamic> json) => CourierSession(
-        token: json['token'] as String,
+  factory CourierSession.fromJson(
+    Map<String, dynamic> json, {
+    String token = '',
+  }) =>
+      CourierSession(
+        token: token,
         courier: Courier.fromJson(json['courier'] as Map<String, dynamic>),
         branch: Branch.fromJson(json['branch'] as Map<String, dynamic>),
         phone: json['phone'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
-        'token': token,
         'courier': courier.toJson(),
         'branch': branch.toJson(),
         if (phone != null) 'phone': phone,

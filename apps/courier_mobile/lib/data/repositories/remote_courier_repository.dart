@@ -2,35 +2,25 @@ import 'package:dio/dio.dart';
 
 import '../models/courier.dart';
 import '../models/courier_order.dart';
+import '../models/courier_order_event.dart';
+import 'courier_events_client.dart';
 import 'courier_repository.dart';
 
-/// Remote repository over the fixed backend contract:
+/// Remote repository over the guarded backend contract (ADR-1617):
 ///
-/// * POST /couriers/auth/pin {pin, phone} -> {token, courier:{id,name}}
-/// * GET  /couriers/orders/active?branchId=... -> [order, ...]
-/// * PATCH /orders/{id}/status {status, courierId}
+/// * POST  /couriers/auth/pin {pin, phone} -> {token, courier:{id,name}}
+/// * GET   /couriers/orders/active -> [order, ...]   (JWT-scoped)
+/// * PATCH /couriers/orders/{id}/status {status}     (JWT identity)
+/// * GET   /couriers/stream                        (SSE order events)
+///
+/// The Dio instance must be configured by the composition root with
+/// CourierAuthInterceptor; this class never touches the token itself.
 class RemoteCourierRepository implements CourierRepository {
-  RemoteCourierRepository({required String baseUrl, Dio? dio})
-    : _dio =
-          dio ??
-          Dio(
-            BaseOptions(
-              baseUrl: baseUrl,
-              connectTimeout: const Duration(seconds: 10),
-              receiveTimeout: const Duration(seconds: 15),
-            ),
-          );
+  RemoteCourierRepository({required this._dio});
 
   final Dio _dio;
 
-  /// Bearer token of the current session (set after login).
-  set token(String? value) {
-    if (value == null) {
-      _dio.options.headers.remove('Authorization');
-    } else {
-      _dio.options.headers['Authorization'] = 'Bearer $value';
-    }
-  }
+  late final CourierEventsClient _eventsClient = CourierEventsClient(_dio);
 
   @override
   Future<({String token, Courier courier})> loginWithPin({
@@ -48,9 +38,7 @@ class RemoteCourierRepository implements CourierRepository {
       if (token == null || courierJson is! Map<String, dynamic>) {
         throw const CourierAuthException('Некорректный ответ сервера');
       }
-      final courier = Courier.fromJson(courierJson);
-      this.token = token;
-      return (token: token, courier: courier);
+      return (token: token, courier: Courier.fromJson(courierJson));
     } on DioException catch (e) {
       if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
         throw const CourierAuthException();
@@ -60,13 +48,8 @@ class RemoteCourierRepository implements CourierRepository {
   }
 
   @override
-  Future<List<CourierOrder>> fetchActiveOrders({
-    required String branchId,
-  }) async {
-    final response = await _dio.get<List<dynamic>>(
-      '/couriers/orders/active',
-      queryParameters: {'branchId': branchId},
-    );
+  Future<List<CourierOrder>> fetchActiveOrders() async {
+    final response = await _dio.get<List<dynamic>>('/couriers/orders/active');
     final raw = response.data ?? const [];
     return raw
         .whereType<Map<String, dynamic>>()
@@ -82,14 +65,32 @@ class RemoteCourierRepository implements CourierRepository {
   }
 
   @override
-  Future<void> updateOrderStatus({
-    required String orderId,
-    required OrderStatus status,
-    required String courierId,
-  }) {
-    return _dio.patch<void>(
-      '/orders/$orderId/status',
-      data: {'status': status.wireName, 'courierId': courierId},
-    );
+  Future<void> claimOrder(String orderId) =>
+      _transition(orderId, OrderStatus.ready);
+
+  @override
+  Future<void> startDelivery(String orderId) =>
+      _transition(orderId, OrderStatus.onWay);
+
+  @override
+  Future<void> completeDelivery(String orderId) =>
+      _transition(orderId, OrderStatus.completed);
+
+  Future<void> _transition(String orderId, OrderStatus status) async {
+    try {
+      await _dio.patch<void>(
+        '/couriers/orders/$orderId/status',
+        data: {'status': status.wireName},
+      );
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      if (statusCode == 409) {
+        throw const CourierOrderConflictException();
+      }
+      rethrow;
+    }
   }
+
+  @override
+  Stream<CourierOrderEvent> watchOrders() => _eventsClient.watch();
 }
