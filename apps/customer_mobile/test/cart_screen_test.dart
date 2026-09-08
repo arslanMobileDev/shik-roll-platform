@@ -11,6 +11,8 @@ import 'package:customer_mobile/features/cart/bloc/customer_cart_bloc.dart';
 import 'package:customer_mobile/features/cart/data/fake_orders_repository.dart';
 import 'package:customer_mobile/features/cart/data/orders_repository.dart';
 import 'package:customer_mobile/features/cart/view/cart_screen.dart';
+import 'package:customer_mobile/features/loyalty/bloc/loyalty_cubit.dart';
+import 'package:customer_mobile/features/loyalty/data/loyalty_repository.dart';
 import 'package:customer_mobile/features/menu/bloc/order_type.dart';
 import 'package:customer_mobile/features/menu/data/menu_models.dart';
 import 'package:customer_mobile/features/payments/data/fake_payments_repository.dart';
@@ -130,6 +132,16 @@ Future<CustomerCartBloc> _pumpCart(
           BlocProvider<CheckoutCubit>.value(value: checkoutCubit),
           BlocProvider<OrderTypeCubit>(create: (_) => OrderTypeCubit()),
           BlocProvider<AuthBloc>.value(value: auth),
+          // Без загруженного баланса секция списания бонусов скрыта —
+          // сценарии этого файла лояльность не задействуют.
+          BlocProvider<LoyaltyCubit>(
+            create: (_) => LoyaltyCubit(
+              repository: FakeLoyaltyRepository(
+                latency: Duration.zero,
+                balance: 0,
+              ),
+            ),
+          ),
         ],
         child: Scaffold(body: CartScreen(onGoToMenu: onGoToMenu ?? () {})),
       ),
@@ -172,7 +184,9 @@ void main() {
     cart.add(
       CartItemAdded(
         item: _roll,
-        selection: const {'mg-sauce': {'mi-s-spicy'}},
+        selection: const {
+          'mg-sauce': {'mi-s-spicy'},
+        },
       ),
     );
     await tester.pump();
@@ -180,7 +194,10 @@ void main() {
     // Название, модификаторы мелким текстом, цена и счётчик.
     expect(find.text('Филадельфия'), findsOneWidget);
     expect(find.text('Спайси'), findsOneWidget);
-    expect(find.text('${const Money.kopecks(43000).format()} / шт'), findsOneWidget);
+    expect(
+      find.text('${const Money.kopecks(43000).format()} / шт'),
+      findsOneWidget,
+    );
     expect(find.text('1'), findsOneWidget);
     expect(
       find.text('Оформить заказ на ${const Money.kopecks(43000).format()}'),
@@ -264,10 +281,7 @@ void main() {
     tester,
   ) async {
     var backToMenu = false;
-    final cart = await _pumpCart(
-      tester,
-      onGoToMenu: () => backToMenu = true,
-    );
+    final cart = await _pumpCart(tester, onGoToMenu: () => backToMenu = true);
     cart.add(const CartItemAdded(item: _drink));
     await tester.pump();
 
@@ -310,59 +324,56 @@ void main() {
     expect(find.text('Корзина пуста'), findsOneWidget);
   });
 
-  testWidgets(
-    'гость не авторизован: модальный вход по SMS без сброса корзины, '
-    'затем заказ уходит',
-    (tester) async {
-      final auth = _anonymousAuthBloc();
-      final cart = await _pumpCart(tester, authBloc: auth);
-      cart.add(const CartItemAdded(item: _drink));
-      await tester.pump();
+  testWidgets('гость не авторизован: модальный вход по SMS без сброса корзины, '
+      'затем заказ уходит', (tester) async {
+    final auth = _anonymousAuthBloc();
+    final cart = await _pumpCart(tester, authBloc: auth);
+    cart.add(const CartItemAdded(item: _drink));
+    await tester.pump();
 
-      await _selectPickup(tester);
-      await _acceptOffer(tester);
+    await _selectPickup(tester);
+    await _acceptOffer(tester);
 
-      // Тап по «Оформить заказ» открывает модальный вход, заказ не уходит.
-      await tester.tap(_submitButton);
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('phone-field')), findsOneWidget);
-      expect(cart.state.isEmpty, isFalse);
+    // Тап по «Оформить заказ» открывает модальный вход, заказ не уходит.
+    await tester.tap(_submitButton);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('phone-field')), findsOneWidget);
+    expect(cart.state.isEmpty, isFalse);
 
-      // Вводим номер и запрашиваем код.
-      await tester.enterText(
-        find.byKey(const ValueKey('phone-field')),
-        '9991234567',
-      );
-      await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('send-code-button')));
-      // Bounded pumps: дальше работает таймер повторной отправки.
-      await tester.pump();
-      await tester.pump();
-      await tester.pump();
-      expect(find.byKey(const ValueKey('otp-field')), findsOneWidget);
+    // Вводим номер и запрашиваем код.
+    await tester.enterText(
+      find.byKey(const ValueKey('phone-field')),
+      '9991234567',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('send-code-button')));
+    // Bounded pumps: дальше работает таймер повторной отправки.
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const ValueKey('otp-field')), findsOneWidget);
 
-      // Вводим код: вход завершается, шторка закрывается, заказ уходит.
-      await tester.enterText(find.byKey(const ValueKey('otp-field')), '1234');
-      await tester.pump();
-      await tester.pump();
-      await tester.pump();
-      await tester.pump();
+    // Вводим код: вход завершается, шторка закрывается, заказ уходит.
+    await tester.enterText(find.byKey(const ValueKey('otp-field')), '1234');
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
 
-      // Онлайн-оплата по умолчанию: проходим демо-оплату ЮKassa.
-      expect(find.text('Счёт на оплату выставлен'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('mock-pay-button')));
-      await tester.pump();
-      await tester.pump();
+    // Онлайн-оплата по умолчанию: проходим демо-оплату ЮKassa.
+    expect(find.text('Счёт на оплату выставлен'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('mock-pay-button')));
+    await tester.pump();
+    await tester.pump();
 
-      expect(find.text('Заказ #1042 принят!'), findsOneWidget);
-      expect(cart.state.isEmpty, isTrue);
-      expect(auth.state.isAuthenticated, isTrue);
+    expect(find.text('Заказ #1042 принят!'), findsOneWidget);
+    expect(cart.state.isEmpty, isTrue);
+    expect(auth.state.isAuthenticated, isTrue);
 
-      // Закрываем экран поздравления, чтобы его таймер не остался висеть.
-      await tester.tap(find.byKey(const ValueKey('back-to-menu-button')));
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
-      await tester.pump();
-    },
-  );
+    // Закрываем экран поздравления, чтобы его таймер не остался висеть.
+    await tester.tap(find.byKey(const ValueKey('back-to-menu-button')));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+  });
 }

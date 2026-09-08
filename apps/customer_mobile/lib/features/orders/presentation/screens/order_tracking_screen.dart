@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/utils/money.dart';
+import '../../../loyalty/bloc/loyalty_cubit.dart';
+import '../../../loyalty/domain/bonus_math.dart';
 import '../../bloc/order_tracking_bloc.dart';
 import '../../data/order_tracking_repository.dart';
+import '../../domain/order_timeline.dart';
 import '../widgets/order_status_tracker.dart';
 
 /// Экран отслеживания заказа (ADR-1615): живой трекер поверх SSE-стрима
@@ -16,6 +20,7 @@ class OrderTrackingScreen extends StatelessWidget {
     this.deliveryAddress,
     this.items = const [],
     this.totalPrice,
+    this.loyaltyCubit,
   });
 
   final String orderId;
@@ -31,11 +36,16 @@ class OrderTrackingScreen extends StatelessWidget {
   /// Итог в рублях; блок итога скрывается, если не передан.
   final num? totalPrice;
 
+  /// Источник данных о начисленных за заказ бонусах (ADR-1614); без него
+  /// блок бонусов не отображается (preview/изолированные тесты).
+  final LoyaltyCubit? loyaltyCubit;
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider<OrderTrackingBloc>(
-      create: (_) => OrderTrackingBloc(repository: trackingRepository)
-        ..add(OrderTrackingStarted(orderId)),
+      create: (_) =>
+          OrderTrackingBloc(repository: trackingRepository)
+            ..add(OrderTrackingStarted(orderId)),
       child: Scaffold(
         backgroundColor: const Color(0xFFF8F9FA),
         appBar: AppBar(
@@ -59,48 +69,67 @@ class OrderTrackingScreen extends StatelessWidget {
           ),
           centerTitle: true,
         ),
-        body: BlocBuilder<OrderTrackingBloc, OrderTrackingState>(
-          builder: (context, state) {
-            if (state.isLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (state.loadFailed) {
-              return _TrackingError(message: state.errorMessage!);
-            }
-            return SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                children: [
-                  // 1. Интерактивный статус-трекер
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 8,
+        body: BlocListener<OrderTrackingBloc, OrderTrackingState>(
+          // Кешбэк начисляется при внутреннем переходе в COMPLETED, который
+          // клиент видит как DELIVERED (ADR-1614): обновляем баланс, чтобы
+          // блок бонусов показал свежую EARN-запись леджера.
+          listenWhen: (previous, next) =>
+              next.status == OrderTimelineStatus.delivered &&
+              previous.status != OrderTimelineStatus.delivered,
+          listener: (context, state) => loyaltyCubit?.loadBalance(),
+          child: BlocBuilder<OrderTrackingBloc, OrderTrackingState>(
+            builder: (context, state) {
+              if (state.isLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (state.loadFailed) {
+                return _TrackingError(message: state.errorMessage!);
+              }
+              return SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  children: [
+                    // 1. Интерактивный статус-трекер
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 8,
+                      ),
+                      child: OrderStatusTracker(
+                        orderNumber: orderNumber,
+                        status: state.status,
+                        progressPercent: state.progressPercent,
+                        estimatedDeliveryAt: state.estimatedDeliveryAt,
+                        updatedAt: state.updatedAt,
+                      ),
                     ),
-                    child: OrderStatusTracker(
-                      orderNumber: orderNumber,
-                      status: state.status,
-                      progressPercent: state.progressPercent,
-                      estimatedDeliveryAt: state.estimatedDeliveryAt,
-                      updatedAt: state.updatedAt,
-                    ),
-                  ),
 
-                  // 2. Блок адреса доставки
-                  if (deliveryAddress != null)
-                    _AddressCard(address: deliveryAddress!),
+                    // 2. Блок адреса доставки
+                    if (deliveryAddress != null)
+                      _AddressCard(address: deliveryAddress!),
 
-                  // 3. Блок состава заказа
-                  if (items.isNotEmpty)
-                    _ItemsCard(items: items, totalPrice: totalPrice),
+                    // 3. Блок состава заказа
+                    if (items.isNotEmpty)
+                      _ItemsCard(items: items, totalPrice: totalPrice),
 
-                  // 4. Кнопка связи с поддержкой
-                  const _SupportButton(),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            );
-          },
+                    // 4. Бонусы, начисленные за заказ (ADR-1614)
+                    if (loyaltyCubit != null)
+                      BlocProvider<LoyaltyCubit>.value(
+                        value: loyaltyCubit!,
+                        child: _BonusEarnCard(
+                          orderId: orderId,
+                          totalPrice: totalPrice,
+                        ),
+                      ),
+
+                    // 5. Кнопка связи с поддержкой
+                    const _SupportButton(),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -321,6 +350,105 @@ class _ItemsCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Блок бонусов, начисленных за этот заказ (ADR-1614): фактическая
+/// EARN-запись леджера либо превью ожидаемого кешбэка, пока заказ не
+/// доставлен. Скрыт, когда ни того ни другого нет.
+class _BonusEarnCard extends StatelessWidget {
+  const _BonusEarnCard({required this.orderId, this.totalPrice});
+
+  final String orderId;
+  final num? totalPrice;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<LoyaltyCubit, LoyaltyState>(
+      builder: (context, state) {
+        final earned = state.earnedPointsFor(orderId);
+        // Превью до доставки: floor(итог * cashback_rate / 100) — сервер
+        // начислит фактическое значение при COMPLETED.
+        final estimated = totalPrice == null
+            ? 0
+            : cashbackPointsFor(
+                Money.fromRubles(totalPrice!),
+                state.cashbackRate,
+              );
+        if (earned <= 0 && estimated <= 0) return const SizedBox.shrink();
+
+        const brandOrange = Color(0xFFFF5B00);
+        return Container(
+          key: const ValueKey('bonus-earn-card'),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF4E5),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.stars_rounded,
+                  color: Color(0xFFED6C02),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      earned > 0 ? 'Бонусы начислены' : 'Бонусы за заказ',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      earned > 0
+                          ? '+$earned бонусов зачислено на баланс'
+                          : 'Начислим ~$estimated бонусов после доставки',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1B1D21),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (earned > 0)
+                Text(
+                  '+$earned',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: brandOrange,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

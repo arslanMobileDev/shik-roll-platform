@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/shik_roll_logo.dart';
 import '../../../features/cart/bloc/cart_event.dart';
 import '../../../features/cart/bloc/customer_cart_bloc.dart';
+import '../../loyalty/view/promotions_carousel.dart';
 import '../bloc/menu_bloc.dart';
 import '../bloc/menu_event.dart';
 import '../bloc/menu_state.dart';
@@ -58,9 +59,8 @@ class MenuScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: AppSpacing.s12),
                           FilledButton.tonal(
-                            onPressed: () => context
-                                .read<MenuBloc>()
-                                .add(MenuRefreshed()),
+                            onPressed: () =>
+                                context.read<MenuBloc>().add(MenuRefreshed()),
                             child: const Text('Повторить'),
                           ),
                         ],
@@ -83,7 +83,6 @@ class MenuScreen extends StatelessWidget {
     );
   }
 }
-
 
 class _MenuContent extends StatelessWidget {
   const _MenuContent({
@@ -108,15 +107,16 @@ class _MenuContent extends StatelessWidget {
           SliverToBoxAdapter(
             child: Column(
               children: [
+                // Лента активных акций (ADR-1614) над каталогом; пустая —
+                // невидима.
+                const PromotionsCarousel(),
                 CategoryStrip(categories: categories),
                 const SizedBox(height: AppSpacing.s12),
               ],
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s16,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
             sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
@@ -124,24 +124,21 @@ class _MenuContent extends StatelessWidget {
                 mainAxisSpacing: AppSpacing.s12,
                 childAspectRatio: 0.62,
               ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final item = items[index];
-                  return MenuItemCard(
-                    item: item,
-                    onAddToCart: () {
-                      context.read<CustomerCartBloc>().add(
-                        CartItemAdded(item: item),
-                      );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('${item.name} — в корзине')),
-                      );
-                    },
-                    onSelect: () => showProductDetails(context, item),
-                  );
-                },
-                childCount: items.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final item = items[index];
+                return MenuItemCard(
+                  item: item,
+                  onAddToCart: () {
+                    context.read<CustomerCartBloc>().add(
+                      CartItemAdded(item: item),
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${item.name} — в корзине')),
+                    );
+                  },
+                  onSelect: () => showProductDetails(context, item),
+                );
+              }, childCount: items.length),
             ),
           ),
         ],

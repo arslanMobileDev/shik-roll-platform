@@ -23,6 +23,7 @@ final class CreateOrderRequest extends Equatable {
     required this.items,
     this.deliveryAddress,
     this.comment,
+    this.useBonusPoints = 0,
   });
 
   final String branchId;
@@ -33,6 +34,10 @@ final class CreateOrderRequest extends Equatable {
   final String? deliveryAddress;
   final String? comment;
 
+  /// Bonus points to spend (ADR-1614): integer, 1 point = 1 RUB, max 30% of
+  /// the item amount. Omitted from the payload when zero.
+  final int useBonusPoints;
+
   Map<String, dynamic> toJson() => {
     'branchId': branchId,
     'brandId': '37b84f4c-0a70-4263-bfa0-cc04ba0d4b99',
@@ -40,6 +45,7 @@ final class CreateOrderRequest extends Equatable {
     if (deliveryAddress != null && deliveryAddress!.isNotEmpty)
       'deliveryAddress': deliveryAddress,
     if (comment != null && comment!.isNotEmpty) 'comment': comment,
+    if (useBonusPoints > 0) 'useBonusPoints': useBonusPoints,
     'items': [for (final item in items) item.toJson()],
   };
 
@@ -50,6 +56,7 @@ final class CreateOrderRequest extends Equatable {
     items,
     deliveryAddress,
     comment,
+    useBonusPoints,
   ];
 }
 
@@ -77,7 +84,10 @@ final class OrderItemRequest extends Equatable {
 
 /// One chosen modifier option inside an [OrderItemRequest].
 final class SelectedModifierRequest extends Equatable {
-  const SelectedModifierRequest({required this.modifierItemId, this.quantity = 1});
+  const SelectedModifierRequest({
+    required this.modifierItemId,
+    this.quantity = 1,
+  });
 
   final String modifierItemId;
   final int quantity;

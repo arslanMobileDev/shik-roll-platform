@@ -15,6 +15,8 @@ import 'package:customer_mobile/features/cart/data/fake_orders_repository.dart';
 import 'package:customer_mobile/features/cart/data/guest_order.dart';
 import 'package:customer_mobile/features/cart/data/orders_repository.dart';
 import 'package:customer_mobile/features/cart/view/cart_screen.dart';
+import 'package:customer_mobile/features/loyalty/bloc/loyalty_cubit.dart';
+import 'package:customer_mobile/features/loyalty/data/loyalty_repository.dart';
 import 'package:customer_mobile/features/menu/bloc/order_type.dart';
 import 'package:customer_mobile/features/menu/data/menu_models.dart';
 import 'package:customer_mobile/features/payments/data/fake_payments_repository.dart';
@@ -56,7 +58,8 @@ const _successOrder = GuestOrder(
 
 const _pendingPayment = Payment(
   id: 'payment-uuid-1',
-  paymentUrl: 'https://yoomoney.ru/checkout/payments/v2/demo?orderId=order-uuid-1',
+  paymentUrl:
+      'https://yoomoney.ru/checkout/payments/v2/demo?orderId=order-uuid-1',
   status: PaymentStatus.pending,
 );
 
@@ -192,9 +195,7 @@ void main() {
       build: buildCubit,
       act: (cubit) => cubit.paymentMethodSelected(PaymentMethod.cash),
       expect: () => [
-        predicate<CheckoutState>(
-          (s) => s.paymentMethod == PaymentMethod.cash,
-        ),
+        predicate<CheckoutState>((s) => s.paymentMethod == PaymentMethod.cash),
       ],
     );
   });
@@ -238,6 +239,14 @@ void main() {
               ),
               BlocProvider<OrderTypeCubit>(create: (_) => OrderTypeCubit()),
               BlocProvider<AuthBloc>.value(value: authBloc),
+              BlocProvider<LoyaltyCubit>(
+                create: (_) => LoyaltyCubit(
+                  repository: FakeLoyaltyRepository(
+                    latency: Duration.zero,
+                    balance: 0,
+                  ),
+                ),
+              ),
             ],
             child: Scaffold(body: CartScreen(onGoToMenu: () {})),
           ),

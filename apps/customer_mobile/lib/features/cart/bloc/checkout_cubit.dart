@@ -22,6 +22,7 @@ final class CheckoutState extends Equatable {
     this.comment = '',
     this.offerAccepted = false,
     this.paymentMethod = PaymentMethod.yookassa,
+    this.bonusSpendEnabled = false,
     this.status = CheckoutStatus.editing,
     this.errorMessage,
     this.placedOrder,
@@ -34,6 +35,10 @@ final class CheckoutState extends Equatable {
 
   /// Выбранный способ оплаты; по умолчанию — онлайн-эквайринг ЮKassa.
   final PaymentMethod paymentMethod;
+
+  /// «Списать бонусы» (ADR-1614): при включении чекаут уходит с
+  /// `useBonusPoints`, рассчитанным по балансу и лимиту 30% от чека.
+  final bool bonusSpendEnabled;
 
   final CheckoutStatus status;
   final String? errorMessage;
@@ -63,6 +68,7 @@ final class CheckoutState extends Equatable {
     String? comment,
     bool? offerAccepted,
     PaymentMethod? paymentMethod,
+    bool? bonusSpendEnabled,
     CheckoutStatus? status,
     String? errorMessage,
     GuestOrder? placedOrder,
@@ -73,6 +79,7 @@ final class CheckoutState extends Equatable {
       comment: comment ?? this.comment,
       offerAccepted: offerAccepted ?? this.offerAccepted,
       paymentMethod: paymentMethod ?? this.paymentMethod,
+      bonusSpendEnabled: bonusSpendEnabled ?? this.bonusSpendEnabled,
       status: status ?? this.status,
       errorMessage: errorMessage ?? this.errorMessage,
       placedOrder: placedOrder ?? this.placedOrder,
@@ -86,6 +93,7 @@ final class CheckoutState extends Equatable {
     comment,
     offerAccepted,
     paymentMethod,
+    bonusSpendEnabled,
     status,
     errorMessage,
     placedOrder,
@@ -97,10 +105,8 @@ final class CheckoutState extends Equatable {
 /// payment additionally creates a YooKassa payment via
 /// [CustomerPaymentsRepository] (`POST /payments/create`, API-702).
 class CheckoutCubit extends Cubit<CheckoutState> {
-  CheckoutCubit({
-    required this._repository,
-    required this._paymentsRepository,
-  }) : super(const CheckoutState());
+  CheckoutCubit({required this._repository, required this._paymentsRepository})
+    : super(const CheckoutState());
 
   final CustomerOrdersRepository _repository;
   final CustomerPaymentsRepository _paymentsRepository;
@@ -119,9 +125,19 @@ class CheckoutCubit extends Cubit<CheckoutState> {
     state.copyWith(paymentMethod: method, status: CheckoutStatus.editing),
   );
 
+  /// «Списать бонусы» переключатель корзины (ADR-1614).
+  void bonusSpendToggled(bool enabled) => emit(
+    state.copyWith(bonusSpendEnabled: enabled, status: CheckoutStatus.editing),
+  );
+
   Future<void> submit({
     required OrderType orderType,
     required List<CartLine> lines,
+
+    /// Бонусы к списанию (`useBonusPoints`, ADR-1614), уже усечённые до
+    /// `min(balance, floor(30% от чека))` на экране. Игнорируется, когда
+    /// переключатель списания выключен. Сервер повторно проверяет лимит.
+    int bonusPoints = 0,
   }) async {
     if (!state.canSubmit(orderType: orderType, cartIsEmpty: lines.isEmpty)) {
       return;
@@ -133,12 +149,13 @@ class CheckoutCubit extends Cubit<CheckoutState> {
         comment: state.comment,
         offerAccepted: state.offerAccepted,
         paymentMethod: state.paymentMethod,
+        bonusSpendEnabled: state.bonusSpendEnabled,
         status: CheckoutStatus.submitting,
       ),
     );
     try {
       final order = await _repository.createOrder(
-        _buildRequest(orderType, lines),
+        _buildRequest(orderType, lines, bonusPoints),
       );
       // Онлайн-оплата: сразу после создания заказа выставляем счёт в ЮKassa.
       final payment = switch (state.paymentMethod) {
@@ -156,17 +173,11 @@ class CheckoutCubit extends Cubit<CheckoutState> {
       );
     } on OrdersException catch (e) {
       emit(
-        state.copyWith(
-          status: CheckoutStatus.failure,
-          errorMessage: e.message,
-        ),
+        state.copyWith(status: CheckoutStatus.failure, errorMessage: e.message),
       );
     } on PaymentsException catch (e) {
       emit(
-        state.copyWith(
-          status: CheckoutStatus.failure,
-          errorMessage: e.message,
-        ),
+        state.copyWith(status: CheckoutStatus.failure, errorMessage: e.message),
       );
     }
   }
@@ -174,7 +185,11 @@ class CheckoutCubit extends Cubit<CheckoutState> {
   /// Back to a blank form after the success was consumed.
   void reset() => emit(const CheckoutState());
 
-  CreateOrderRequest _buildRequest(OrderType orderType, List<CartLine> lines) {
+  CreateOrderRequest _buildRequest(
+    OrderType orderType,
+    List<CartLine> lines,
+    int bonusPoints,
+  ) {
     final address = state.address.trim();
     final comment = state.comment.trim();
     return CreateOrderRequest(
@@ -182,6 +197,7 @@ class CheckoutCubit extends Cubit<CheckoutState> {
       orderType: orderType,
       deliveryAddress: orderType == OrderType.delivery ? address : null,
       comment: comment.isEmpty ? null : comment,
+      useBonusPoints: state.bonusSpendEnabled ? bonusPoints : 0,
       items: [
         for (final line in lines)
           OrderItemRequest(

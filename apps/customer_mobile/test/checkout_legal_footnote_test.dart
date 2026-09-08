@@ -10,6 +10,8 @@ import 'package:customer_mobile/features/cart/bloc/customer_cart_bloc.dart';
 import 'package:customer_mobile/features/cart/data/fake_orders_repository.dart';
 import 'package:customer_mobile/features/cart/view/cart_screen.dart';
 import 'package:customer_mobile/features/legal/data/legal_constants.dart';
+import 'package:customer_mobile/features/loyalty/bloc/loyalty_cubit.dart';
+import 'package:customer_mobile/features/loyalty/data/loyalty_repository.dart';
 import 'package:customer_mobile/features/menu/bloc/order_type.dart';
 import 'package:customer_mobile/features/menu/data/menu_models.dart';
 import 'package:customer_mobile/features/payments/data/fake_payments_repository.dart';
@@ -59,6 +61,14 @@ Future<void> _pumpCart(WidgetTester tester) async {
           BlocProvider<CheckoutCubit>.value(value: checkoutCubit),
           BlocProvider<OrderTypeCubit>(create: (_) => OrderTypeCubit()),
           BlocProvider<AuthBloc>.value(value: authBloc),
+          BlocProvider<LoyaltyCubit>(
+            create: (_) => LoyaltyCubit(
+              repository: FakeLoyaltyRepository(
+                latency: Duration.zero,
+                balance: 0,
+              ),
+            ),
+          ),
         ],
         child: Scaffold(body: CartScreen(onGoToMenu: () {})),
       ),

@@ -9,6 +9,8 @@ import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/view/auth_flow.dart';
 import '../../legal/data/legal_document.dart';
 import '../../legal/view/legal_document_viewer_screen.dart';
+import '../../loyalty/bloc/loyalty_cubit.dart';
+import '../../loyalty/view/bonus_spend_section.dart';
 import '../../menu/bloc/order_type.dart';
 import '../../menu/view/widgets/order_type_toggle.dart';
 import '../../payments/view/payment_status_screen.dart';
@@ -127,11 +129,17 @@ class _CartContent extends StatelessWidget {
     final theme = Theme.of(context);
     final orderType = context.watch<OrderTypeCubit>().state;
     final checkout = context.watch<CheckoutCubit>().state;
+    final loyalty = context.watch<LoyaltyCubit>().state;
     final submitting = checkout.status == CheckoutStatus.submitting;
     final canSubmit = checkout.canSubmit(
       orderType: orderType,
       cartIsEmpty: cart.isEmpty,
     );
+    // Превью списания (ADR-1614): до min(баланс, floor(30% от чека)) бонусов;
+    // сервер повторно проверит лимит при оформлении.
+    final appliedBonusPoints = checkout.bonusSpendEnabled
+        ? loyalty.maxSpendablePoints(cart.total)
+        : 0;
 
     return SafeArea(
       child: Column(
@@ -171,6 +179,7 @@ class _CartContent extends StatelessWidget {
                 const SizedBox(height: AppSpacing.s8),
                 const _OfferCheckbox(),
                 const SizedBox(height: AppSpacing.s16),
+                BonusSpendSection(cartTotal: cart.total),
                 Text('Способ оплаты', style: theme.textTheme.titleSmall),
                 const SizedBox(height: AppSpacing.s8),
                 const PaymentMethodSelector(),
@@ -180,6 +189,7 @@ class _CartContent extends StatelessWidget {
           ),
           _CheckoutBar(
             total: cart.total,
+            appliedBonusPoints: appliedBonusPoints,
             canSubmit: canSubmit,
             submitting: submitting,
           ),
@@ -403,17 +413,24 @@ class _LegalFootnoteState extends State<_LegalFootnote> {
 class _CheckoutBar extends StatelessWidget {
   const _CheckoutBar({
     required this.total,
+    required this.appliedBonusPoints,
     required this.canSubmit,
     required this.submitting,
   });
 
   final Money total;
+
+  /// Бонусы к списанию (ADR-1614): 1 балл = 1 ₽, уже усечено до
+  /// `min(баланс, floor(30% от чека))`; 0 — списание выключено.
+  final int appliedBonusPoints;
   final bool canSubmit;
   final bool submitting;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bonusDiscount = Money.kopecks(appliedBonusPoints * 100);
+    final payable = total - bonusDiscount;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.s16,
@@ -424,11 +441,40 @@ class _CheckoutBar extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (appliedBonusPoints > 0) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Сумма заказа', style: theme.textTheme.bodyMedium),
+                Text(total.format(), style: theme.textTheme.bodyMedium),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.s4),
+            Row(
+              key: const ValueKey('bonus-discount-row'),
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Оплата бонусами',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.warning,
+                  ),
+                ),
+                Text(
+                  '−${bonusDiscount.format()}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.warning,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.s4),
+          ],
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Итого', style: theme.textTheme.titleMedium),
-              Text(total.format(), style: theme.textTheme.titleMedium),
+              Text(payable.format(), style: theme.textTheme.titleMedium),
             ],
           ),
           const SizedBox(height: AppSpacing.s8),
@@ -448,7 +494,7 @@ class _CheckoutBar extends StatelessWidget {
                         color: AppColors.onPrimary,
                       ),
                     )
-                  : Text('Оформить заказ на ${total.format()}'),
+                  : Text('Оформить заказ на ${payable.format()}'),
             ),
           ),
         ],
@@ -465,9 +511,17 @@ class _CheckoutBar extends StatelessWidget {
       if (!authenticated || !context.mounted) return;
     }
     if (!context.mounted) return;
-    context.read<CheckoutCubit>().submit(
+    final checkout = context.read<CheckoutCubit>();
+    final cart = context.read<CustomerCartBloc>().state;
+    // «Списать бонусы»: пересчитываем лимит на момент отправки — сервер
+    // всё равно повторит проверку 30% и баланса (ADR-1614).
+    final bonusPoints = checkout.state.bonusSpendEnabled
+        ? context.read<LoyaltyCubit>().state.maxSpendablePoints(cart.total)
+        : 0;
+    checkout.submit(
       orderType: context.read<OrderTypeCubit>().state,
-      lines: context.read<CustomerCartBloc>().state.lines,
+      lines: cart.lines,
+      bonusPoints: bonusPoints,
     );
   }
 }
