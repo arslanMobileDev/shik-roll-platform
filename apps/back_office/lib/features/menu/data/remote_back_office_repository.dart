@@ -80,9 +80,12 @@ final class RemoteBackOfficeRepository implements BackOfficeRepository {
     required bool stopped,
   }) async {
     try {
-      await _dio.post<void>(
+      await _dio.patch<void>(
         '/menu-items/$itemId/stop-list',
-        data: {'branchId': branchId, 'stopped': stopped},
+        data: {
+          'branchId': branchId,
+          'isActive': stopped,
+        },
       );
     } on DioException catch (e) {
       throw BackOfficeApiException(_describe(e));
