@@ -1,14 +1,18 @@
 import { OrderStatus } from '@prisma/client';
 
 /**
- * Order lifecycle state machine:
+ * Order lifecycle state machine (ADR-1618):
  *   NEW -> CONFIRMED -> COOKING -> READY -> ON_WAY -> COMPLETED
  *   READY -> COMPLETED (for takeaway / dine-in)
  *   NEW | CONFIRMED | COOKING | READY | ON_WAY -> CANCELLED
  * COMPLETED and CANCELLED are terminal.
+ *
+ * The kitchen terminal is the single production owner of
+ * CONFIRMED -> COOKING -> READY: an order always passes through CONFIRMED
+ * before cooking starts, so there is deliberately no NEW -> COOKING bypass.
  */
 const TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
-  NEW: [OrderStatus.CONFIRMED, OrderStatus.COOKING, OrderStatus.CANCELLED],
+  NEW: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
   CONFIRMED: [OrderStatus.COOKING, OrderStatus.CANCELLED],
   COOKING: [OrderStatus.READY, OrderStatus.CANCELLED],
   READY: [OrderStatus.ON_WAY, OrderStatus.COMPLETED, OrderStatus.CANCELLED],

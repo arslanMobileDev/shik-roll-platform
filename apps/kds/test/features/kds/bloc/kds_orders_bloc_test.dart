@@ -1,264 +1,500 @@
-import 'package:bloc_test/bloc_test.dart';
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kds/features/kds/bloc/kds_orders_bloc.dart';
 import 'package:kds/features/kds/bloc/kds_orders_event.dart';
 import 'package:kds/features/kds/bloc/kds_orders_state.dart';
 import 'package:kds/features/kds/data/kds_order_models.dart';
+import 'package:kds/features/kds/data/kds_orders_repository.dart';
+import 'package:kds/features/kds/data/kitchen_events_client.dart';
 
 import '../../../helpers/test_fixtures.dart';
 
+Future<void> settle([int times = 8]) async {
+  for (var i = 0; i < times; i++) {
+    await Future<void>.delayed(Duration.zero);
+  }
+}
+
 void main() {
-  const branchId = 'branch-central';
+  late TestKdsOrdersRepository repository;
+  late TestKitchenEventsClient eventsClient;
 
-  KdsOrdersBloc buildBloc(TestKdsOrdersRepository repository) =>
-      KdsOrdersBloc(repository: repository, pollInterval: null);
-
-  group('KdsOrdersBloc — загрузка', () {
-    blocTest<KdsOrdersBloc, KdsOrdersState>(
-      'начальная загрузка: Loading → Loaded, заказы отсортированы FIFO, '
-      'COMPLETED/CANCELLED скрыты',
-      build: () => buildBloc(
-        TestKdsOrdersRepository(
-          orders: [
-            buildOrder(
-              id: 'newer',
-              createdAt: kNow.subtract(const Duration(minutes: 2)),
-            ),
-            buildOrder(
-              id: 'older',
-              createdAt: kNow.subtract(const Duration(minutes: 15)),
-            ),
-            buildOrder(id: 'done', status: KdsOrderStatus.completed),
-            buildOrder(id: 'void', status: KdsOrderStatus.cancelled),
-          ],
-        ),
-      ),
-      act: (bloc) => bloc.add(const KdsOrdersStarted(branchId: branchId)),
-      expect: () => [
-        const KdsOrdersLoading(),
-        isA<KdsOrdersLoaded>()
-            .having(
-              (s) => s.orders.map((o) => o.id).toList(),
-              'FIFO: старейший первым, завершённые скрыты',
-              ['older', 'newer'],
-            )
-            .having(
-              (s) => s.freshOrderIds,
-              'первая загрузка не подсвечивает заказы как новые',
-              isEmpty,
-            ),
-      ],
+  KdsOrdersBloc buildBloc({
+    Duration? pollInterval,
+    Duration reconnectBaseDelay = const Duration(milliseconds: 20),
+    int maxConsecutiveFailures = 3,
+  }) {
+    return KdsOrdersBloc(
+      repository: repository,
+      eventsClient: eventsClient,
+      pollInterval: pollInterval,
+      reconnectBaseDelay: reconnectBaseDelay,
+      reconnectMaxDelay: const Duration(milliseconds: 200),
+      maxConsecutiveFailures: maxConsecutiveFailures,
+      now: () => kNow,
     );
+  }
 
-    blocTest<KdsOrdersBloc, KdsOrdersState>(
-      'ошибка начальной загрузки → Error',
-      build: () => buildBloc(
-        TestKdsOrdersRepository()..fetchError = StateError('нет сети'),
-      ),
-      act: (bloc) => bloc.add(const KdsOrdersStarted(branchId: branchId)),
-      expect: () => [
-        const KdsOrdersLoading(),
-        isA<KdsOrdersError>().having(
-          (s) => s.message,
-          'message',
-          contains('нет сети'),
-        ),
-      ],
-    );
+  KitchenOrderUpserted upsert(KdsOrder order, {int? version}) =>
+      KitchenOrderUpserted(
+        order: order,
+        orderVersion: version ?? order.version,
+        eventId: 'evt-${order.id}-${version ?? order.version}',
+      );
 
-    blocTest<KdsOrdersBloc, KdsOrdersState>(
-      'повторный опрос помечает появившиеся заказы как freshOrderIds',
-      build: () =>
-          buildBloc(TestKdsOrdersRepository(orders: [buildOrder(id: 'a')])),
-      act: (bloc) async {
-        bloc.add(const KdsOrdersStarted(branchId: branchId));
-        await Future<void>.delayed(Duration.zero);
-        // Прилетел новый заказ между опросами.
-        (bloc.repository as TestKdsOrdersRepository).orders.add(
-          buildOrder(id: 'b', orderNumber: '1002'),
-        );
-        bloc.add(const KdsOrdersPollTicked());
-      },
-      expect: () => [
-        const KdsOrdersLoading(),
-        isA<KdsOrdersLoaded>(),
-        isA<KdsOrdersLoaded>().having(
-          (s) => s.freshOrderIds,
-          'только новый заказ подсвечен',
-          {'b'},
-        ),
-      ],
-    );
-
-    blocTest<KdsOrdersBloc, KdsOrdersState>(
-      'KdsOrdersNewOrdersAcknowledged снимает подсветку',
-      build: () =>
-          buildBloc(TestKdsOrdersRepository(orders: [buildOrder(id: 'a')])),
-      act: (bloc) async {
-        bloc.add(const KdsOrdersStarted(branchId: branchId));
-        await Future<void>.delayed(Duration.zero);
-        (bloc.repository as TestKdsOrdersRepository).orders.add(
-          buildOrder(id: 'b'),
-        );
-        bloc.add(const KdsOrdersPollTicked());
-        await Future<void>.delayed(Duration.zero);
-        bloc.add(const KdsOrdersNewOrdersAcknowledged());
-      },
-      expect: () => [
-        const KdsOrdersLoading(),
-        isA<KdsOrdersLoaded>(),
-        isA<KdsOrdersLoaded>().having((s) => s.freshOrderIds, 'fresh', {'b'}),
-        isA<KdsOrdersLoaded>().having(
-          (s) => s.freshOrderIds,
-          'подсветка снята',
-          isEmpty,
-        ),
-      ],
-    );
-
-    blocTest<KdsOrdersBloc, KdsOrdersState>(
-      'ошибка опроса при показанной доске не скрывает заказы',
-      build: () =>
-          buildBloc(TestKdsOrdersRepository(orders: [buildOrder(id: 'a')])),
-      act: (bloc) async {
-        bloc.add(const KdsOrdersStarted(branchId: branchId));
-        await Future<void>.delayed(Duration.zero);
-        (bloc.repository as TestKdsOrdersRepository).fetchError = StateError(
-          'таймаут',
-        );
-        bloc.add(const KdsOrdersPollTicked());
-      },
-      expect: () => [
-        const KdsOrdersLoading(),
-        isA<KdsOrdersLoaded>(),
-        // Ошибка опроса не порождает новых состояний — доска остаётся.
-      ],
-    );
+  setUp(() {
+    repository = TestKdsOrdersRepository();
+    eventsClient = TestKitchenEventsClient();
   });
 
-  group('KdsOrdersBloc — смена статуса', () {
-    blocTest<KdsOrdersBloc, KdsOrdersState>(
-      '«В работу»: ActionInProgress → Loaded, заказ переходит в COOKING',
-      build: () => buildBloc(
-        TestKdsOrdersRepository(
-          orders: [buildOrder(id: 'a', status: KdsOrderStatus.confirmed)],
-        ),
-      ),
-      act: (bloc) async {
-        bloc.add(const KdsOrdersStarted(branchId: branchId));
-        await Future<void>.delayed(Duration.zero);
-        bloc.add(
-          const KdsOrderStatusChangeRequested(
-            orderId: 'a',
+  group('initial snapshot', () {
+    test(
+      'loads the board FIFO by status-entry time and hides non-kitchen '
+      'statuses',
+      () async {
+        repository.orders = [
+          buildOrder(
+            id: 'newer',
+            orderNumber: '102',
+            confirmedAt: kNow.subtract(const Duration(minutes: 1)),
+          ),
+          buildOrder(
+            id: 'older',
+            orderNumber: '101',
+            confirmedAt: kNow.subtract(const Duration(minutes: 6)),
+          ),
+          buildOrder(
+            id: 'cooking',
+            orderNumber: '103',
             status: KdsOrderStatus.cooking,
+            confirmedAt: kNow.subtract(const Duration(minutes: 30)),
+            cookingStartedAt: kNow.subtract(const Duration(minutes: 12)),
           ),
-        );
-      },
-      expect: () => [
-        const KdsOrdersLoading(),
-        isA<KdsOrdersLoaded>(),
-        isA<KdsOrdersActionInProgress>().having(
-          (s) => s.pendingOrderId,
-          'pendingOrderId',
-          'a',
-        ),
-        isA<KdsOrdersLoaded>().having(
-          (s) => s.orders.single.status,
-          'статус после перехода',
-          KdsOrderStatus.cooking,
-        ),
-      ],
-      verify: (bloc) {
-        final repo = bloc.repository as TestKdsOrdersRepository;
-        expect(repo.statusCalls, [('a', KdsOrderStatus.cooking)]);
-      },
-    );
-
-    blocTest<KdsOrdersBloc, KdsOrdersState>(
-      '«Готово»: COOKING → READY',
-      build: () => buildBloc(
-        TestKdsOrdersRepository(
-          orders: [buildOrder(id: 'a', status: KdsOrderStatus.cooking)],
-        ),
-      ),
-      act: (bloc) async {
-        bloc.add(const KdsOrdersStarted(branchId: branchId));
-        await Future<void>.delayed(Duration.zero);
-        bloc.add(
-          const KdsOrderStatusChangeRequested(
-            orderId: 'a',
-            status: KdsOrderStatus.ready,
-          ),
-        );
-      },
-      verify: (bloc) {
-        final repo = bloc.repository as TestKdsOrdersRepository;
-        expect(repo.statusCalls, [('a', KdsOrderStatus.ready)]);
-      },
-    );
-
-    blocTest<KdsOrdersBloc, KdsOrdersState>(
-      '«Выдано»: READY → COMPLETED, заказ уходит с доски',
-      build: () => buildBloc(
-        TestKdsOrdersRepository(
-          orders: [buildOrder(id: 'a', status: KdsOrderStatus.ready)],
-        ),
-      ),
-      act: (bloc) async {
-        bloc.add(const KdsOrdersStarted(branchId: branchId));
-        await Future<void>.delayed(Duration.zero);
-        bloc.add(
-          const KdsOrderStatusChangeRequested(
-            orderId: 'a',
+          buildOrder(
+            id: 'done',
+            orderNumber: '104',
             status: KdsOrderStatus.completed,
           ),
-        );
-      },
-      expect: () => [
-        const KdsOrdersLoading(),
-        isA<KdsOrdersLoaded>(),
-        isA<KdsOrdersActionInProgress>(),
-        isA<KdsOrdersLoaded>().having(
-          (s) => s.orders,
-          'доска пуста после выдачи',
+          buildOrder(
+            id: 'new-order',
+            orderNumber: '105',
+            status: KdsOrderStatus.newOrder,
+          ),
+        ];
+        final bloc = buildBloc()..add(const KdsOrdersStarted());
+        addTearDown(bloc.close);
+        await settle();
+
+        final state = bloc.state;
+        expect(state, isA<KdsOrdersLoaded>());
+        // CONFIRMED (older→newer) then COOKING by statusSince; NEW and
+        // COMPLETED never reach the board.
+        expect(state.orders!.map((o) => o.id), ['cooking', 'older', 'newer']);
+        expect(
+          state.freshOrderIds,
           isEmpty,
-        ),
-      ],
+          reason: 'no alerts on initial load',
+        );
+        expect(eventsClient.connectCount, 1);
+      },
     );
 
-    blocTest<KdsOrdersBloc, KdsOrdersState>(
-      'ошибка API: доска сохраняется, actionError передан в Loaded',
-      build: () => buildBloc(
-        TestKdsOrdersRepository(
-          orders: [buildOrder(id: 'a', status: KdsOrderStatus.confirmed)],
-        )..updateError = StateError('409 конфликт'),
-      ),
-      act: (bloc) async {
-        bloc.add(const KdsOrdersStarted(branchId: branchId));
-        await Future<void>.delayed(Duration.zero);
+    test('derives the server clock offset from serverTime', () async {
+      repository
+        ..orders = [buildOrder()]
+        ..serverTime = kNow.add(const Duration(seconds: 45));
+      final bloc = buildBloc()..add(const KdsOrdersStarted());
+      addTearDown(bloc.close);
+      await settle();
+
+      expect(bloc.state.serverClockOffset, const Duration(seconds: 45));
+    });
+
+    test('initial load error surfaces the Error state', () async {
+      repository.fetchError = Exception('offline');
+      final bloc = buildBloc()..add(const KdsOrdersStarted());
+      addTearDown(bloc.close);
+      await settle();
+
+      expect(bloc.state, isA<KdsOrdersError>());
+    });
+  });
+
+  group('SSE stream', () {
+    test('connected signal flips the board to live', () async {
+      repository.orders = [buildOrder()];
+      final bloc = buildBloc()..add(const KdsOrdersStarted());
+      addTearDown(bloc.close);
+      await settle();
+      expect(bloc.state.connection, KdsConnectionStatus.connecting);
+
+      eventsClient.emitSignal(const KitchenStreamConnected());
+      await settle();
+      expect(bloc.state.connection, KdsConnectionStatus.live);
+    });
+
+    test('upsert of a new CONFIRMED order marks it fresh', () async {
+      repository.orders = [buildOrder(id: 'a')];
+      final bloc = buildBloc()..add(const KdsOrdersStarted());
+      addTearDown(bloc.close);
+      await settle();
+
+      eventsClient.emitSignal(
+        upsert(buildOrder(id: 'fresh', orderNumber: '777', version: 2)),
+      );
+      await settle();
+
+      expect(bloc.state.orders!.map((o) => o.id), contains('fresh'));
+      expect(bloc.state.freshOrderIds, {'fresh'});
+    });
+
+    test('upsert of a non-CONFIRMED newcomer is silent', () async {
+      repository.orders = [buildOrder(id: 'a')];
+      final bloc = buildBloc()..add(const KdsOrdersStarted());
+      addTearDown(bloc.close);
+      await settle();
+
+      eventsClient.emitSignal(
+        upsert(
+          buildOrder(
+            id: 'b',
+            status: KdsOrderStatus.cooking,
+            version: 3,
+            cookingStartedAt: kNow,
+          ),
+        ),
+      );
+      await settle();
+
+      expect(bloc.state.orders!.map((o) => o.id), contains('b'));
+      expect(bloc.state.freshOrderIds, isEmpty);
+    });
+
+    test('stale versions are dropped (version dedupe)', () async {
+      repository.orders = [buildOrder(id: 'a', version: 5)];
+      final bloc = buildBloc()..add(const KdsOrdersStarted());
+      addTearDown(bloc.close);
+      await settle();
+
+      eventsClient.emitSignal(
+        upsert(
+          buildOrder(id: 'a', version: 4, status: KdsOrderStatus.cooking),
+          version: 4,
+        ),
+      );
+      await settle();
+
+      expect(bloc.state.orders!.single.status, KdsOrderStatus.confirmed);
+      expect(bloc.state.orders!.single.version, 5);
+    });
+
+    test('upsert with a newer version replaces the local order', () async {
+      repository.orders = [buildOrder(id: 'a', version: 5)];
+      final bloc = buildBloc()..add(const KdsOrdersStarted());
+      addTearDown(bloc.close);
+      await settle();
+
+      eventsClient.emitSignal(
+        upsert(
+          buildOrder(
+            id: 'a',
+            version: 6,
+            status: KdsOrderStatus.cooking,
+            cookingStartedAt: kNow,
+          ),
+          version: 6,
+        ),
+      );
+      await settle();
+
+      expect(bloc.state.orders!.single.status, KdsOrderStatus.cooking);
+      expect(bloc.state.orders!.single.version, 6);
+      expect(bloc.state.freshOrderIds, isEmpty);
+    });
+
+    test('removed event takes the order off the board', () async {
+      repository.orders = [buildOrder(id: 'a'), buildOrder(id: 'b')];
+      final bloc = buildBloc()..add(const KdsOrdersStarted());
+      addTearDown(bloc.close);
+      await settle();
+
+      eventsClient.emitSignal(
+        const KitchenOrderRemoved(
+          orderId: 'a',
+          orderVersion: 7,
+          eventId: 'evt-a-7',
+        ),
+      );
+      await settle();
+
+      expect(bloc.state.orders!.map((o) => o.id), ['b']);
+    });
+  });
+
+  group('recovery contract (ADR-1618)', () {
+    test(
+      'a dropped stream reconnects and refreshes the snapshot silently',
+      () async {
+        repository.orders = [buildOrder(id: 'a')];
+        final bloc = buildBloc()..add(const KdsOrdersStarted());
+        addTearDown(bloc.close);
+        await settle();
+        eventsClient.emitSignal(const KitchenStreamConnected());
+        await settle();
+        expect(repository.fetchCount, 1);
+
+        eventsClient.dropStream();
+        await settle();
+        expect(bloc.state.connection, KdsConnectionStatus.connecting);
+
+        // Backoff fires → a fresh connection is dialled.
+        await Future<void>.delayed(const Duration(milliseconds: 90));
+        expect(eventsClient.connectCount, 2);
+
+        // A brand-new CONFIRMED order is present in the re-sync snapshot.
+        repository.orders = [
+          ...repository.orders,
+          buildOrder(id: 'during-drop', orderNumber: '999'),
+        ];
+        eventsClient.emitSignal(const KitchenStreamConnected());
+        await settle();
+
+        expect(bloc.state.connection, KdsConnectionStatus.live);
+        expect(repository.fetchCount, 2, reason: 'snapshot after reconnect');
+        expect(bloc.state.orders!.map((o) => o.id), contains('during-drop'));
+        expect(
+          bloc.state.freshOrderIds,
+          isEmpty,
+          reason: 'no new-order alerts on a reconnect snapshot',
+        );
+      },
+    );
+
+    test(
+      'three failed reconnects fall back to polling; recovery stops it',
+      () async {
+        repository.orders = [buildOrder(id: 'a')];
+        final bloc = buildBloc(
+          pollInterval: const Duration(milliseconds: 30),
+          maxConsecutiveFailures: 3,
+        )..add(const KdsOrdersStarted());
+        addTearDown(bloc.close);
+        await settle();
+        eventsClient.emitSignal(const KitchenStreamConnected());
+        await settle();
+        final fetchesAfterStart = repository.fetchCount;
+
+        // Three consecutive drops, each followed by a failed dial (the
+        // stream closes before any Connected signal).
+        for (var i = 0; i < 3; i++) {
+          eventsClient.dropStream();
+          await settle();
+          await Future<void>.delayed(const Duration(milliseconds: 150));
+        }
+
+        expect(eventsClient.connectCount, greaterThanOrEqualTo(4));
+        expect(bloc.state.connection, KdsConnectionStatus.polling);
+
+        // Fallback polling refreshes the snapshot on its own.
+        await Future<void>.delayed(const Duration(milliseconds: 90));
+        expect(repository.fetchCount, greaterThan(fetchesAfterStart));
+
+        // SSE recovers: snapshot is refreshed once and polling stops.
+        final fetchesBeforeRecovery = repository.fetchCount;
+        eventsClient.emitSignal(const KitchenStreamConnected());
+        await settle();
+        expect(bloc.state.connection, KdsConnectionStatus.live);
+        expect(repository.fetchCount, fetchesBeforeRecovery + 1);
+        final fetchesAtRecovery = repository.fetchCount;
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        expect(
+          repository.fetchCount,
+          fetchesAtRecovery,
+          reason: 'polling must stop once SSE is live again',
+        );
+      },
+    );
+
+    test('polling marks newly CONFIRMED orders as fresh', () async {
+      repository.orders = [buildOrder(id: 'a')];
+      final bloc = buildBloc(
+        pollInterval: const Duration(milliseconds: 30),
+        maxConsecutiveFailures: 1,
+      )..add(const KdsOrdersStarted());
+      addTearDown(bloc.close);
+      await settle();
+      eventsClient.emitSignal(const KitchenStreamConnected());
+      await settle();
+
+      // One failure is enough here → polling starts.
+      eventsClient.dropStream();
+      await settle();
+      expect(bloc.state.connection, KdsConnectionStatus.polling);
+
+      repository.orders = [
+        ...repository.orders,
+        buildOrder(id: 'polled', orderNumber: '555'),
+      ];
+      await Future<void>.delayed(const Duration(milliseconds: 90));
+
+      expect(bloc.state.orders!.map((o) => o.id), contains('polled'));
+      expect(bloc.state.freshOrderIds, contains('polled'));
+    });
+  });
+
+  group('status transitions (kitchen-owned)', () {
+    test(
+      '«Начать готовить» moves the card optimistically and passes '
+      'expectedVersion from the local order',
+      () async {
+        repository.orders = [
+          buildOrder(
+            id: 'a',
+            version: 4,
+            confirmedAt: kNow.subtract(const Duration(minutes: 3)),
+          ),
+        ];
+        final bloc = buildBloc()..add(const KdsOrdersStarted());
+        addTearDown(bloc.close);
+        await settle();
+
+        final pending = Completer<KdsOrder>();
+        repository.updateCompleter = pending;
+        bloc.add(
+          const KdsOrderStatusChangeRequested(
+            orderId: 'a',
+            status: KdsOrderStatus.cooking,
+            cookId: 'cook-1',
+            shiftId: 'shift-1',
+          ),
+        );
+        await settle();
+
+        // Optimistic: the card already sits in COOKING and is blocked.
+        expect(bloc.state.orders!.single.status, KdsOrderStatus.cooking);
+        expect(bloc.state.mutatingOrderIds, {'a'});
+        expect(repository.statusCalls, [('a', KdsOrderStatus.cooking, 4)]);
+        expect(repository.attributionCalls, [('a', 'cook-1', 'shift-1')]);
+
+        pending.complete(
+          repository.applyServerUpdate('a', KdsOrderStatus.cooking),
+        );
+        await settle();
+        // Server response is authoritative: version bumped, unblocked.
+        expect(bloc.state.orders!.single.version, 5);
+        expect(bloc.state.orders!.single.status, KdsOrderStatus.cooking);
+        expect(bloc.state.mutatingOrderIds, isEmpty);
+      },
+    );
+
+    test('«Готово» moves COOKING → READY', () async {
+      repository.orders = [
+        buildOrder(
+          id: 'a',
+          version: 2,
+          status: KdsOrderStatus.cooking,
+          cookingStartedAt: kNow.subtract(const Duration(minutes: 7)),
+        ),
+      ];
+      final bloc = buildBloc()..add(const KdsOrdersStarted());
+      addTearDown(bloc.close);
+      await settle();
+
+      bloc.add(
+        const KdsOrderStatusChangeRequested(
+          orderId: 'a',
+          status: KdsOrderStatus.ready,
+        ),
+      );
+      await settle();
+
+      expect(repository.statusCalls, [('a', KdsOrderStatus.ready, 2)]);
+      expect(bloc.state.orders!.single.status, KdsOrderStatus.ready);
+    });
+
+    test(
+      'a version conflict rolls back, reports the error code and forces a '
+      'snapshot refresh',
+      () async {
+        repository.orders = [buildOrder(id: 'a', version: 3)];
+        repository.updateError = const KitchenOrderUpdateException(
+          'ORDER_VERSION_CONFLICT',
+          'Заказ уже изменён другой станцией (ORDER_VERSION_CONFLICT)',
+        );
+        final bloc = buildBloc()..add(const KdsOrdersStarted());
+        addTearDown(bloc.close);
+        await settle();
+        final fetchesBefore = repository.fetchCount;
+
         bloc.add(
           const KdsOrderStatusChangeRequested(
             orderId: 'a',
             status: KdsOrderStatus.cooking,
           ),
         );
+        await settle();
+
+        final state = bloc.state as KdsOrdersLoaded;
+        expect(state.orders.single.status, KdsOrderStatus.confirmed);
+        expect(state.mutatingOrderIds, isEmpty);
+        expect(state.actionError, contains('ORDER_VERSION_CONFLICT'));
+        expect(
+          repository.fetchCount,
+          greaterThan(fetchesBefore),
+          reason: 'conflict forces a snapshot refresh',
+        );
       },
-      expect: () => [
-        const KdsOrdersLoading(),
-        isA<KdsOrdersLoaded>(),
-        isA<KdsOrdersActionInProgress>(),
-        isA<KdsOrdersLoaded>()
-            .having(
-              (s) => s.orders.single.status,
-              'статус не изменился',
-              KdsOrderStatus.confirmed,
-            )
-            .having(
-              (s) => s.actionError,
-              'actionError',
-              allOf(isNotNull, contains('409 конфликт')),
-            ),
-      ],
     );
+
+    test('a second tap on a mutating order is ignored', () async {
+      repository.orders = [buildOrder(id: 'a')];
+      final bloc = buildBloc()..add(const KdsOrdersStarted());
+      addTearDown(bloc.close);
+      await settle();
+
+      final pending = Completer<KdsOrder>();
+      repository.updateCompleter = pending;
+      bloc.add(
+        const KdsOrderStatusChangeRequested(
+          orderId: 'a',
+          status: KdsOrderStatus.cooking,
+        ),
+      );
+      await settle();
+      expect(bloc.state.mutatingOrderIds, {'a'});
+
+      bloc.add(
+        const KdsOrderStatusChangeRequested(
+          orderId: 'a',
+          status: KdsOrderStatus.cooking,
+        ),
+      );
+      await settle();
+      expect(repository.statusCalls, hasLength(1));
+
+      pending.complete(repository.applyServerUpdate('a', KdsOrderStatus.cooking));
+      await settle();
+      expect(bloc.state.mutatingOrderIds, isEmpty);
+    });
+  });
+
+  group('fresh-order acknowledgement', () {
+    test('acknowledgement clears the highlight set', () async {
+      repository.orders = [buildOrder(id: 'a')];
+      final bloc = buildBloc()..add(const KdsOrdersStarted());
+      addTearDown(bloc.close);
+      await settle();
+
+      eventsClient.emitSignal(
+        upsert(buildOrder(id: 'fresh', orderNumber: '778', version: 1)),
+      );
+      await settle();
+      expect(bloc.state.freshOrderIds, {'fresh'});
+
+      bloc.add(const KdsOrdersNewOrdersAcknowledged());
+      await settle();
+      expect(bloc.state.freshOrderIds, isEmpty);
+    });
   });
 }

@@ -2,10 +2,12 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { OrderStatus, Prisma, ProductStatus } from '@prisma/client';
 import { concat, Observable, of } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
+import { KitchenEventsService } from '../kitchen/kitchen-events.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
 import { lineTotal, orderSubtotal, orderTotal } from './domain/order-pricing';
@@ -33,6 +35,9 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly couriersEvents: CouriersEventsService,
     private readonly loyalty: LoyaltyService,
+    // Optional so unit specs can construct the service without the kitchen
+    // bounded context; always present in the wired app.
+    @Optional() private readonly kitchenEvents?: KitchenEventsService,
   ) {}
 
   /**
@@ -293,6 +298,10 @@ export class OrdersService {
       timestamp: new Date().toISOString(),
     });
     this.couriersEvents.emitOrderTrackingEvent(this.toTrackingEvent(updated));
+    // Kitchen POS (ADR-1618): the branch board follows every operator-driven
+    // change — an order entering CONFIRMED appears, one leaving READY (POS
+    // handout, cancel) is removed.
+    await this.kitchenEvents?.publishOrderChanged(updated.id);
 
     // Loyalty (ADR-1614): cashback accrues exactly once on the transition to
     // COMPLETED; a cancellation refunds the points spent at checkout. Both

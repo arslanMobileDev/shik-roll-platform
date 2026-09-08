@@ -73,6 +73,12 @@ export class OrdersRepository {
     courierId?: string | undefined,
   ): Promise<OrderRecord> {
     const terminalPatch: Prisma.OrderUncheckedUpdateInput = {};
+    // Kitchen POS (ADR-1618): the server stamps the moment an order enters a
+    // kitchen-owned status — the KDS board timers run off these, never off
+    // client clocks.
+    if (to === OrderStatus.CONFIRMED) terminalPatch.confirmedAt = new Date();
+    if (to === OrderStatus.COOKING) terminalPatch.cookingStartedAt = new Date();
+    if (to === OrderStatus.READY) terminalPatch.readyAt = new Date();
     if (to === OrderStatus.COMPLETED) terminalPatch.completedAt = new Date();
     if (to === OrderStatus.CANCELLED) {
       terminalPatch.cancelledAt = new Date();

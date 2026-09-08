@@ -1,8 +1,10 @@
 import { InjectQueue, OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { OrderStatus, Prisma } from '@prisma/client';
 import { Job, Queue } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
+import { kdsStatusEmulationEnabled } from '../kitchen/kitchen.config';
+import { KitchenEventsService } from '../kitchen/kitchen-events.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { lineTotal, orderSubtotal, orderTotal } from '../orders/domain/order-pricing';
 import { canTransition } from '../orders/domain/order-status-machine';
@@ -20,8 +22,10 @@ export interface StatusTimerJobData {
 }
 
 /**
- * Timer emulation for the order lifecycle (dev harness): after background
- * processing confirms an order, COOKING and READY follow on delays.
+ * Timer emulation for the order lifecycle (dev harness only, ADR-1618): after
+ * background processing confirms an order, COOKING and READY follow on
+ * delays — but ONLY when KDS_STATUS_EMULATION_ENABLED=true outside
+ * production. In production the kitchen terminal owns those transitions.
  * Overridable via env for tests/dev.
  */
 const STATUS_TIMER_DELAYS_MS: ReadonlyArray<{ to: OrderStatus; delayMs: number }> = [
@@ -45,6 +49,9 @@ export class OrderProcessingProcessor extends WorkerHost {
     private readonly loyalty: LoyaltyService,
     @InjectQueue(ORDER_PROCESSING_QUEUE)
     private readonly queue: Queue<ProcessOrderJobData | StatusTimerJobData>,
+    // Optional so unit specs can construct the processor without the kitchen
+    // bounded context; always present in the wired app.
+    @Optional() private readonly kitchenEvents?: KitchenEventsService,
   ) {
     super();
   }
@@ -136,28 +143,40 @@ export class OrderProcessingProcessor extends WorkerHost {
       }),
     ]);
 
-    // 3. Confirm the order and schedule the emulated lifecycle timers.
+    // 3. Confirm the order. Production flow ENDS at CONFIRMED (ADR-1618):
+    // the kitchen terminal owns COOKING/READY; the emulated lifecycle timers
+    // are scheduled only by the dev-harness flag.
     if (order.status === OrderStatus.NEW) {
       await this.transitionWithHistory(orderId, OrderStatus.NEW, OrderStatus.CONFIRMED, {
         reason: 'AUTO_CONFIRM',
       });
-      for (const step of STATUS_TIMER_DELAYS_MS) {
-        await this.queue.add(
-          STATUS_TIMER_JOB,
-          { orderId, to: step.to },
-          { delay: step.delayMs, jobId: `status-timer:${orderId}:${step.to}` },
-        );
+      if (kdsStatusEmulationEnabled()) {
+        for (const step of STATUS_TIMER_DELAYS_MS) {
+          await this.queue.add(
+            STATUS_TIMER_JOB,
+            { orderId, to: step.to },
+            { delay: step.delayMs, jobId: `status-timer:${orderId}:${step.to}` },
+          );
+        }
       }
     }
   }
 
   /**
-   * Kitchen dispatch for a paid order (payments contract): CONFIRMED ->
-   * COOKING, guarded by the state machine so a duplicate or late job
-   * (order already cooking, cancelled, ...) is a logged no-op.
+   * Kitchen dispatch for a paid order — DEV EMULATION ONLY (ADR-1618). In
+   * production the payment flow ends at CONFIRMED and the kitchen terminal
+   * starts cooking; with the emulation flag off this job is a logged no-op.
+   * When enabled, CONFIRMED -> COOKING is guarded by the state machine so a
+   * duplicate or late job is a no-op as well.
    */
   private async sendToKitchen(job: Job<ProcessOrderJobData>): Promise<void> {
     const { orderId } = job.data;
+    if (!kdsStatusEmulationEnabled()) {
+      this.logger.log(
+        `send-to-kitchen: emulation disabled, skipping auto COOKING for order ${orderId} (ADR-1618)`,
+      );
+      return;
+    }
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, deletedAt: null },
       select: { status: true },
@@ -179,6 +198,12 @@ export class OrderProcessingProcessor extends WorkerHost {
 
   private async advanceStatus(job: Job<StatusTimerJobData>): Promise<void> {
     const { orderId, to } = job.data;
+    if (!kdsStatusEmulationEnabled()) {
+      this.logger.log(
+        `status-timer: emulation disabled, skipping auto ${to} for order ${orderId} (ADR-1618)`,
+      );
+      return;
+    }
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, deletedAt: null },
       select: { status: true },
@@ -205,6 +230,10 @@ export class OrderProcessingProcessor extends WorkerHost {
     options: { reason?: string },
   ): Promise<void> {
     const terminalPatch: Prisma.OrderUncheckedUpdateInput = {};
+    // Kitchen POS (ADR-1618): server-side timestamps for the board timers.
+    if (to === OrderStatus.CONFIRMED) terminalPatch.confirmedAt = new Date();
+    if (to === OrderStatus.COOKING) terminalPatch.cookingStartedAt = new Date();
+    if (to === OrderStatus.READY) terminalPatch.readyAt = new Date();
     if (to === OrderStatus.COMPLETED) terminalPatch.completedAt = new Date();
     if (to === OrderStatus.CANCELLED) {
       terminalPatch.cancelledAt = new Date();
@@ -225,6 +254,11 @@ export class OrderProcessingProcessor extends WorkerHost {
       }),
     ]);
     this.logger.log(`Order ${orderId}: ${from} -> ${to} (${options.reason ?? 'n/a'})`);
+
+    // Kitchen POS (ADR-1618): the branch board follows worker-driven
+    // transitions too — CONFIRMED appears, CANCELLED (e.g. stop-listed) is
+    // removed. Published after the commit; clients dedupe by orderVersion.
+    await this.kitchenEvents?.publishOrderChanged(orderId);
 
     // Loyalty (ADR-1614): a worker-driven terminal transition follows the same
     // rules as the operator path — COMPLETED accrues cashback, CANCELLED

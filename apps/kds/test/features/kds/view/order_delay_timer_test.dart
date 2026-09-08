@@ -46,11 +46,19 @@ void main() {
       return (container.decoration! as BoxDecoration).color!;
     }
 
-    Future<void> pumpTimer(WidgetTester tester, Duration age) async {
+    Future<void> pumpTimer(
+      WidgetTester tester,
+      Duration age, {
+      Duration clockOffset = Duration.zero,
+    }) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: OrderDelayTimer(createdAt: kNow.subtract(age), now: kNow),
+            body: OrderDelayTimer(
+              since: kNow.subtract(age),
+              clockOffset: clockOffset,
+              now: kNow,
+            ),
           ),
         ),
       );
@@ -77,6 +85,20 @@ void main() {
     testWidgets('formats hours for very old orders', (tester) async {
       await pumpTimer(tester, const Duration(hours: 1, minutes: 12));
       expect(find.text('1 ч 12 мин'), findsOneWidget);
+    });
+
+    testWidgets('server clock offset corrects terminal clock drift', (
+      tester,
+    ) async {
+      // The terminal clock runs 12 minutes behind the server: a 5-minute-old
+      // order must render its true server-side age (17 min → yellow).
+      await pumpTimer(
+        tester,
+        const Duration(minutes: 5),
+        clockOffset: const Duration(minutes: 12),
+      );
+      expect(find.text('17 мин'), findsOneWidget);
+      expect(renderedBackground(tester), AppColors.timerWarningContainer);
     });
   });
 }

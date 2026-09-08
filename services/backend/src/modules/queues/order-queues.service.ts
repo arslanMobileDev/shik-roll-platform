@@ -40,8 +40,10 @@ export class OrderQueuesService {
   }
 
   /**
-   * Dispatch a paid order to the kitchen (payments bounded context contract:
-   * a successful online payment moves CONFIRMED -> COOKING). jobId is the
+   * Dispatch a paid order to the kitchen. Since ADR-1618 the payment flow
+   * ends at CONFIRMED and the kitchen terminal owns CONFIRMED -> COOKING —
+   * this job only drives the dev-harness status emulation
+   * (KDS_STATUS_EMULATION_ENABLED) and is a no-op otherwise. jobId is the
    * order id, so repeated payment webhooks never duplicate the dispatch
    * (idempotency, BE-907).
    */

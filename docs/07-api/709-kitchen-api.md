@@ -15,7 +15,7 @@ Owner: Arslan Berslanov
 
 Solution Architect: OpenAI ChatGPT
 
-Last Updated: July 2026
+Last Updated: September 2026
 
 Classification: Internal
 ---
@@ -24,7 +24,9 @@ Classification: Internal
 
 ## Purpose
 
-Определяет REST API Kitchen Display System и управления производством.
+Определяет REST/SSE контракт Kitchen POS (ADR-1618): аутентификация кухонного терминала, snapshot активной доски филиала, realtime-поток событий и kitchen-owned переходы статусов `CONFIRMED -> COOKING -> READY`.
+
+`NEW` кухне не показывается. `READY -> COMPLETED` не является действием кухни: доставку завершает courier, выдачу dine-in/takeaway — POS или операторский контур.
 
 ---
 
@@ -36,302 +38,248 @@ Classification: Internal
 
 ---
 
+# Authentication And JWT Scope
+
+Терминал аутентифицируется shared device identity с ролью `KITCHEN`. Все защищённые endpoints определяют `terminalId` и `branchId` строго из JWT — клиентские `branchId`/`terminalId`/`cookId` не являются источником авторизации.
+
+```ts
+type KitchenTokenPayload = {
+  sub: string;       // kitchenTerminalId
+  branchId: string;
+  role: 'KITCHEN';
+  type: 'access';
+  iat: number;
+  exp: number;
+};
+```
+
+`KitchenJwtAuthGuard` проверяет подпись, срок, `role: KITCHEN`, `type: access` и активность терминала в БД на каждый запрос: деактивированный терминал теряет доступ немедленно, даже с валидным JWT.
+
+Токены других bounded contexts (`CUSTOMER`, `COURIER`) отклоняются. PIN и JWT запрещено логировать.
+
+## POST /kitchen/auth/pin
+
+Purpose
+
+Аутентификация терминала по коду и 4-значному PIN (bcrypt). Публичный endpoint.
+
+Request
+
+```ts
+type KitchenPinAuthDto = {
+  terminalCode: string;
+  pin: string;       // exactly 4 digits
+};
+```
+
+Response 200
+
+```ts
+type KitchenAuthResponseDto = {
+  token: string;
+  tokenType: 'Bearer';
+  expiresInSeconds: number;   // KITCHEN_TOKEN_TTL_SECONDS, default 12 h
+  terminal: { id: string; code: string; name: string; branchId: string };
+};
+```
+
+Errors
+
+- `401 UNAUTHORIZED` — неверный код или PIN (uniform message, не раскрывает существование кода); терминал деактивирован
+- `401 TERMINAL_BRANCH_UNAVAILABLE` — филиал терминала недоступен
+- `400 VALIDATION_ERROR` — формат полей
+
+---
+
 # Kitchen Orders
 
-## GET /kitchen/orders
+## GET /kitchen/orders/active
 
 Purpose
 
-Получить очередь кухни.
+Snapshot активной доски филиала из JWT: заказы в статусах `CONFIRMED`, `COOKING`, `READY`, FIFO по timestamp входа в текущий статус. `serverTime` используется клиентом для clock offset и устойчивых таймеров.
 
 Authentication
 
-JWT
+Bearer JWT (`KITCHEN`)
 
-Permission
+Response 200
 
-kitchen.view
+```ts
+type KitchenOrderStatus = 'CONFIRMED' | 'COOKING' | 'READY';
 
-Supports
+type KitchenOrderItemDto = {
+  id: string;
+  name: string;
+  quantity: number;
+  comment: string | null;
+  modifiers: Array<{ id: string; name: string; quantity: number }>;
+};
 
-- Branch
-- Station
-- Status
-- Priority
+type KitchenOrderDto = {
+  id: string;
+  orderNumber: string;
+  version: number;
+  status: KitchenOrderStatus;
+  type: 'DINE_IN' | 'TAKEAWAY' | 'DELIVERY';
+  tableNumber: string | null;
+  comment: string | null;
+  confirmedAt: string;
+  cookingStartedAt: string | null;
+  readyAt: string | null;
+  items: KitchenOrderItemDto[];
+};
+
+type KitchenBoardSnapshotDto = {
+  serverTime: string;
+  orders: KitchenOrderDto[];
+};
+```
+
+DTO намеренно не содержит телефон/адрес клиента и платёжные данные.
+
+Errors
+
+- `401 UNAUTHORIZED` / `401 TOKEN_INVALID` / `401 TERMINAL_INACTIVE`
 
 ---
 
-## GET /kitchen/orders/{id}
+## PATCH /kitchen/orders/{orderId}/status
 
 Purpose
 
-Получить кухонный заказ.
+Kitchen-driven переход статуса: `CONFIRMED -> COOKING` (атомарно пишет `cookingStartedAt = serverNow`) или `COOKING -> READY` (атомарно пишет `readyAt = serverNow`). Status transition, timestamps и `OrderStatusHistory` фиксируются одной PostgreSQL transaction.
 
 Authentication
 
-JWT
-
----
-
-## POST /kitchen/orders/{id}/accept
-
-Purpose
-
-Принять заказ в работу.
-
-Permission
-
-kitchen.accept
-
----
-
-## POST /kitchen/orders/{id}/start
-
-Purpose
-
-Начать приготовление.
-
-Permission
-
-kitchen.start
-
----
-
-## POST /kitchen/orders/{id}/ready
-
-Purpose
-
-Отметить как готовый.
-
-Permission
-
-kitchen.ready
-
----
-
-## POST /kitchen/orders/{id}/complete
-
-Purpose
-
-Завершить приготовление.
-
-Permission
-
-kitchen.complete
-
----
-
-## POST /kitchen/orders/{id}/cancel
-
-Purpose
-
-Отменить приготовление.
-
-Permission
-
-kitchen.cancel
+Bearer JWT (`KITCHEN`)
 
 Request
 
-- reason
+```ts
+type UpdateKitchenOrderStatusDto = {
+  status: 'COOKING' | 'READY';
+  expectedVersion: number;   // optimistic concurrency
+  cookId?: string;           // audit metadata, не авторизация
+  shiftId?: string;          // audit metadata, не авторизация
+};
+```
+
+Response 200
+
+`KitchenOrderDto` с инкрементированным `version`.
+
+Errors
+
+- `401 UNAUTHORIZED` / `401 TOKEN_INVALID` / `401 TERMINAL_INACTIVE`
+- `404 ORDER_NOT_FOUND` — заказ не существует
+- `403 ORDER_BRANCH_FORBIDDEN` — заказ другого филиала
+- `409 ORDER_VERSION_CONFLICT` — `expectedVersion` устарела (refresh + retry)
+- `409 INVALID_ORDER_STATUS_TRANSITION` — текущий статус не является источником перехода
+- `400 VALIDATION_ERROR` — формат полей
 
 ---
 
-# Kitchen Stations
+# Realtime
 
-## GET /kitchen/stations
+## GET /kitchen/stream
 
 Purpose
 
-Получить станции кухни.
+Branch-scoped SSE поток (ADR-1618 realtime contract). Fan-out через Redis Pub/Sub channel `kitchen.branch.{branchId}` (in-process bus без Redis). Pub/Sub — realtime fan-out, не durable event bus: источник истины — PostgreSQL snapshot.
+
+Authentication
+
+Bearer JWT (`KITCHEN`)
+
+Events
+
+```ts
+type KitchenOrderEventV1 = {
+  eventId: string;
+  eventType: 'kitchen.order.upserted' | 'kitchen.order.removed';
+  eventVersion: 1;
+  occurredAt: string;
+  orderId: string;
+  orderVersion: number;
+  order: KitchenOrderDto | null;   // null для removed
+};
+```
+
+- SSE `event:` = `eventType`; `COMPLETED`/`CANCELLED`/`ON_WAY` отправляются как `removed`
+- heartbeat `event: heartbeat` каждые 15 s (`KITCHEN_SSE_HEARTBEAT_MS`, контракт: не реже 20 s) с `{ serverTime }`
+- клиент применяет только события с `orderVersion` выше локальной; первое состояние — через `GET /kitchen/orders/active`
+
+Client recovery
+
+- reconnect: exponential backoff с jitter до 30 s
+- после reconnect — сначала snapshot
+- после трёх неудачных reconnect — foreground polling каждые 15 s
+- после восстановления SSE polling останавливается
+
+Errors
+
+- `401 UNAUTHORIZED` / `401 TOKEN_INVALID` / `401 TERMINAL_INACTIVE`
 
 ---
 
-## POST /kitchen/stations
+# Production Status Ownership
 
-Purpose
-
-Создать станцию.
-
-Permission
-
-kitchen.station.create
-
----
-
-## PATCH /kitchen/stations/{id}
-
-Purpose
-
-Изменить станцию.
-
-Permission
-
-kitchen.station.update
-
----
-
-## DELETE /kitchen/stations/{id}
-
-Purpose
-
-Архивировать станцию.
-
-Permission
-
-kitchen.station.delete
-
----
-
-# Production Queue
-
-## GET /kitchen/queue
-
-Purpose
-
-Получить производственную очередь.
-
----
-
-## PATCH /kitchen/queue/{id}/priority
-
-Purpose
-
-Изменить приоритет.
-
-Permission
-
-kitchen.queue.manage
-
-Request
-
-- priority
-
----
-
-# Timers
-
-## GET /kitchen/timers
-
-Purpose
-
-Получить активные таймеры.
-
----
-
-## POST /kitchen/timers/{id}/start
-
-Purpose
-
-Запустить таймер.
-
----
-
-## POST /kitchen/timers/{id}/stop
-
-Purpose
-
-Остановить таймер.
-
----
-
-# Recipes
-
-## GET /kitchen/recipes/{productId}
-
-Purpose
-
-Получить рецепт.
-
-Permission
-
-recipe.view
-
----
-
-# Kitchen Events
-
-## GET /kitchen/events
-
-Purpose
-
-Получить события кухни.
-
-Permission
-
-kitchen.view
-
----
-
-# Kitchen Status
-
-- Waiting
-- Accepted
-- Preparing
-- Ready
-- Completed
-- Cancelled
-
----
-
-# Priority
-
-- Low
-- Normal
-- High
-- Urgent
+- payment/order processing переводит валидный заказ в `CONFIRMED` и публикует его в kitchen channel
+- только authenticated kitchen mutation начинает приготовление (`COOKING`) и завершает его (`READY`)
+- автоматические timers (`SEND_TO_KITCHEN_JOB`, status timers) работают лишь при явном `KDS_STATUS_EMULATION_ENABLED=true` вне production; включение emulation в production — configuration error, останавливающий startup
 
 ---
 
 # Validation Rules
 
-- Заказ принимается только один раз.
-- Статусы изменяются последовательно.
-- Таймер запускается после начала приготовления.
-- Только назначенная станция изменяет свой заказ.
-- Все действия журналируются.
-
----
-
-# Events
-
-- KitchenOrderAccepted
-- KitchenStartedCooking
-- KitchenOrderReady
-- KitchenOrderCompleted
-- KitchenDelayDetected
+- PIN ровно 4 цифры; `expectedVersion >= 1`
+- переходы строго `CONFIRMED -> COOKING -> READY`, без пропусков и возвратов
+- все действия журналируются в `OrderStatusHistory` (terminalId, cookId/shiftId, previous/new status, server timestamp)
 
 ---
 
 # Error Codes
 
-- KITCHEN_ORDER_NOT_FOUND
-- STATION_NOT_FOUND
-- INVALID_STATUS
-- INVALID_PRIORITY
-- TIMER_ALREADY_RUNNING
-- RECIPE_NOT_FOUND
-- ACCESS_DENIED
+- `UNAUTHORIZED`
+- `TOKEN_INVALID`
+- `TERMINAL_INACTIVE`
+- `TERMINAL_BRANCH_UNAVAILABLE`
+- `ORDER_NOT_FOUND`
+- `ORDER_BRANCH_FORBIDDEN`
+- `ORDER_VERSION_CONFLICT`
+- `INVALID_ORDER_STATUS_TRANSITION`
+- `VALIDATION_ERROR`
 
 ---
 
 # Security
 
-- JWT Required
-- RBAC
-- Branch Isolation
+- Bearer JWT (`KITCHEN`), TTL не дольше одной рабочей смены
+- Активность терминала проверяется в БД на каждый запрос
+- Branch Isolation: `403 ORDER_BRANCH_FORBIDDEN` на чужой филиал
+- customer phone/address и payment details не входят в Kitchen DTO
+- JWT, PIN и customer comments не попадают в logs/metrics
 - Audit Logging
+
+---
+
+# Out Of Scope (Future)
+
+Kitchen stations, production queue priorities, standalone timers и recipes зарезервированы под отдельные ADR (station-specific routing — см. Review Criteria ADR-1618) и не являются частью реализованного контракта.
 
 ---
 
 # Related Documents
 
+ADR-1618 Kitchen POS Architecture
+
 DB-610 Kitchen & Production Schema
 
 API-707 Order API
 
-ARC-504 Event-Driven Architecture
+ADR-1617 Courier Mobile Architecture
 
-PB-305 Product Requirements
+ADR-1615 Realtime Order Timeline
 
 END OF DOCUMENT

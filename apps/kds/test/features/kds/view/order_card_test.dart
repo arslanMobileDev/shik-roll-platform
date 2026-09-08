@@ -104,33 +104,33 @@ void main() {
   });
 
   group('OrderCard actions', () {
-    testWidgets('queued order offers «В работу» → COOKING', (tester) async {
+    testWidgets('confirmed order offers «Начать готовить» → COOKING', (
+      tester,
+    ) async {
       KdsOrderStatus? requested;
       await pumpCard(
         tester,
-        buildOrder(status: KdsOrderStatus.newOrder),
+        buildOrder(status: KdsOrderStatus.confirmed),
         onAction: (status) => requested = status,
       );
 
       final button = find.byKey(const Key('order-action-order-1'));
       expect(
-        find.descendant(of: button, matching: find.text('В работу')),
+        find.descendant(of: button, matching: find.text('Начать готовить')),
         findsOneWidget,
       );
       await tester.tap(button);
       expect(requested, KdsOrderStatus.cooking);
     });
 
-    testWidgets('confirmed order also offers «В работу»', (tester) async {
-      await pumpCard(tester, buildOrder(status: KdsOrderStatus.confirmed));
-      expect(find.text('В работу'), findsOneWidget);
-    });
-
     testWidgets('cooking order offers «Готово» → READY', (tester) async {
       KdsOrderStatus? requested;
       await pumpCard(
         tester,
-        buildOrder(status: KdsOrderStatus.cooking),
+        buildOrder(
+          status: KdsOrderStatus.cooking,
+          cookingStartedAt: kNow.subtract(const Duration(minutes: 3)),
+        ),
         onAction: (status) => requested = status,
       );
 
@@ -139,17 +139,28 @@ void main() {
       expect(requested, KdsOrderStatus.ready);
     });
 
-    testWidgets('ready order offers «Выдано» → COMPLETED', (tester) async {
-      KdsOrderStatus? requested;
-      await pumpCard(
-        tester,
-        buildOrder(status: KdsOrderStatus.ready),
-        onAction: (status) => requested = status,
-      );
+    testWidgets(
+      'ready order has NO kitchen action (handout belongs to POS/courier)',
+      (tester) async {
+        await pumpCard(
+          tester,
+          buildOrder(
+            status: KdsOrderStatus.ready,
+            cookingStartedAt: kNow.subtract(const Duration(minutes: 8)),
+            readyAt: kNow.subtract(const Duration(minutes: 1)),
+          ),
+        );
 
-      await tester.tap(find.byKey(const Key('order-action-order-1')));
-      expect(find.text('Выдано'), findsOneWidget);
-      expect(requested, KdsOrderStatus.completed);
+        expect(find.byKey(const Key('order-action-order-1')), findsNothing);
+        expect(find.text('Выдано'), findsNothing);
+        expect(find.text('Начать готовить'), findsNothing);
+        expect(find.text('Готово'), findsNothing);
+      },
+    );
+
+    testWidgets('NEW status never reaches the card actions', (tester) async {
+      await pumpCard(tester, buildOrder(status: KdsOrderStatus.newOrder));
+      expect(find.byKey(const Key('order-action-order-1')), findsNothing);
     });
 
     testWidgets('pending order disables the button and shows a spinner', (

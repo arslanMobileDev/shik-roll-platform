@@ -18,14 +18,25 @@ enum DelayBand {
   late,
 }
 
-/// UI-804 — color-coded order age chip.
+/// UI-804 / ADR-1618 — color-coded order age chip.
 ///
-/// Green under 10 min, yellow 10–20 min, red over 20 min. Ticks every 30 s
-/// while live; pass a fixed [now] in tests for deterministic rendering.
+/// Green under 10 min, yellow 10–20 min, red over 20 min. The age is measured
+/// from [since] — the server-stamped moment the order entered its current
+/// status — with [clockOffset] (`serverTime − localTime`) correcting terminal
+/// clock drift. Ticks every 30 s while live; pass a fixed [now] in tests for
+/// deterministic rendering.
 class OrderDelayTimer extends StatefulWidget {
-  const OrderDelayTimer({super.key, required this.createdAt, this.now});
+  const OrderDelayTimer({
+    super.key,
+    required this.since,
+    this.clockOffset = Duration.zero,
+    this.now,
+  });
 
-  final DateTime createdAt;
+  final DateTime since;
+
+  /// Server-clock correction from the board snapshot/heartbeat.
+  final Duration clockOffset;
 
   /// Fixed clock for tests; when null the widget ticks by itself.
   final DateTime? now;
@@ -75,7 +86,7 @@ class _OrderDelayTimerState extends State<OrderDelayTimer> {
   @override
   Widget build(BuildContext context) {
     final now = widget.now ?? DateTime.now();
-    final age = now.difference(widget.createdAt);
+    final age = now.add(widget.clockOffset).difference(widget.since);
     final band = OrderDelayTimer.bandFor(age);
 
     final (foreground, background) = switch (band) {
