@@ -11,6 +11,7 @@ import 'features/auth/data/auth_repository.dart';
 import 'features/auth/data/fake_auth_repository.dart';
 import 'features/cart/data/fake_orders_repository.dart';
 import 'features/cart/data/orders_repository.dart';
+import 'features/loyalty/data/loyalty_repository.dart';
 import 'features/menu/data/fake_customer_menu_repository.dart';
 import 'features/menu/data/menu_repository.dart';
 import 'features/orders/data/order_history_repository.dart';
@@ -32,12 +33,8 @@ Future<void> main() async {
   final tokenProvider = AuthTokenProvider();
 
   final CustomerMenuRepository repository = AppConfig.useRemoteMenu
-      ? RemoteCustomerMenuRepository(
-          ApiClient(baseUrl: AppConfig.apiBaseUrl),
-        )
-      : FakeCustomerMenuRepository(
-          latency: const Duration(milliseconds: 200),
-        );
+      ? RemoteCustomerMenuRepository(ApiClient(baseUrl: AppConfig.apiBaseUrl))
+      : FakeCustomerMenuRepository(latency: const Duration(milliseconds: 200));
 
   final CustomerOrdersRepository ordersRepository = AppConfig.useRemoteMenu
       ? RemoteCustomerOrdersRepository(
@@ -64,8 +61,7 @@ Future<void> main() async {
         )
       : FakeAuthRepository();
 
-  final OrderHistoryRepository orderHistoryRepository =
-      AppConfig.useRemoteMenu
+  final OrderHistoryRepository orderHistoryRepository = AppConfig.useRemoteMenu
       ? RemoteOrderHistoryRepository(
           ApiClient(baseUrl: AppConfig.apiBaseUrl),
           tokenProvider,
@@ -80,6 +76,14 @@ Future<void> main() async {
           tokenProvider,
         )
       : FakeOrderTrackingRepository();
+
+  // Программа лояльности (ADR-1614): баланс бонусов и лента акций.
+  final LoyaltyRepository loyaltyRepository = AppConfig.useRemoteMenu
+      ? RemoteLoyaltyRepository(
+          ApiClient(baseUrl: AppConfig.apiBaseUrl),
+          tokenProvider,
+        )
+      : FakeLoyaltyRepository(latency: const Duration(milliseconds: 300));
 
   // Локальные UI-настройки гостя (ADR-1616).
   final userSettingsRepository = SharedPreferencesUserSettingsRepository(
@@ -97,6 +101,7 @@ Future<void> main() async {
       orderHistoryRepository: orderHistoryRepository,
       orderTrackingRepository: orderTrackingRepository,
       userSettingsRepository: userSettingsRepository,
+      loyaltyRepository: loyaltyRepository,
     ),
   );
 }

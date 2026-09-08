@@ -13,4 +13,12 @@ abstract final class AppConfig {
     'BRANCH_ID',
     defaultValue: 'branch-demo',
   );
+
+  /// Brand whose promotion feed is loaded (ADR-1614, `GET /promotions/feed`).
+  /// Passed via `--dart-define=BRAND_ID=…`; the demo value matches the seeded
+  /// SHIK ROLL brand.
+  static const String defaultBrandId = String.fromEnvironment(
+    'BRAND_ID',
+    defaultValue: '37b84f4c-0a70-4263-bfa0-cc04ba0d4b99',
+  );
 }

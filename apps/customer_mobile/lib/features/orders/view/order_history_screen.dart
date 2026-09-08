@@ -9,6 +9,7 @@ import '../../auth/bloc/auth_state.dart';
 import '../../auth/view/auth_flow.dart';
 import '../../cart/bloc/cart_event.dart';
 import '../../cart/bloc/customer_cart_bloc.dart';
+import '../../loyalty/bloc/loyalty_cubit.dart';
 import '../../menu/bloc/menu_bloc.dart';
 import '../../menu/bloc/menu_state.dart';
 import '../../menu/data/menu_models.dart';
@@ -54,9 +55,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
         listenWhen: (previous, next) => previous.status != next.status,
         listener: (context, state) {
           if (state.isAuthenticated) {
-            context.read<OrderHistoryBloc>().add(
-              const OrderHistoryRefreshed(),
-            );
+            context.read<OrderHistoryBloc>().add(const OrderHistoryRefreshed());
           }
         },
         child: BlocBuilder<AuthBloc, AuthState>(
@@ -74,7 +73,10 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                     AppSpacing.s16,
                     AppSpacing.s12,
                   ),
-                  child: Text('Мои заказы', style: theme.textTheme.headlineSmall),
+                  child: Text(
+                    'Мои заказы',
+                    style: theme.textTheme.headlineSmall,
+                  ),
                 ),
                 Expanded(
                   child: _OrdersBody(
@@ -162,9 +164,7 @@ class _OrdersBody extends StatelessWidget {
               const OrderHistoryRefreshed(),
             ),
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s16,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
               itemCount: state.orders.length,
               itemBuilder: (context, index) => _OrderCard(
                 order: state.orders[index],
@@ -262,7 +262,9 @@ class _OrderCard extends StatelessWidget {
   final VoidCallback onGoToCart;
   final OrderTrackingRepository orderTrackingRepository;
 
-  /// Открывает realtime-трекинг заказа (ADR-1615).
+  /// Открывает realtime-трекинг заказа (ADR-1615). LoyaltyCubit пробрасываем
+  /// вручную: pushed-роут не видит провайдеры оболочки, а блок начисленных
+  /// за заказ бонусов (ADR-1614) читает леджер из него.
   void _openTracking(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -270,6 +272,7 @@ class _OrderCard extends StatelessWidget {
           orderId: order.id,
           orderNumber: order.orderNumber,
           trackingRepository: orderTrackingRepository,
+          loyaltyCubit: context.read<LoyaltyCubit>(),
           deliveryAddress: order.deliveryAddress,
           items: [
             for (final item in order.items)
@@ -298,45 +301,45 @@ class _OrderCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.s12),
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Заказ #${order.orderNumber}',
-                    style: theme.textTheme.titleSmall,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Заказ #${order.orderNumber}',
+                      style: theme.textTheme.titleSmall,
+                    ),
                   ),
-                ),
-                OrderStatusBadge(status: order.status, type: order.type),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.s4),
-            Text(
-              DateFormat('dd.MM.yyyy, HH:mm').format(order.createdAt),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppColors.gray600,
+                  OrderStatusBadge(status: order.status, type: order.type),
+                ],
               ),
-            ),
-            const SizedBox(height: AppSpacing.s8),
-            for (final item in order.items) _OrderItemLine(item: item),
-            const Divider(height: AppSpacing.s20),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    order.totalAmount.format(),
-                    style: theme.textTheme.titleSmall,
+              const SizedBox(height: AppSpacing.s4),
+              Text(
+                DateFormat('dd.MM.yyyy, HH:mm').format(order.createdAt),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.gray600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s8),
+              for (final item in order.items) _OrderItemLine(item: item),
+              const Divider(height: AppSpacing.s20),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      order.totalAmount.format(),
+                      style: theme.textTheme.titleSmall,
+                    ),
                   ),
-                ),
-                TextButton.icon(
-                  key: ValueKey('repeat-order-${order.id}'),
-                  onPressed: () => _repeatOrder(context),
-                  icon: const Icon(Icons.replay, size: 18),
-                  label: const Text('Повторить заказ'),
-                ),
-              ],
-            ),
+                  TextButton.icon(
+                    key: ValueKey('repeat-order-${order.id}'),
+                    onPressed: () => _repeatOrder(context),
+                    icon: const Icon(Icons.replay, size: 18),
+                    label: const Text('Повторить заказ'),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -433,7 +436,9 @@ class _OrderItemLine extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text(item.name, style: theme.textTheme.bodyMedium)),
+              Expanded(
+                child: Text(item.name, style: theme.textTheme.bodyMedium),
+              ),
               Text(
                 '×${item.quantity}',
                 style: theme.textTheme.bodySmall?.copyWith(

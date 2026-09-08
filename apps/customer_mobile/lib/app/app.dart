@@ -6,6 +6,7 @@ import '../core/auth/auth_token_storage.dart';
 import '../core/theme/app_theme.dart';
 import '../features/auth/data/auth_repository.dart';
 import '../features/cart/data/orders_repository.dart';
+import '../features/loyalty/data/loyalty_repository.dart';
 import '../features/menu/data/menu_repository.dart';
 import '../features/orders/data/order_history_repository.dart';
 import '../features/orders/data/order_tracking_repository.dart';
@@ -27,6 +28,7 @@ class CustomerApp extends StatelessWidget {
     required this.orderHistoryRepository,
     required this.orderTrackingRepository,
     required this.userSettingsRepository,
+    required this.loyaltyRepository,
   });
 
   final CustomerMenuRepository repository;
@@ -38,6 +40,7 @@ class CustomerApp extends StatelessWidget {
   final OrderHistoryRepository orderHistoryRepository;
   final OrderTrackingRepository orderTrackingRepository;
   final UserSettingsRepository userSettingsRepository;
+  final LoyaltyRepository loyaltyRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -59,6 +62,7 @@ class CustomerApp extends StatelessWidget {
           tokenProvider: tokenProvider,
           orderHistoryRepository: orderHistoryRepository,
           orderTrackingRepository: orderTrackingRepository,
+          loyaltyRepository: loyaltyRepository,
         ),
       ),
     );

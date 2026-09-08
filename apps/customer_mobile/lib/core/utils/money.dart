@@ -9,8 +9,7 @@ final class Money extends Equatable implements Comparable<Money> {
   const Money.kopecks(this.minorUnits);
 
   /// Parses an API price value (rubles, e.g. 390.0) into kopecks.
-  factory Money.fromRubles(num rubles) =>
-      Money.kopecks((rubles * 100).round());
+  factory Money.fromRubles(num rubles) => Money.kopecks((rubles * 100).round());
 
   static const Money zero = Money.kopecks(0);
 
@@ -19,8 +18,9 @@ final class Money extends Equatable implements Comparable<Money> {
 
   double get rubles => minorUnits / 100;
 
-  Money operator +(Money other) =>
-      Money.kopecks(minorUnits + other.minorUnits);
+  Money operator +(Money other) => Money.kopecks(minorUnits + other.minorUnits);
+
+  Money operator -(Money other) => Money.kopecks(minorUnits - other.minorUnits);
 
   Money operator *(int quantity) => Money.kopecks(minorUnits * quantity);
 

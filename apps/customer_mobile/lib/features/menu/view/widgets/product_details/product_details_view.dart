@@ -3,9 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/theme/app_spacing.dart';
+import '../../../../../core/utils/money.dart';
 import '../../../../../core/widgets/halal_status_badge.dart';
 import '../../../../cart/bloc/cart_event.dart';
 import '../../../../cart/bloc/customer_cart_bloc.dart';
+import '../../../../loyalty/bloc/loyalty_cubit.dart';
+import '../../../../loyalty/domain/bonus_math.dart';
 import '../../../data/menu_models.dart';
 import 'modifier_selector.dart';
 import 'product_details_cubit.dart';
@@ -13,12 +16,16 @@ import 'product_details_cubit.dart';
 /// Body of the product-details bottom sheet.
 ///
 /// Exposes a value-keyed add-to-cart button for widget tests; selection and
-/// total math live in [ProductDetailsCubit].
+/// total math live in [ProductDetailsCubit]. [cashbackRate] (ADR-1614, %)
+/// drives the «+X бонусов при заказе» badge; 0 hides it.
 class ProductDetailsView extends StatelessWidget {
-  ProductDetailsView({super.key, required this.item})
+  ProductDetailsView({super.key, required this.item, this.cashbackRate = 0})
     : cubit = ProductDetailsCubit(item);
 
   final MenuItem item;
+
+  /// Cashback rate in percent for the bonus-earn badge preview.
+  final double cashbackRate;
 
   /// Owned cubit instance (avoids creating it in BlocProvider builder).
   final ProductDetailsCubit cubit;
@@ -27,15 +34,19 @@ class ProductDetailsView extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider<ProductDetailsCubit>.value(
       value: cubit,
-      child: _ProductDetailsContent(item: item),
+      child: _ProductDetailsContent(item: item, cashbackRate: cashbackRate),
     );
   }
 }
 
 class _ProductDetailsContent extends StatelessWidget {
-  const _ProductDetailsContent({required this.item});
+  const _ProductDetailsContent({
+    required this.item,
+    required this.cashbackRate,
+  });
 
   final MenuItem item;
+  final double cashbackRate;
 
   @override
   Widget build(BuildContext context) {
@@ -120,9 +131,7 @@ class _ProductDetailsContent extends StatelessWidget {
                 header(
                   ModifierSelector(
                     groups: item.modifierGroups,
-                    onToggle: context
-                        .read<ProductDetailsCubit>()
-                        .toggleOption,
+                    onToggle: context.read<ProductDetailsCubit>().toggleOption,
                     selection: context
                         .watch<ProductDetailsCubit>()
                         .state
@@ -144,30 +153,40 @@ class _ProductDetailsContent extends StatelessWidget {
             ),
             child: BlocBuilder<ProductDetailsCubit, ProductDetailsState>(
               builder: (context, state) {
-                return FilledButton(
-                  key: const ValueKey('add-to-cart-button'),
-                  onPressed: state.isValid
-                      ? () {
-                          context.read<CustomerCartBloc>().add(
-                            CartItemAdded(
-                              item: item,
-                              selection: state.selection,
-                            ),
-                          );
-                          // Show the snackbar before popping: after pop()
-                          // this context is deactivated and ancestor lookup
-                          // would throw.
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Добавлено в корзину'),
-                            ),
-                          );
-                          Navigator.of(context).pop();
-                        }
-                      : null,
-                  child: Text(
-                    'Добавить в корзину за ${state.totalPrice.format()}',
-                  ),
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _BonusEarnBadge(
+                      totalPrice: state.totalPrice,
+                      cashbackRate: cashbackRate,
+                    ),
+                    FilledButton(
+                      key: const ValueKey('add-to-cart-button'),
+                      onPressed: state.isValid
+                          ? () {
+                              context.read<CustomerCartBloc>().add(
+                                CartItemAdded(
+                                  item: item,
+                                  selection: state.selection,
+                                ),
+                              );
+                              // Show the snackbar before popping: after pop()
+                              // this context is deactivated and ancestor lookup
+                              // would throw.
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Добавлено в корзину'),
+                                ),
+                              );
+                              Navigator.of(context).pop();
+                            }
+                          : null,
+                      child: Text(
+                        'Добавить в корзину за ${state.totalPrice.format()}',
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -186,6 +205,56 @@ class _ProductDetailsContent extends StatelessWidget {
   }
 }
 
+/// «+X бонусов при заказе» (ADR-1614): превью кешбэка от текущей суммы с
+/// модификаторами. Скрыт, пока ставка неизвестна или начисление равно 0.
+class _BonusEarnBadge extends StatelessWidget {
+  const _BonusEarnBadge({required this.totalPrice, required this.cashbackRate});
+
+  final Money totalPrice;
+  final double cashbackRate;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = cashbackPointsFor(totalPrice, cashbackRate);
+    if (points <= 0) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+      child: DecoratedBox(
+        key: const ValueKey('bonus-earn-badge'),
+        decoration: BoxDecoration(
+          color: AppColors.warningContainer,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s12,
+            vertical: AppSpacing.s8,
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.stars_rounded,
+                size: 18,
+                color: AppColors.warning,
+              ),
+              const SizedBox(width: AppSpacing.s8),
+              Expanded(
+                child: Text(
+                  '+$points бонусов при заказе',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Opens the product sheet.
 ///
 /// The sheet's route is pushed onto the Navigator above the shell's
@@ -194,6 +263,14 @@ class _ProductDetailsContent extends StatelessWidget {
 /// inside the sheet for the add-to-cart button.
 void showProductDetails(BuildContext context, MenuItem item) {
   final cartBloc = context.read<CustomerCartBloc>();
+  // Cashback rate for the «+X бонусов» badge (ADR-1614); the loyalty cubit
+  // is absent in isolated tests — then the badge stays hidden.
+  var cashbackRate = 0.0;
+  try {
+    cashbackRate = context.read<LoyaltyCubit>().state.cashbackRate;
+  } on ProviderNotFoundException {
+    cashbackRate = 0;
+  }
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -203,7 +280,7 @@ void showProductDetails(BuildContext context, MenuItem item) {
     ),
     builder: (_) => BlocProvider<CustomerCartBloc>.value(
       value: cartBloc,
-      child: ProductDetailsView(item: item),
+      child: ProductDetailsView(item: item, cashbackRate: cashbackRate),
     ),
   );
 }

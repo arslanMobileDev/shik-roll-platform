@@ -5,12 +5,15 @@ import '../../core/auth/auth_token_provider.dart';
 import '../../core/auth/auth_token_storage.dart';
 import '../auth/bloc/auth_bloc.dart';
 import '../auth/bloc/auth_event.dart';
+import '../auth/bloc/auth_state.dart';
 import '../auth/data/auth_repository.dart';
 import '../cart/bloc/cart_state.dart';
 import '../cart/bloc/checkout_cubit.dart';
 import '../cart/bloc/customer_cart_bloc.dart';
 import '../cart/data/orders_repository.dart';
 import '../cart/view/cart_screen.dart';
+import '../loyalty/bloc/loyalty_cubit.dart';
+import '../loyalty/data/loyalty_repository.dart';
 import '../menu/bloc/order_type.dart';
 import '../menu/bloc/menu_bloc.dart';
 import '../menu/bloc/menu_event.dart';
@@ -35,6 +38,7 @@ class HomeShell extends StatefulWidget {
     required this.tokenProvider,
     required this.orderHistoryRepository,
     required this.orderTrackingRepository,
+    required this.loyaltyRepository,
   });
 
   final CustomerMenuRepository repository;
@@ -45,6 +49,7 @@ class HomeShell extends StatefulWidget {
   final AuthTokenProvider tokenProvider;
   final OrderHistoryRepository orderHistoryRepository;
   final OrderTrackingRepository orderTrackingRepository;
+  final LoyaltyRepository loyaltyRepository;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -66,8 +71,8 @@ class _HomeShellState extends State<HomeShell> {
         ),
         BlocProvider<OrderTypeCubit>(create: (_) => OrderTypeCubit()),
         BlocProvider<MenuBloc>(
-          create: (_) => MenuBloc(repository: widget.repository)
-            ..add(MenuStarted()),
+          create: (_) =>
+              MenuBloc(repository: widget.repository)..add(MenuStarted()),
         ),
         BlocProvider<AuthBloc>(
           create: (_) => AuthBloc(
@@ -80,54 +85,73 @@ class _HomeShellState extends State<HomeShell> {
           create: (_) =>
               OrderHistoryBloc(repository: widget.orderHistoryRepository),
         ),
+        // Программа лояльности (ADR-1614): лента акций грузится сразу,
+        // баланс — только для авторизованного гостя (см. BlocListener ниже).
+        BlocProvider<LoyaltyCubit>(
+          create: (_) =>
+              LoyaltyCubit(repository: widget.loyaltyRepository)
+                ..loadPromotions(),
+        ),
       ],
-      child: Builder(
-        builder: (context) {
-          return Scaffold(
-            body: IndexedStack(
-              index: _tab,
-              children: [
-                const MenuScreen(),
-                CartScreen(onGoToMenu: () => setState(() => _tab = 0)),
-                OrderHistoryScreen(
-                  onGoToCart: () => setState(() => _tab = 1),
-                  orderTrackingRepository: widget.orderTrackingRepository,
-                ),
-                const ProfileScreen(),
-              ],
-            ),
-            bottomNavigationBar: NavigationBar(
-              selectedIndex: _tab,
-              onDestinationSelected: (index) => setState(() => _tab = index),
-              destinations: [
-                const NavigationDestination(
-                  icon: Icon(Icons.restaurant_menu_outlined),
-                  label: 'Меню',
-                ),
-                NavigationDestination(
-                  icon: BlocBuilder<CustomerCartBloc, CartState>(
-                    builder: (context, cart) {
-                      return Badge(
-                        isLabelVisible: cart.itemCount > 0,
-                        label: Text('${cart.itemCount}'),
-                        child: const Icon(Icons.shopping_cart_outlined),
-                      );
-                    },
-                  ),
-                  label: 'Корзина',
-                ),
-                const NavigationDestination(
-                  icon: Icon(Icons.receipt_long_outlined),
-                  label: 'Заказы',
-                ),
-                const NavigationDestination(
-                  icon: Icon(Icons.person_outline),
-                  label: 'Профиль',
-                ),
-              ],
-            ),
-          );
+      child: BlocListener<AuthBloc, AuthState>(
+        listenWhen: (previous, next) =>
+            previous.isAuthenticated != next.isAuthenticated,
+        listener: (context, auth) {
+          final loyalty = context.read<LoyaltyCubit>();
+          if (auth.isAuthenticated) {
+            loyalty.loadBalance();
+          } else {
+            loyalty.clear();
+          }
         },
+        child: Builder(
+          builder: (context) {
+            return Scaffold(
+              body: IndexedStack(
+                index: _tab,
+                children: [
+                  const MenuScreen(),
+                  CartScreen(onGoToMenu: () => setState(() => _tab = 0)),
+                  OrderHistoryScreen(
+                    onGoToCart: () => setState(() => _tab = 1),
+                    orderTrackingRepository: widget.orderTrackingRepository,
+                  ),
+                  const ProfileScreen(),
+                ],
+              ),
+              bottomNavigationBar: NavigationBar(
+                selectedIndex: _tab,
+                onDestinationSelected: (index) => setState(() => _tab = index),
+                destinations: [
+                  const NavigationDestination(
+                    icon: Icon(Icons.restaurant_menu_outlined),
+                    label: 'Меню',
+                  ),
+                  NavigationDestination(
+                    icon: BlocBuilder<CustomerCartBloc, CartState>(
+                      builder: (context, cart) {
+                        return Badge(
+                          isLabelVisible: cart.itemCount > 0,
+                          label: Text('${cart.itemCount}'),
+                          child: const Icon(Icons.shopping_cart_outlined),
+                        );
+                      },
+                    ),
+                    label: 'Корзина',
+                  ),
+                  const NavigationDestination(
+                    icon: Icon(Icons.receipt_long_outlined),
+                    label: 'Заказы',
+                  ),
+                  const NavigationDestination(
+                    icon: Icon(Icons.person_outline),
+                    label: 'Профиль',
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
