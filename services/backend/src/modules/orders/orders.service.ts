@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { OrderStatus, Prisma, ProductStatus } from '@prisma/client';
+import { concat, Observable, of } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
 import { lineTotal, orderSubtotal, orderTotal } from './domain/order-pricing';
@@ -16,9 +17,12 @@ import { MyOrdersQueryDto } from './dto/my-orders-query.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderEntity, OrderPage } from './entities/order.entity';
-import { toOrderEntity } from './mappers/order.mapper';
+import { OrderRecord, toOrderEntity } from './mappers/order.mapper';
 import { OrdersRepository } from './orders.repository';
-import { CouriersEventsService } from '../couriers/couriers-events.service';
+import {
+  CouriersEventsService,
+  OrderTrackingEvent,
+} from '../couriers/couriers-events.service';
 
 @Injectable()
 export class OrdersService {
@@ -250,8 +254,42 @@ export class OrdersService {
       totalRubles: Math.round(Number(updated.totalAmount)),
       timestamp: new Date().toISOString(),
     });
+    this.couriersEvents.emitOrderTrackingEvent(this.toTrackingEvent(updated));
 
     return toOrderEntity(updated);
+  }
+
+  /**
+   * Customer-facing order tracking stream (ADR-1615). The current order state
+   * is emitted first (snapshot), then live events for every status change of
+   * this order. Scoped to the owning customer — a foreign or unknown order id
+   * answers ORDER_NOT_FOUND so order existence is never leaked.
+   */
+  async getTrackingStream(
+    orderId: string,
+    customerId: string,
+  ): Promise<Observable<MessageEvent>> {
+    const record = await this.repository.findById(orderId);
+    if (!record || record.customerId !== customerId) {
+      throw new NotFoundException({
+        statusCode: 404,
+        code: 'ORDER_NOT_FOUND',
+        message: `Order ${orderId} not found`,
+      });
+    }
+    const snapshot = { data: this.toTrackingEvent(record) } as MessageEvent;
+    return concat(of(snapshot), this.couriersEvents.getOrderTrackingStream(orderId));
+  }
+
+  private toTrackingEvent(record: OrderRecord): OrderTrackingEvent {
+    return {
+      orderId: record.id,
+      status: record.status,
+      courierId: record.courierId,
+      version: record.version,
+      estimatedReadyAt: record.estimatedReadyAt?.toISOString() ?? null,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   private formatOrderNumber(branchId: string, sequence: number): string {

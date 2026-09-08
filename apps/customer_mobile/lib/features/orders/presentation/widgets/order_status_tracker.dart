@@ -1,49 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
 import '../../../profile/bloc/user_settings_cubit.dart';
 import '../../../profile/domain/delivery_vehicle.dart';
+import '../../domain/order_timeline.dart';
 
-enum OrderStatus {
-  confirmed,
-  cooking,
-  delivering,
-  completed;
-
-  static OrderStatus fromDynamic(dynamic val) {
-    if (val is OrderStatus) return val;
-    final s = (val ?? '').toString().toUpperCase();
-    if (s.contains('COOK') || s.contains('ГОТОВ')) return OrderStatus.cooking;
-    if (s.contains('DELIVER') || s.contains('WAY') || s.contains('ПУТИ')) return OrderStatus.delivering;
-    if (s.contains('COMPLET') || s.contains('DONE') || s.contains('ДОСТАВ')) return OrderStatus.completed;
-    return OrderStatus.confirmed;
-  }
-}
-
+/// Карточка трекера заказа: статус-чип, расчётное время доставки,
+/// анимированная шкала прогресса и вертикальный список шагов timeline
+/// (проекция ADR-1615). Отменённый заказ ([status] == null) показывается
+/// без процента прогресса.
 class OrderStatusTracker extends StatefulWidget {
-  final OrderStatus status;
-  final String orderNumber;
-  final String estimatedDeliveryTime;
-  final String? arrivingByTime;
-  final int remainingMinutes;
-  final String confirmedTime;
-  final String cookingTime;
-  final String deliveringTime;
-  final String completedTime;
-
-  OrderStatusTracker({
+  const OrderStatusTracker({
     super.key,
-    required dynamic status,
     required this.orderNumber,
-    String? estimatedDeliveryTime,
-    this.arrivingByTime,
-    required this.remainingMinutes,
-    this.confirmedTime = '19:08',
-    this.cookingTime = '19:15',
-    this.deliveringTime = '--',
-    this.completedTime = '--',
-  })  : status = OrderStatus.fromDynamic(status),
-        estimatedDeliveryTime = estimatedDeliveryTime ?? arrivingByTime ?? '19:45';
+    required this.status,
+    required this.progressPercent,
+    this.estimatedDeliveryAt,
+    this.updatedAt,
+  });
+
+  final String orderNumber;
+
+  /// Текущий шаг timeline; `null` — заказ отменён.
+  final OrderTimelineStatus? status;
+
+  /// Процент прогресса (5/15/40/55/75/100 по ADR-1615).
+  final int progressPercent;
+
+  /// Расчётное время доставки; `null` — блок ETA показывает плейсхолдеры.
+  final DateTime? estimatedDeliveryAt;
+
+  /// Время последнего перехода (подпись у активного шага).
+  final DateTime? updatedAt;
 
   @override
   State<OrderStatusTracker> createState() => _OrderStatusTrackerState();
@@ -53,6 +42,12 @@ class _OrderStatusTrackerState extends State<OrderStatusTracker> {
   bool _didPrecacheVehicles = false;
 
   static const double _vehicleImageCacheSize = 256;
+  static const _brandOrange = Color(0xFFFF5200);
+  static const _cancelRed = Color(0xFFE53935);
+
+  bool get _isCancelled => widget.status == null;
+
+  int get _currentStep => widget.status?.index ?? -1;
 
   @override
   void didChangeDependencies() {
@@ -92,7 +87,8 @@ class _OrderStatusTrackerState extends State<OrderStatusTracker> {
         cacheWidth: _vehicleImageCacheSize.toInt(),
         cacheHeight: _vehicleImageCacheSize.toInt(),
         gaplessPlayback: true,
-        errorBuilder: (_, e, s) => Text(fallbackEmoji, style: TextStyle(fontSize: size * 0.7)),
+        errorBuilder: (_, e, s) =>
+            Text(fallbackEmoji, style: TextStyle(fontSize: size * 0.7)),
       );
     }
     return Image.network(
@@ -103,21 +99,9 @@ class _OrderStatusTrackerState extends State<OrderStatusTracker> {
       cacheWidth: _vehicleImageCacheSize.toInt(),
       cacheHeight: _vehicleImageCacheSize.toInt(),
       gaplessPlayback: true,
-      errorBuilder: (_, e, s) => Text(fallbackEmoji, style: TextStyle(fontSize: size * 0.7)),
+      errorBuilder: (_, e, s) =>
+          Text(fallbackEmoji, style: TextStyle(fontSize: size * 0.7)),
     );
-  }
-
-  int get currentStep {
-    switch (widget.status) {
-      case OrderStatus.confirmed:
-        return 1;
-      case OrderStatus.cooking:
-        return 2;
-      case OrderStatus.delivering:
-        return 3;
-      case OrderStatus.completed:
-        return 4;
-    }
   }
 
   @override
@@ -143,143 +127,224 @@ class _OrderStatusTrackerState extends State<OrderStatusTracker> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'ВАШ ЗАКАЗ',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF8A8A8E),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '#${widget.orderNumber}',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
+          _buildHeader(),
+          const SizedBox(height: 18),
+          _buildEtaCard(vehicle),
+          if (!_isCancelled) ...[
+            const SizedBox(height: 20),
+            _buildProgressBar(),
+          ],
+          const SizedBox(height: 20),
+          ..._buildSteps(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    final chipColor = _isCancelled ? _cancelRed : _brandOrange;
+    final chipLabel = _isCancelled ? 'Отменён' : widget.status!.label;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'ВАШ ЗАКАЗ',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF8A8A8E),
+                letterSpacing: 0.5,
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF5200).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '#${widget.orderNumber}',
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: chipColor.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            chipLabel,
+            style: TextStyle(
+              color: chipColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Блок транспорта + расчётного времени доставки. Для отменённого заказа —
+  /// нейтральное уведомление вместо ETA.
+  Widget _buildEtaCard(DeliveryVehicle vehicle) {
+    if (_isCancelled) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F7F9),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.cancel_outlined, color: _cancelRed, size: 22),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Заказ отменён. Если списались деньги — они вернутся автоматически.',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF8A8A8E),
                 ),
-                child: const Text(
-                  'Готовится',
-                  style: TextStyle(
-                    color: Color(0xFFFF5200),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final eta = widget.estimatedDeliveryAt?.toLocal();
+    final remainingMinutes = eta?.difference(DateTime.now()).inMinutes.clamp(
+      0,
+      999,
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F9),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          _buildVehicleImage(vehicle.imageUrl, vehicle.fallbackEmoji, 46),
+          const SizedBox(width: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                remainingMinutes == null ? '—' : '$remainingMinutes',
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: _brandOrange,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Text(
+                'мин',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _brandOrange,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF7F7F9),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                _buildVehicleImage(vehicle.imageUrl, vehicle.fallbackEmoji, 46),
-                const SizedBox(width: 14),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      '${widget.remainingMinutes}',
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFFFF5200),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'мин',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFFF5200),
-                      ),
-                    ),
-                  ],
+          const Spacer(),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Text(
+                'Доставка к',
+                style: TextStyle(fontSize: 11, color: Color(0xFF8A8A8E)),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                eta == null ? '—' : DateFormat('HH:mm').format(eta),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
                 ),
-                const Spacer(),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text(
-                      'Доставка к',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF8A8A8E),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      widget.estimatedDeliveryTime,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          _buildStepRow(
-            stepNumber: 1,
-            title: 'Заказ подтвержден',
-            time: widget.confirmedTime,
-            isPassed: currentStep >= 1,
-            isActive: currentStep == 1,
-          ),
-          _buildStepRow(
-            stepNumber: 2,
-            title: 'Шеф готовит',
-            time: widget.cookingTime,
-            isPassed: currentStep >= 2,
-            isActive: currentStep == 2,
-          ),
-          _buildStepRow(
-            stepNumber: 3,
-            title: 'Курьер мчит к вам',
-            time: widget.deliveringTime,
-            isPassed: currentStep >= 3,
-            isActive: currentStep == 3,
-          ),
-          _buildStepRow(
-            stepNumber: 4,
-            title: 'Приятного аппетита!',
-            time: widget.completedTime,
-            isPassed: currentStep >= 4,
-            isActive: currentStep == 4,
-            isLast: true,
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
+  /// Шкала прогресса: плавно догоняет новый процент при каждом событии.
+  Widget _buildProgressBar() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TweenAnimationBuilder<double>(
+          key: const ValueKey('order-progress-bar'),
+          tween: Tween<double>(
+            begin: 0,
+            end: (widget.progressPercent / 100).clamp(0.0, 1.0),
+          ),
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, _) {
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: value,
+                minHeight: 8,
+                backgroundColor: const Color(0xFFF1F3F5),
+                valueColor: const AlwaysStoppedAnimation(_brandOrange),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Шаг ${_currentStep + 1} из ${OrderTimelineStatus.values.length}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF8A8A8E),
+              ),
+            ),
+            Text(
+              '${widget.progressPercent}%',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: _brandOrange,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _buildSteps() {
+    final updatedAt = widget.updatedAt?.toLocal();
+    return [
+      for (var i = 0; i < OrderTimelineStatus.values.length; i++)
+        _buildStepRow(
+          title: OrderTimelineStatus.values[i].stepTitle,
+          // Точное время знаем только у текущего шага (по событию).
+          time: i == _currentStep && updatedAt != null
+              ? DateFormat('HH:mm').format(updatedAt)
+              : '--',
+          isPassed: !_isCancelled && i <= _currentStep,
+          isActive: !_isCancelled && i == _currentStep,
+          isLast: i == OrderTimelineStatus.values.length - 1,
+        ),
+    ];
+  }
+
   Widget _buildStepRow({
-    required int stepNumber,
     required String title,
     required String time,
     required bool isPassed,
@@ -290,7 +355,7 @@ class _OrderStatusTrackerState extends State<OrderStatusTracker> {
     Widget iconWidget;
 
     if (isActive) {
-      iconColor = const Color(0xFFFF5200);
+      iconColor = _brandOrange;
       iconWidget = Container(
         width: 22,
         height: 22,
@@ -302,22 +367,16 @@ class _OrderStatusTrackerState extends State<OrderStatusTracker> {
           child: Container(
             width: 8,
             height: 8,
-            decoration: BoxDecoration(
-              color: iconColor,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: iconColor, shape: BoxShape.circle),
           ),
         ),
       );
     } else if (isPassed) {
-      iconColor = const Color(0xFFFF5200);
+      iconColor = _brandOrange;
       iconWidget = Container(
         width: 22,
         height: 22,
-        decoration: BoxDecoration(
-          color: iconColor,
-          shape: BoxShape.circle,
-        ),
+        decoration: BoxDecoration(color: iconColor, shape: BoxShape.circle),
         child: const Icon(Icons.check, size: 14, color: Colors.white),
       );
     } else {
@@ -343,8 +402,12 @@ class _OrderStatusTrackerState extends State<OrderStatusTracker> {
               title,
               style: TextStyle(
                 fontSize: 15,
-                fontWeight: isActive || isPassed ? FontWeight.w600 : FontWeight.w400,
-                color: isActive || isPassed ? Colors.black : const Color(0xFF8A8A8E),
+                fontWeight: isActive || isPassed
+                    ? FontWeight.w600
+                    : FontWeight.w400,
+                color: isActive || isPassed
+                    ? Colors.black
+                    : const Color(0xFF8A8A8E),
               ),
             ),
           ),
@@ -353,7 +416,7 @@ class _OrderStatusTrackerState extends State<OrderStatusTracker> {
             style: TextStyle(
               fontSize: 13,
               fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-              color: isActive ? const Color(0xFFFF5200) : const Color(0xFF8A8A8E),
+              color: isActive ? _brandOrange : const Color(0xFF8A8A8E),
             ),
           ),
         ],

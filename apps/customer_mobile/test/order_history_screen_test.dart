@@ -14,6 +14,7 @@ import 'package:customer_mobile/features/menu/data/fake_customer_menu_repository
 import 'package:customer_mobile/features/orders/bloc/order_history_bloc.dart';
 import 'package:customer_mobile/features/orders/data/order_history_models.dart';
 import 'package:customer_mobile/features/orders/data/order_history_repository.dart';
+import 'package:customer_mobile/features/orders/data/order_tracking_repository.dart';
 import 'package:customer_mobile/features/orders/view/order_history_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -87,7 +88,12 @@ Future<CustomerCartBloc> _pumpOrders(
           BlocProvider<MenuBloc>.value(value: menu),
         ],
         child: Scaffold(
-          body: OrderHistoryScreen(onGoToCart: onGoToCart ?? () {}),
+          body: OrderHistoryScreen(
+            onGoToCart: onGoToCart ?? () {},
+            orderTrackingRepository: FakeOrderTrackingRepository(
+              latency: Duration.zero,
+            ),
+          ),
         ),
       ),
     ),

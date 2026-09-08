@@ -1,8 +1,12 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderStatus, OrderType, Prisma, ProductStatus } from '@prisma/client';
+import { firstValueFrom, of, take, toArray } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CouriersEventsService } from '../couriers/couriers-events.service';
+import {
+  CouriersEventsService,
+  OrderTrackingEvent,
+} from '../couriers/couriers-events.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
 import { OrdersRepository } from './orders.repository';
 import { OrdersService } from './orders.service';
@@ -14,6 +18,7 @@ const BRANCH_ID = '22222222-2222-2222-2222-222222222222';
 const MENU_ITEM_ID = '33333333-3333-3333-3333-333333333333';
 const MODIFIER_ID = '44444444-4444-4444-4444-444444444444';
 const ORDER_ID = '55555555-5555-5555-5555-555555555555';
+const CUSTOMER_ID = '10101010-1010-1010-1010-101010101010';
 
 function makeOrderRecord(status: OrderStatus = OrderStatus.NEW) {
   return {
@@ -23,6 +28,8 @@ function makeOrderRecord(status: OrderStatus = OrderStatus.NEW) {
     type: OrderType.DINE_IN,
     brandId: BRAND_ID,
     branchId: BRANCH_ID,
+    customerId: CUSTOMER_ID,
+    courierId: null as string | null,
     tableNumber: '7',
     deliveryAddress: null,
     comment: null,
@@ -81,7 +88,11 @@ describe('OrdersService', () => {
     menuItem: { findMany: jest.Mock };
     modifierItem: { findMany: jest.Mock };
   };
-  let couriersEvents: { emitOrderEvent: jest.Mock };
+  let couriersEvents: {
+    emitOrderEvent: jest.Mock;
+    emitOrderTrackingEvent: jest.Mock;
+    getOrderTrackingStream: jest.Mock;
+  };
 
   beforeEach(async () => {
     repository = {
@@ -103,7 +114,14 @@ describe('OrdersService', () => {
         { provide: OrdersRepository, useValue: repository },
         { provide: OrderQueuesService, useValue: queues },
         { provide: PrismaService, useValue: prisma },
-        { provide: CouriersEventsService, useValue: { emitOrderEvent: jest.fn() } },
+        {
+          provide: CouriersEventsService,
+          useValue: {
+            emitOrderEvent: jest.fn(),
+            emitOrderTrackingEvent: jest.fn(),
+            getOrderTrackingStream: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -268,6 +286,70 @@ describe('OrdersService', () => {
       );
     });
 
+    it('emits a customer tracking event after transition', async () => {
+      repository.findById.mockResolvedValue(makeOrderRecord(OrderStatus.NEW));
+      repository.transitionStatus.mockResolvedValue(makeOrderRecord(OrderStatus.CONFIRMED));
+
+      await service.updateStatus(ORDER_ID, { status: OrderStatus.CONFIRMED });
+
+      expect(couriersEvents.emitOrderTrackingEvent).toHaveBeenCalledTimes(1);
+      const event = couriersEvents.emitOrderTrackingEvent.mock
+        .calls[0][0] as OrderTrackingEvent;
+      expect(event).toMatchObject({
+        orderId: ORDER_ID,
+        status: OrderStatus.CONFIRMED,
+        courierId: null,
+        version: 1,
+        estimatedReadyAt: null,
+      });
+      expect(typeof event.timestamp).toBe('string');
+    });
+
+    it('emits a tracking event on cancellation', async () => {
+      repository.findById.mockResolvedValue(makeOrderRecord(OrderStatus.COOKING));
+      repository.transitionStatus.mockResolvedValue(makeOrderRecord(OrderStatus.CANCELLED));
+
+      await service.updateStatus(ORDER_ID, {
+        status: OrderStatus.CANCELLED,
+        reason: 'out of ingredients',
+      });
+
+      expect(couriersEvents.emitOrderTrackingEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ orderId: ORDER_ID, status: OrderStatus.CANCELLED }),
+      );
+    });
+
+    it('carries the assigned courier in the tracking event', async () => {
+      repository.findById.mockResolvedValue(makeOrderRecord(OrderStatus.READY));
+      repository.transitionStatus.mockResolvedValue({
+        ...makeOrderRecord(OrderStatus.ON_WAY),
+        courierId: '99999999-9999-9999-9999-999999999999',
+      });
+
+      await service.updateStatus(ORDER_ID, {
+        status: OrderStatus.ON_WAY,
+        courierId: '99999999-9999-9999-9999-999999999999',
+      });
+
+      expect(couriersEvents.emitOrderTrackingEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderId: ORDER_ID,
+          status: OrderStatus.ON_WAY,
+          courierId: '99999999-9999-9999-9999-999999999999',
+        }),
+      );
+    });
+
+    it('does not emit a tracking event when the transition is rejected', async () => {
+      repository.findById.mockResolvedValue(makeOrderRecord(OrderStatus.COMPLETED));
+
+      await expect(
+        service.updateStatus(ORDER_ID, { status: OrderStatus.CANCELLED }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(couriersEvents.emitOrderTrackingEvent).not.toHaveBeenCalled();
+    });
+
     it('forwards courierId to the repository', async () => {
       repository.findById.mockResolvedValue(makeOrderRecord(OrderStatus.READY));
       repository.transitionStatus.mockResolvedValue(makeOrderRecord(OrderStatus.ON_WAY));
@@ -314,6 +396,51 @@ describe('OrdersService', () => {
       await expect(
         service.updateStatus(ORDER_ID, { status: OrderStatus.CONFIRMED }),
       ).rejects.toMatchObject({ response: { code: 'ORDER_NOT_FOUND' } });
+    });
+  });
+
+  describe('getTrackingStream', () => {
+    it('emits the current state as the first (snapshot) event, then live events', async () => {
+      repository.findById.mockResolvedValue(makeOrderRecord(OrderStatus.COOKING));
+      const live: OrderTrackingEvent = {
+        orderId: ORDER_ID,
+        status: OrderStatus.READY,
+        courierId: null,
+        version: 2,
+        estimatedReadyAt: null,
+        timestamp: new Date().toISOString(),
+      };
+      couriersEvents.getOrderTrackingStream.mockReturnValue(of({ data: live }));
+
+      const stream = await service.getTrackingStream(ORDER_ID, CUSTOMER_ID);
+      const events = await firstValueFrom(stream.pipe(take(2), toArray()));
+
+      expect(couriersEvents.getOrderTrackingStream).toHaveBeenCalledWith(ORDER_ID);
+      expect(events).toHaveLength(2);
+      expect(events[0].data).toMatchObject({
+        orderId: ORDER_ID,
+        status: OrderStatus.COOKING,
+        version: 1,
+      });
+      expect(events[1].data).toEqual(live);
+    });
+
+    it('throws ORDER_NOT_FOUND when the order does not exist', async () => {
+      repository.findById.mockResolvedValue(null);
+
+      await expect(service.getTrackingStream(ORDER_ID, CUSTOMER_ID)).rejects.toMatchObject({
+        response: { code: 'ORDER_NOT_FOUND' },
+      });
+      expect(couriersEvents.getOrderTrackingStream).not.toHaveBeenCalled();
+    });
+
+    it("throws ORDER_NOT_FOUND for a foreign customer's order", async () => {
+      repository.findById.mockResolvedValue(makeOrderRecord());
+
+      await expect(
+        service.getTrackingStream(ORDER_ID, '00000000-0000-0000-0000-000000000000'),
+      ).rejects.toMatchObject({ response: { code: 'ORDER_NOT_FOUND' } });
+      expect(couriersEvents.getOrderTrackingStream).not.toHaveBeenCalled();
     });
   });
 });

@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Query,
+  Sse,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -19,6 +20,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Observable } from 'rxjs';
 import { AuthenticatedCustomer } from '../auth/auth.types';
 import { CurrentCustomer } from '../auth/decorators/current-customer.decorator';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -85,6 +87,25 @@ export class OrdersController {
   @ApiOkResponse({ type: OrderEntity })
   getById(@Param('id', ParseUUIDPipe) id: string): Promise<OrderEntity> {
     return this.service.getById(id);
+  }
+
+  /**
+   * Customer order tracking (ADR-1615): SSE stream of the order's status
+   * changes. The first event is a snapshot of the current state, subsequent
+   * events arrive on every status transition. Own orders only.
+   */
+  @Sse(':id/tracking-stream')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "SSE stream of the guest's own order status updates (snapshot first, then live events)",
+  })
+  @ApiUnauthorizedResponse({ description: 'UNAUTHORIZED / TOKEN_INVALID' })
+  trackOrder(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentCustomer() customer: AuthenticatedCustomer,
+  ): Promise<Observable<MessageEvent>> {
+    return this.service.getTrackingStream(id, customer.id);
   }
 
   @Patch(':id/status')
