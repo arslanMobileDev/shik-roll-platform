@@ -79,7 +79,13 @@ export class OrderEntity {
   @ApiProperty({ description: 'Subtotal in RUB' })
   subtotalAmount!: number;
 
-  @ApiProperty({ description: 'Total in RUB' })
+  @ApiProperty({ description: 'Bonus discount applied at checkout in RUB (ADR-1614)' })
+  bonusDiscountAmount!: number;
+
+  @ApiProperty({ description: 'Bonus points spent at checkout (ADR-1614)' })
+  appliedBonusPoints!: number;
+
+  @ApiProperty({ description: 'Payable total in RUB (subtotal minus bonus discount)' })
   totalAmount!: number;
 
   @ApiProperty()

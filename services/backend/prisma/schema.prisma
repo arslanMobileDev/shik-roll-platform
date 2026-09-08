@@ -68,6 +68,7 @@ model Brand {
   ingredients     Ingredient[]
   modifierGroups  ModifierGroup[]
   orders          Order[]
+  promotionCampaigns PromotionCampaign[]
 
   @@unique([code], map: "uq_brands_code")
   @@index([status], map: "idx_brands_status")
@@ -496,6 +497,10 @@ model Order {
   deliveryAddress String?     @map("delivery_address") // DELIVERY
   comment         String?
   subtotalAmount  Decimal     @default(0) @map("subtotal_amount") @db.Decimal(10, 2)
+  // Loyalty (ADR-1614): bonus discount applied at checkout; total_amount is
+  // the payable amount = subtotal - bonus_discount_amount.
+  bonusDiscountAmount Decimal @default(0) @map("bonus_discount_amount") @db.Decimal(10, 2)
+  appliedBonusPoints Int     @default(0) @map("applied_bonus_points")
   totalAmount     Decimal     @default(0) @map("total_amount") @db.Decimal(10, 2)
   currency        String      @default("RUB")
   estimatedReadyAt DateTime?  @map("estimated_ready_at") @db.Timestamptz(6)
@@ -517,6 +522,7 @@ model Order {
   courierId      String?   @map("courier_id") @db.Uuid
   courier        Courier?  @relation(fields: [courierId], references: [id], onDelete: SetNull, map: "fk_orders_couriers")
   payments Payment[]
+  bonusTransactions BonusTransaction[]
 
   @@unique([orderNumber], map: "uq_orders_order_number")
   @@index([brandId], map: "idx_orders_brand_id")
@@ -552,6 +558,7 @@ model Customer {
   updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   orders Order[]
+  bonusAccount BonusAccount?
 
   @@unique([phone], map: "uq_customers_phone")
   @@map("customers")
@@ -673,4 +680,78 @@ model Courier {
   orders      Order[]
 
   @@map("couriers")
+}
+
+// ---------------------------------------------------------------------------
+// Loyalty program (ADR-1614). Bounded context: loyalty.
+// BonusTransaction is the immutable ledger; BonusAccount.balance is the
+// atomically updated projection. 1 bonus point = 1 RUB, points are integers.
+// Ledger rows are append-only: no soft delete, no version, no updated_at.
+// ---------------------------------------------------------------------------
+
+enum BonusTransactionType {
+  EARN
+  SPEND
+  EXPIRE
+  REFUND
+}
+
+enum PromotionCampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+model BonusAccount {
+  id           String   @id @default(uuid()) @db.Uuid
+  customerId   String   @unique @map("customer_id") @db.Uuid
+  balance      Int      @default(0)
+  cashbackRate Decimal  @default(0) @map("cashback_rate") @db.Decimal(5, 2)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customer     Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict, map: "fk_bonus_accounts_customers")
+  transactions BonusTransaction[]
+
+  @@map("bonus_accounts")
+}
+
+model BonusTransaction {
+  id             String               @id @default(uuid()) @db.Uuid
+  accountId      String               @map("account_id") @db.Uuid
+  orderId        String?              @map("order_id") @db.Uuid
+  type           BonusTransactionType
+  points         Int // signed: EARN/REFUND > 0; SPEND/EXPIRE < 0
+  balanceAfter   Int                  @map("balance_after")
+  idempotencyKey String               @unique @map("idempotency_key")
+  expiresAt      DateTime?            @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  account BonusAccount @relation(fields: [accountId], references: [id], onDelete: Restrict, map: "fk_bonus_transactions_bonus_accounts")
+  order   Order?       @relation(fields: [orderId], references: [id], onDelete: Restrict, map: "fk_bonus_transactions_orders")
+
+  @@index([accountId, createdAt], map: "idx_bonus_transactions_account_id_created_at")
+  @@index([orderId], map: "idx_bonus_transactions_order_id")
+  @@map("bonus_transactions")
+}
+
+model PromotionCampaign {
+  id          String                  @id @default(uuid()) @db.Uuid
+  brandId     String                  @map("brand_id") @db.Uuid
+  title       String
+  description String?
+  bannerUrl   String                  @map("banner_url")
+  actionUrl   String?                 @map("action_url")
+  status      PromotionCampaignStatus @default(DRAFT)
+  priority    Int                     @default(0)
+  startsAt    DateTime                @map("starts_at") @db.Timestamptz(6)
+  endsAt      DateTime                @map("ends_at") @db.Timestamptz(6)
+  createdAt   DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_promotion_campaigns_brands")
+
+  @@index([brandId, status, startsAt, endsAt], map: "idx_promotion_campaigns_feed")
+  @@map("promotion_campaigns")
 }

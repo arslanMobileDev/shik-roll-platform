@@ -6,6 +6,7 @@ import {
 import { OrderStatus, Prisma, ProductStatus } from '@prisma/client';
 import { concat, Observable, of } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
 import { lineTotal, orderSubtotal, orderTotal } from './domain/order-pricing';
 import {
@@ -31,6 +32,7 @@ export class OrdersService {
     private readonly queues: OrderQueuesService,
     private readonly prisma: PrismaService,
     private readonly couriersEvents: CouriersEventsService,
+    private readonly loyalty: LoyaltyService,
   ) {}
 
   /**
@@ -187,9 +189,27 @@ export class OrdersService {
         modifiers: item.modifiers.create,
       })),
     );
-    const total = orderTotal(subtotal);
 
-    const record = await this.repository.create({
+    // Loyalty checkout (ADR-1614): bonus_base = subtotal - promotion discounts
+    // (promotion discounts are not implemented yet, so the base is the
+    // subtotal); payable = bonus_base - bonus_discount. The server re-checks
+    // the 30% limit and the balance — client-supplied points are never trusted.
+    const useBonusPoints = dto.useBonusPoints ?? 0;
+    if (useBonusPoints > 0 && !customerId) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'BONUS_CUSTOMER_REQUIRED',
+        message: 'Spending bonus points requires an authenticated customer',
+      });
+    }
+    let bonusDiscount = new Prisma.Decimal(0);
+    if (useBonusPoints > 0) {
+      await this.loyalty.assertSpendAllowed(customerId!, useBonusPoints, subtotal);
+      bonusDiscount = new Prisma.Decimal(useBonusPoints);
+    }
+    const total = orderTotal(subtotal.minus(bonusDiscount));
+
+    const data: Prisma.OrderCreateInput = {
       orderNumber,
       type: dto.type,
       status: OrderStatus.NEW,
@@ -200,9 +220,27 @@ export class OrdersService {
       deliveryAddress: dto.deliveryAddress ?? null,
       comment: dto.comment ?? null,
       subtotalAmount: subtotal,
+      bonusDiscountAmount: bonusDiscount,
+      appliedBonusPoints: useBonusPoints,
       totalAmount: total,
       items: { create: itemInputs },
-    });
+    };
+
+    // Order creation, the conditional balance decrement and the SPEND ledger
+    // entry commit in one transaction (ADR-1614): a lost balance race rolls
+    // the order back with 409 INSUFFICIENT_BONUS_BALANCE.
+    const record =
+      useBonusPoints > 0
+        ? await this.prisma.$transaction(async (tx) => {
+            const created = await this.repository.create(data, tx);
+            await this.loyalty.spendWithinTransaction(tx, {
+              customerId: customerId!,
+              orderId: created.id,
+              points: useBonusPoints,
+            });
+            return created;
+          })
+        : await this.repository.create(data);
 
     await this.queues.scheduleOrderProcessing(record.id);
     return toOrderEntity(record);
@@ -255,6 +293,15 @@ export class OrdersService {
       timestamp: new Date().toISOString(),
     });
     this.couriersEvents.emitOrderTrackingEvent(this.toTrackingEvent(updated));
+
+    // Loyalty (ADR-1614): cashback accrues exactly once on the transition to
+    // COMPLETED; a cancellation refunds the points spent at checkout. Both
+    // operations are idempotent (ledger keys earn:/refund:{orderId}).
+    if (updated.status === OrderStatus.COMPLETED) {
+      await this.loyalty.earnCashback(updated.id);
+    } else if (updated.status === OrderStatus.CANCELLED) {
+      await this.loyalty.refundOnCancel(updated.id);
+    }
 
     return toOrderEntity(updated);
   }

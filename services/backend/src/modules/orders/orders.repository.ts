@@ -51,8 +51,16 @@ export class OrdersRepository {
     });
   }
 
-  create(data: Prisma.OrderCreateInput): Promise<OrderRecord> {
-    return this.prisma.order.create({ data, include: ORDER_INCLUDE });
+  /**
+   * Create the order. Accepts an ambient transaction client so the checkout
+   * bonus spend (ADR-1614) commits in the same transaction as the order.
+   */
+  create(
+    data: Prisma.OrderCreateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<OrderRecord> {
+    const client = tx ?? this.prisma;
+    return client.order.create({ data, include: ORDER_INCLUDE });
   }
 
   /** Transition the status and append to history in one atomic operation (BE-907). */

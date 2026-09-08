@@ -1,4 +1,9 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderStatus, OrderType, Prisma, ProductStatus } from '@prisma/client';
 import { firstValueFrom, of, take, toArray } from 'rxjs';
@@ -7,6 +12,7 @@ import {
   CouriersEventsService,
   OrderTrackingEvent,
 } from '../couriers/couriers-events.service';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
 import { OrdersRepository } from './orders.repository';
 import { OrdersService } from './orders.service';
@@ -34,6 +40,8 @@ function makeOrderRecord(status: OrderStatus = OrderStatus.NEW) {
     deliveryAddress: null,
     comment: null,
     subtotalAmount: D('800.00'),
+    bonusDiscountAmount: D('0.00'),
+    appliedBonusPoints: 0,
     totalAmount: D('800.00'),
     currency: 'RUB',
     estimatedReadyAt: null,
@@ -87,6 +95,13 @@ describe('OrdersService', () => {
   let prisma: {
     menuItem: { findMany: jest.Mock };
     modifierItem: { findMany: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let loyalty: {
+    assertSpendAllowed: jest.Mock;
+    spendWithinTransaction: jest.Mock;
+    earnCashback: jest.Mock;
+    refundOnCancel: jest.Mock;
   };
   let couriersEvents: {
     emitOrderEvent: jest.Mock;
@@ -106,6 +121,17 @@ describe('OrdersService', () => {
     prisma = {
       menuItem: { findMany: jest.fn() },
       modifierItem: { findMany: jest.fn() },
+      // Interactive transactions hand the callback a bare client stub; the
+      // repository is mocked, so the client itself is never exercised.
+      $transaction: jest.fn((callback: (client: unknown) => unknown) =>
+        callback({}),
+      ),
+    };
+    loyalty = {
+      assertSpendAllowed: jest.fn().mockResolvedValue(undefined),
+      spendWithinTransaction: jest.fn().mockResolvedValue(undefined),
+      earnCashback: jest.fn().mockResolvedValue(undefined),
+      refundOnCancel: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -114,6 +140,7 @@ describe('OrdersService', () => {
         { provide: OrdersRepository, useValue: repository },
         { provide: OrderQueuesService, useValue: queues },
         { provide: PrismaService, useValue: prisma },
+        { provide: LoyaltyService, useValue: loyalty },
         {
           provide: CouriersEventsService,
           useValue: {
@@ -246,6 +273,123 @@ describe('OrdersService', () => {
         response: { code: 'PRODUCT_UNAVAILABLE' },
       });
       expect(repository.create).not.toHaveBeenCalled();
+    });
+
+    it('does not touch loyalty when no bonuses are requested', async () => {
+      await service.create(dto, CUSTOMER_ID);
+
+      expect(loyalty.assertSpendAllowed).not.toHaveBeenCalled();
+      expect(loyalty.spendWithinTransaction).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      const createArg = repository.create.mock.calls[0][0];
+      expect(createArg.appliedBonusPoints).toBe(0);
+      expect(createArg.bonusDiscountAmount.toString()).toBe('0');
+    });
+  });
+
+  describe('create — bonus checkout (ADR-1614)', () => {
+    const dto = {
+      type: OrderType.DINE_IN,
+      brandId: BRAND_ID,
+      branchId: BRANCH_ID,
+      tableNumber: '7',
+      items: [
+        {
+          menuItemId: MENU_ITEM_ID,
+          quantity: 2,
+          modifiers: [{ modifierItemId: MODIFIER_ID, quantity: 1 }],
+        },
+      ],
+      // Subtotal is 900 -> the 30% limit is 270 points.
+      useBonusPoints: 200,
+    };
+
+    beforeEach(() => {
+      prisma.menuItem.findMany.mockResolvedValue([
+        {
+          id: MENU_ITEM_ID,
+          name: 'Филадельфия',
+          basePrice: D('400.00'),
+          status: ProductStatus.PUBLISHED,
+          prices: [],
+        },
+      ]);
+      prisma.modifierItem.findMany.mockResolvedValue([
+        { id: MODIFIER_ID, name: 'Икра тобико', price: D('50.00') },
+      ]);
+      repository.create.mockResolvedValue({
+        ...makeOrderRecord(),
+        bonusDiscountAmount: D('200.00'),
+        appliedBonusPoints: 200,
+        totalAmount: D('700.00'),
+      });
+    });
+
+    it('spends the points in one transaction with the order and reduces the payable total', async () => {
+      const result = await service.create(dto, CUSTOMER_ID);
+
+      // bonus_base = 900 (no promotion discounts yet); server-side guard.
+      expect(loyalty.assertSpendAllowed).toHaveBeenCalledTimes(1);
+      const guardArgs = loyalty.assertSpendAllowed.mock.calls[0];
+      expect(guardArgs[0]).toBe(CUSTOMER_ID);
+      expect(guardArgs[1]).toBe(200);
+      expect(guardArgs[2].toString()).toBe('900');
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      const createArg = repository.create.mock.calls[0][0];
+      expect(createArg.subtotalAmount.toString()).toBe('900');
+      expect(createArg.bonusDiscountAmount.toString()).toBe('200');
+      expect(createArg.appliedBonusPoints).toBe(200);
+      // payable = 900 - 200 = 700
+      expect(createArg.totalAmount.toString()).toBe('700');
+      expect(loyalty.spendWithinTransaction).toHaveBeenCalledWith(
+        expect.anything(),
+        { customerId: CUSTOMER_ID, orderId: ORDER_ID, points: 200 },
+      );
+      expect(queues.scheduleOrderProcessing).toHaveBeenCalledWith(ORDER_ID);
+      expect(result.appliedBonusPoints).toBe(200);
+      expect(result.bonusDiscountAmount).toBe(200);
+      expect(result.totalAmount).toBe(700);
+    });
+
+    it('rejects bonus spend for an anonymous checkout with BONUS_CUSTOMER_REQUIRED', async () => {
+      await expect(service.create(dto)).rejects.toMatchObject({
+        response: { code: 'BONUS_CUSTOMER_REQUIRED' },
+      });
+      expect(loyalty.assertSpendAllowed).not.toHaveBeenCalled();
+      expect(repository.create).not.toHaveBeenCalled();
+      expect(queues.scheduleOrderProcessing).not.toHaveBeenCalled();
+    });
+
+    it('propagates the 30% limit rejection (422 BONUS_LIMIT_EXCEEDED) and writes nothing', async () => {
+      loyalty.assertSpendAllowed.mockRejectedValue(
+        new UnprocessableEntityException({
+          statusCode: 422,
+          code: 'BONUS_LIMIT_EXCEEDED',
+          message: 'over the limit',
+        }),
+      );
+
+      await expect(
+        service.create({ ...dto, useBonusPoints: 500 }, CUSTOMER_ID),
+      ).rejects.toMatchObject({ response: { code: 'BONUS_LIMIT_EXCEEDED' } });
+      expect(repository.create).not.toHaveBeenCalled();
+      expect(queues.scheduleOrderProcessing).not.toHaveBeenCalled();
+    });
+
+    it('rolls the order back when the balance raced (409 INSUFFICIENT_BONUS_BALANCE from the ledger)', async () => {
+      loyalty.spendWithinTransaction.mockRejectedValue(
+        new ConflictException({
+          statusCode: 409,
+          code: 'INSUFFICIENT_BONUS_BALANCE',
+          message: 'balance moved',
+        }),
+      );
+
+      await expect(service.create(dto, CUSTOMER_ID)).rejects.toMatchObject({
+        response: { code: 'INSUFFICIENT_BONUS_BALANCE' },
+      });
+      expect(queues.scheduleOrderProcessing).not.toHaveBeenCalled();
     });
   });
 
@@ -389,6 +533,39 @@ describe('OrdersService', () => {
       ).rejects.toMatchObject({
         response: { code: 'INVALID_ORDER_STATUS_TRANSITION' },
       });
+    });
+
+    it('accrues cashback once the order reaches COMPLETED (ADR-1614)', async () => {
+      repository.findById.mockResolvedValue(makeOrderRecord(OrderStatus.READY));
+      repository.transitionStatus.mockResolvedValue(makeOrderRecord(OrderStatus.COMPLETED));
+
+      await service.updateStatus(ORDER_ID, { status: OrderStatus.COMPLETED });
+
+      expect(loyalty.earnCashback).toHaveBeenCalledWith(ORDER_ID);
+      expect(loyalty.refundOnCancel).not.toHaveBeenCalled();
+    });
+
+    it('refunds the spent points when the order is CANCELLED (ADR-1614)', async () => {
+      repository.findById.mockResolvedValue(makeOrderRecord(OrderStatus.COOKING));
+      repository.transitionStatus.mockResolvedValue(makeOrderRecord(OrderStatus.CANCELLED));
+
+      await service.updateStatus(ORDER_ID, {
+        status: OrderStatus.CANCELLED,
+        reason: 'out of ingredients',
+      });
+
+      expect(loyalty.refundOnCancel).toHaveBeenCalledWith(ORDER_ID);
+      expect(loyalty.earnCashback).not.toHaveBeenCalled();
+    });
+
+    it('does not touch loyalty on non-terminal transitions', async () => {
+      repository.findById.mockResolvedValue(makeOrderRecord(OrderStatus.NEW));
+      repository.transitionStatus.mockResolvedValue(makeOrderRecord(OrderStatus.CONFIRMED));
+
+      await service.updateStatus(ORDER_ID, { status: OrderStatus.CONFIRMED });
+
+      expect(loyalty.earnCashback).not.toHaveBeenCalled();
+      expect(loyalty.refundOnCancel).not.toHaveBeenCalled();
     });
 
     it('throws ORDER_NOT_FOUND when missing', async () => {

@@ -81,6 +81,17 @@ export class CreateOrderDto {
   @MaxLength(1000)
   comment?: string;
 
+  @ApiPropertyOptional({
+    description:
+      'Bonus points to spend (ADR-1614): integer, 1 point = 1 RUB, max 30% of the item amount; requires a guest Bearer token',
+    default: 0,
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  useBonusPoints?: number = 0;
+
   @ApiProperty({ type: [CreateOrderItemDto] })
   @IsArray()
   @ArrayMinSize(1)
