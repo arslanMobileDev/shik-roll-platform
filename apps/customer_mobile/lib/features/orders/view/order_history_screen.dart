@@ -14,15 +14,24 @@ import '../../menu/bloc/menu_state.dart';
 import '../../menu/data/menu_models.dart';
 import '../bloc/order_history_bloc.dart';
 import '../data/order_history_models.dart';
+import '../data/order_tracking_repository.dart';
+import '../presentation/screens/order_tracking_screen.dart';
 import 'widgets/order_status_badge.dart';
 
 /// «Мои заказы» tab: the authenticated guest's orders (`GET /orders`)
 /// with statuses, totals and the «Повторить заказ» action.
 class OrderHistoryScreen extends StatefulWidget {
-  const OrderHistoryScreen({super.key, required this.onGoToCart});
+  const OrderHistoryScreen({
+    super.key,
+    required this.onGoToCart,
+    required this.orderTrackingRepository,
+  });
 
   /// Switches the shell to the cart tab after «Повторить заказ».
   final VoidCallback onGoToCart;
+
+  /// Realtime-трекинг заказа (ADR-1615) для перехода с карточки.
+  final OrderTrackingRepository orderTrackingRepository;
 
   @override
   State<OrderHistoryScreen> createState() => _OrderHistoryScreenState();
@@ -67,7 +76,12 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                   ),
                   child: Text('Мои заказы', style: theme.textTheme.headlineSmall),
                 ),
-                Expanded(child: _OrdersBody(onGoToCart: widget.onGoToCart)),
+                Expanded(
+                  child: _OrdersBody(
+                    onGoToCart: widget.onGoToCart,
+                    orderTrackingRepository: widget.orderTrackingRepository,
+                  ),
+                ),
               ],
             );
           },
@@ -122,9 +136,13 @@ class _LoginPrompt extends StatelessWidget {
 }
 
 class _OrdersBody extends StatelessWidget {
-  const _OrdersBody({required this.onGoToCart});
+  const _OrdersBody({
+    required this.onGoToCart,
+    required this.orderTrackingRepository,
+  });
 
   final VoidCallback onGoToCart;
+  final OrderTrackingRepository orderTrackingRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -151,6 +169,7 @@ class _OrdersBody extends StatelessWidget {
               itemBuilder: (context, index) => _OrderCard(
                 order: state.orders[index],
                 onGoToCart: onGoToCart,
+                orderTrackingRepository: orderTrackingRepository,
               ),
             ),
           ),
@@ -233,10 +252,38 @@ class _OrdersError extends StatelessWidget {
 /// One order card: number + status badge, date, composition, total and
 /// the «Повторить заказ» action.
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.order, required this.onGoToCart});
+  const _OrderCard({
+    required this.order,
+    required this.onGoToCart,
+    required this.orderTrackingRepository,
+  });
 
   final OrderHistoryEntry order;
   final VoidCallback onGoToCart;
+  final OrderTrackingRepository orderTrackingRepository;
+
+  /// Открывает realtime-трекинг заказа (ADR-1615).
+  void _openTracking(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => OrderTrackingScreen(
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          trackingRepository: orderTrackingRepository,
+          deliveryAddress: order.deliveryAddress,
+          items: [
+            for (final item in order.items)
+              {
+                'name': item.name,
+                'count': item.quantity,
+                'price': (item.unitPrice * item.quantity).rubles.round(),
+              },
+          ],
+          totalPrice: order.totalAmount.rubles.round(),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -244,9 +291,13 @@ class _OrderCard extends StatelessWidget {
     return Card(
       key: ValueKey('order-card-${order.id}'),
       margin: const EdgeInsets.only(bottom: AppSpacing.s8),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.s12),
-        child: Column(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: ValueKey('open-tracking-${order.id}'),
+        onTap: () => _openTracking(context),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.s12),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -286,7 +337,8 @@ class _OrderCard extends StatelessWidget {
                 ),
               ],
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

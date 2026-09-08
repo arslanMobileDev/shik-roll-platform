@@ -18,6 +18,7 @@ import '../menu/data/menu_repository.dart';
 import '../menu/view/menu_screen.dart';
 import '../orders/bloc/order_history_bloc.dart';
 import '../orders/data/order_history_repository.dart';
+import '../orders/data/order_tracking_repository.dart';
 import '../orders/view/order_history_screen.dart';
 import '../payments/data/payments_repository.dart';
 import '../profile/view/profile_screen.dart';
@@ -33,6 +34,7 @@ class HomeShell extends StatefulWidget {
     required this.tokenStorage,
     required this.tokenProvider,
     required this.orderHistoryRepository,
+    required this.orderTrackingRepository,
   });
 
   final CustomerMenuRepository repository;
@@ -42,6 +44,7 @@ class HomeShell extends StatefulWidget {
   final AuthTokenStorage tokenStorage;
   final AuthTokenProvider tokenProvider;
   final OrderHistoryRepository orderHistoryRepository;
+  final OrderTrackingRepository orderTrackingRepository;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -88,6 +91,7 @@ class _HomeShellState extends State<HomeShell> {
                 CartScreen(onGoToMenu: () => setState(() => _tab = 0)),
                 OrderHistoryScreen(
                   onGoToCart: () => setState(() => _tab = 1),
+                  orderTrackingRepository: widget.orderTrackingRepository,
                 ),
                 const ProfileScreen(),
               ],

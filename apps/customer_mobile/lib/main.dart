@@ -14,6 +14,7 @@ import 'features/cart/data/orders_repository.dart';
 import 'features/menu/data/fake_customer_menu_repository.dart';
 import 'features/menu/data/menu_repository.dart';
 import 'features/orders/data/order_history_repository.dart';
+import 'features/orders/data/order_tracking_repository.dart';
 import 'features/payments/data/fake_payments_repository.dart';
 import 'features/payments/data/payments_repository.dart';
 import 'features/profile/data/user_settings_repository.dart';
@@ -71,6 +72,15 @@ Future<void> main() async {
         )
       : FakeOrderHistoryRepository();
 
+  // Realtime-трекинг статуса заказа (ADR-1615): SSE + fallback-поллинг.
+  final OrderTrackingRepository orderTrackingRepository =
+      AppConfig.useRemoteMenu
+      ? RemoteOrderTrackingRepository(
+          ApiClient(baseUrl: AppConfig.apiBaseUrl),
+          tokenProvider,
+        )
+      : FakeOrderTrackingRepository();
+
   // Локальные UI-настройки гостя (ADR-1616).
   final userSettingsRepository = SharedPreferencesUserSettingsRepository(
     await SharedPreferences.getInstance(),
@@ -85,6 +95,7 @@ Future<void> main() async {
       tokenStorage: const SecureAuthTokenStorage(),
       tokenProvider: tokenProvider,
       orderHistoryRepository: orderHistoryRepository,
+      orderTrackingRepository: orderTrackingRepository,
       userSettingsRepository: userSettingsRepository,
     ),
   );

@@ -8,6 +8,7 @@ import '../features/auth/data/auth_repository.dart';
 import '../features/cart/data/orders_repository.dart';
 import '../features/menu/data/menu_repository.dart';
 import '../features/orders/data/order_history_repository.dart';
+import '../features/orders/data/order_tracking_repository.dart';
 import '../features/payments/data/payments_repository.dart';
 import '../features/profile/bloc/user_settings_cubit.dart';
 import '../features/profile/data/user_settings_repository.dart';
@@ -24,6 +25,7 @@ class CustomerApp extends StatelessWidget {
     required this.tokenStorage,
     required this.tokenProvider,
     required this.orderHistoryRepository,
+    required this.orderTrackingRepository,
     required this.userSettingsRepository,
   });
 
@@ -34,6 +36,7 @@ class CustomerApp extends StatelessWidget {
   final AuthTokenStorage tokenStorage;
   final AuthTokenProvider tokenProvider;
   final OrderHistoryRepository orderHistoryRepository;
+  final OrderTrackingRepository orderTrackingRepository;
   final UserSettingsRepository userSettingsRepository;
 
   @override
@@ -55,6 +58,7 @@ class CustomerApp extends StatelessWidget {
           tokenStorage: tokenStorage,
           tokenProvider: tokenProvider,
           orderHistoryRepository: orderHistoryRepository,
+          orderTrackingRepository: orderTrackingRepository,
         ),
       ),
     );

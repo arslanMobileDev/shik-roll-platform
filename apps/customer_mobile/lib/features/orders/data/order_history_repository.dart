@@ -112,6 +112,7 @@ final class FakeOrderHistoryRepository implements OrderHistoryRepository {
       type: 'DELIVERY',
       totalAmount: const Money.kopecks(78000),
       createdAt: DateTime(2026, 9, 4, 12, 30),
+      deliveryAddress: 'ул. Ленина, д. 42, кв. 15',
       items: const [
         OrderHistoryItem(
           menuItemId: 'item-philadelphia',

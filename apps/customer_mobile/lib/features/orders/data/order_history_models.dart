@@ -80,6 +80,7 @@ final class OrderHistoryEntry extends Equatable {
     required this.totalAmount,
     required this.createdAt,
     required this.items,
+    this.deliveryAddress,
   });
 
   factory OrderHistoryEntry.fromJson(Map<String, dynamic> json) {
@@ -101,6 +102,7 @@ final class OrderHistoryEntry extends Equatable {
           for (final item in (json['items'] as List<dynamic>?) ?? const [])
             OrderHistoryItem.fromJson(item as Map<String, dynamic>),
         ],
+        deliveryAddress: json['deliveryAddress'] as String?,
       );
     } on TypeError catch (e) {
       throw FormatException('Malformed order payload: $e');
@@ -122,6 +124,9 @@ final class OrderHistoryEntry extends Equatable {
   final DateTime createdAt;
   final List<OrderHistoryItem> items;
 
+  /// Адрес доставки (`null` для takeaway/dine-in).
+  final String? deliveryAddress;
+
   /// Composition preview: `«Филадельфия ×2, Лимонад ×1»`.
   String get itemsLabel =>
       items.map((i) => '${i.name} ×${i.quantity}').join(', ');
@@ -135,5 +140,6 @@ final class OrderHistoryEntry extends Equatable {
     totalAmount,
     createdAt,
     items,
+    deliveryAddress,
   ];
 }
