@@ -1,3 +1,4 @@
+import '../../../core/config/pos_config.dart';
 import '../../../core/utils/money.dart';
 import 'catalog_models.dart';
 import 'catalog_repository.dart';
@@ -12,7 +13,7 @@ final class FakeCatalogRepository implements CatalogRepository {
   /// Simulated network latency; pass [Duration.zero] in tests.
   final Duration latency;
 
-  static const _brandId = 'brand-shik-roll';
+  static const _brandId = PosConfig.defaultBrandId;
   static const _menuId = 'menu-main';
 
   static final _categories = <Category>[
@@ -427,6 +428,15 @@ final class FakeCatalogRepository implements CatalogRepository {
     ),
   ];
 
+  bool _matchesBrand(String? itemBrandId, String? requestedBrandId) {
+    if (requestedBrandId == null) return true;
+    if (itemBrandId == requestedBrandId) return true;
+    if (requestedBrandId == 'brand-shik-roll' || requestedBrandId == PosConfig.defaultBrandId) {
+      return itemBrandId == 'brand-shik-roll' || itemBrandId == PosConfig.defaultBrandId;
+    }
+    return false;
+  }
+
   Future<void> _simulateLatency() async {
     if (latency > Duration.zero) await Future<void>.delayed(latency);
   }
@@ -465,7 +475,7 @@ final class FakeCatalogRepository implements CatalogRepository {
         status: 'PUBLISHED',
         categoryCount: 6,
       ),
-    ].where((m) => brandId == null || m.brandId == brandId).toList();
+    ].where((m) => _matchesBrand(m.brandId, brandId)).toList();
     return _page(menus, page, limit);
   }
 
@@ -481,7 +491,7 @@ final class FakeCatalogRepository implements CatalogRepository {
         .where(
           (c) =>
               (menuId == null || c.menuId == menuId) &&
-              (brandId == null || c.brandId == brandId),
+              _matchesBrand(c.brandId, brandId),
         )
         .toList();
     return _page(categories, page, limit);
@@ -499,7 +509,7 @@ final class FakeCatalogRepository implements CatalogRepository {
     int limit = 30,
   }) async {
     await _simulateLatency();
-    var items = _buildItems().where((i) => i.brandId == brandId);
+    var items = _buildItems().where((i) => _matchesBrand(i.brandId, brandId));
     if (categoryId != null) {
       items = items.where((i) => i.category.id == categoryId);
     }
