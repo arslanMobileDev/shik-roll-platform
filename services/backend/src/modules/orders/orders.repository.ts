@@ -6,7 +6,8 @@ import { ORDER_INCLUDE, OrderRecord } from './mappers/order.mapper';
 export interface OrderListFilter {
   brandId?: string;
   branchId?: string;
-  status?: OrderStatus;
+  statuses?: OrderStatus[];
+  excludePendingPayment?: boolean;
   customerId?: string;
   page: number;
   limit: number;
@@ -26,7 +27,11 @@ export class OrdersRepository {
       deletedAt: null,
       ...(filter.brandId ? { brandId: filter.brandId } : {}),
       ...(filter.branchId ? { branchId: filter.branchId } : {}),
-      ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.statuses?.length
+        ? { status: { in: filter.statuses } }
+        : filter.excludePendingPayment
+          ? { status: { not: OrderStatus.PENDING_PAYMENT } }
+          : {}),
       ...(filter.customerId ? { customerId: filter.customerId } : {}),
     };
 
@@ -73,6 +78,7 @@ export class OrdersRepository {
     courierId?: string | undefined,
   ): Promise<OrderRecord> {
     const terminalPatch: Prisma.OrderUncheckedUpdateInput = {};
+    if (to === OrderStatus.CONFIRMED) terminalPatch.confirmedAt = new Date();
     if (to === OrderStatus.COMPLETED) terminalPatch.completedAt = new Date();
     if (to === OrderStatus.CANCELLED) {
       terminalPatch.cancelledAt = new Date();

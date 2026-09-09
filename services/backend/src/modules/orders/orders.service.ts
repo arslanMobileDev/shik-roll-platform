@@ -3,7 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { OrderStatus, Prisma, ProductStatus } from '@prisma/client';
+import {
+  OrderStatus,
+  PaymentMethod,
+  Prisma,
+  ProductStatus,
+} from '@prisma/client';
 import { concat, Observable, of } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
@@ -48,7 +53,8 @@ export class OrdersService {
     const { records, total } = await this.repository.list({
       brandId: query.brandId,
       branchId: query.branchId,
-      status: query.status,
+      statuses: query.status,
+      excludePendingPayment: !query.status?.length,
       customerId,
       page,
       limit,
@@ -73,7 +79,7 @@ export class OrdersService {
     const limit = query.limit ?? 20;
     const { records, total } = await this.repository.list({
       customerId,
-      status: query.status,
+      statuses: query.status ? [query.status] : undefined,
       page,
       limit,
     });
@@ -219,11 +225,17 @@ export class OrdersService {
       bonusDiscount = new Prisma.Decimal(useBonusPoints);
     }
     const total = orderTotal(subtotal.minus(bonusDiscount));
+    const paymentMethod = dto.paymentMethod ?? PaymentMethod.ON_DELIVERY;
+    const initialStatus =
+      paymentMethod === PaymentMethod.ONLINE
+        ? OrderStatus.PENDING_PAYMENT
+        : OrderStatus.NEW;
 
     const data: Prisma.OrderCreateInput = {
       orderNumber,
       type: dto.type,
-      status: OrderStatus.NEW,
+      status: initialStatus,
+      paymentMethod,
       brand: { connect: { id: dto.brandId } },
       branch: { connect: { id: dto.branchId } },
       ...(customerId ? { customer: { connect: { id: customerId } } } : {}),
@@ -254,14 +266,16 @@ export class OrdersService {
         : await this.repository.create(data);
 
     await this.queues.scheduleOrderProcessing(record.id);
-    this.ordersEvents.emitKdsEvent({
-      eventType: "ORDER_CREATED",
-      orderId: record.id,
-      orderNumber: record.orderNumber,
-      branchId: record.branchId,
-      status: record.status,
-      timestamp: new Date().toISOString(),
-    });
+    if (record.status !== OrderStatus.PENDING_PAYMENT) {
+      this.ordersEvents.emitKdsEvent({
+        eventType: 'ORDER_CREATED',
+        orderId: record.id,
+        orderNumber: record.orderNumber,
+        branchId: record.branchId,
+        status: record.status,
+        timestamp: new Date().toISOString(),
+      });
+    }
     return toOrderEntity(record);
   }
 
@@ -313,7 +327,11 @@ export class OrdersService {
     });
     this.couriersEvents.emitOrderTrackingEvent(this.toTrackingEvent(updated));
     this.ordersEvents.emitKdsEvent({
-      eventType: "ORDER_STATUS_CHANGED",
+      eventType:
+        record.status === OrderStatus.PENDING_PAYMENT &&
+        updated.status === OrderStatus.CONFIRMED
+          ? 'ORDER_CREATED'
+          : 'ORDER_STATUS_CHANGED',
       orderId: updated.id,
       orderNumber: updated.orderNumber,
       branchId: updated.branchId,

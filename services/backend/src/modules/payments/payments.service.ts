@@ -13,6 +13,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { OrdersEventsService } from '../orders/orders-events.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import {
@@ -42,6 +43,7 @@ export class PaymentsService {
     @Inject(PAYMENT_PROVIDER_ADAPTER)
     private readonly provider: PaymentProviderAdapter,
     private readonly queues: OrderQueuesService,
+    private readonly ordersEvents: OrdersEventsService,
   ) {}
 
   /**
@@ -228,37 +230,77 @@ export class PaymentsService {
    */
   private async applyPaymentSuccess(paymentId: string): Promise<Payment> {
     let dispatchToKitchen = false;
+    let becameVisibleToKitchen:
+      | {
+          id: string;
+          orderNumber: string;
+          branchId: string;
+          status: OrderStatus;
+        }
+      | undefined;
     const payment = await this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.update({
         where: { id: paymentId },
         data: { status: PaymentStatus.SUCCEEDED },
       });
       const order = await tx.order.findUnique({ where: { id: payment.orderId } });
-      if (order && !order.deletedAt && order.status === OrderStatus.NEW) {
+      if (
+        order &&
+        !order.deletedAt &&
+        (order.status === OrderStatus.PENDING_PAYMENT ||
+          order.status === OrderStatus.NEW)
+      ) {
+        const previousStatus = order.status;
         await tx.order.update({
           where: { id: order.id },
-          data: { status: OrderStatus.CONFIRMED, version: { increment: 1 } },
+          data: {
+            status: OrderStatus.CONFIRMED,
+            confirmedAt: new Date(),
+            version: { increment: 1 },
+          },
         });
         await tx.orderStatusHistory.create({
           data: {
             orderId: order.id,
-            previousStatus: OrderStatus.NEW,
+            previousStatus,
             newStatus: OrderStatus.CONFIRMED,
             reason: 'Online payment succeeded',
           },
         });
         dispatchToKitchen = true;
+        if (previousStatus === OrderStatus.PENDING_PAYMENT) {
+          becameVisibleToKitchen = {
+            id: order.id,
+            orderNumber: order.orderNumber,
+            branchId: order.branchId,
+            status: OrderStatus.CONFIRMED,
+          };
+        }
       } else if (order && !order.deletedAt && order.status === OrderStatus.CONFIRMED) {
         // Already confirmed (e.g. by the POS auto-confirm path) — the
         // kitchen still waits for the paid signal before starting.
         dispatchToKitchen = true;
-      } else if (order && order.status !== OrderStatus.NEW) {
+      } else if (
+        order &&
+        order.status !== OrderStatus.NEW &&
+        order.status !== OrderStatus.PENDING_PAYMENT
+      ) {
         this.logger.warn(
           `Payment ${payment.id} succeeded but order ${order.id} is ${order.status} — status left unchanged`,
         );
       }
       return payment;
     });
+    if (becameVisibleToKitchen) {
+      this.ordersEvents.emitKdsEvent({
+        eventType: 'ORDER_CREATED',
+        orderId: becameVisibleToKitchen.id,
+        orderNumber: becameVisibleToKitchen.orderNumber,
+        branchId: becameVisibleToKitchen.branchId,
+        status: becameVisibleToKitchen.status,
+        timestamp: new Date().toISOString(),
+      });
+    }
     if (dispatchToKitchen) {
       await this.queues.sendToKitchen(payment.orderId);
     }

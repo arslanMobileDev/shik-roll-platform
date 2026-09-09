@@ -476,6 +476,7 @@ enum OrderType {
 }
 
 enum OrderStatus {
+  PENDING_PAYMENT
   NEW
   CONFIRMED
   COOKING
@@ -485,10 +486,16 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum PaymentMethod {
+  ONLINE
+  ON_DELIVERY
+}
+
 model Order {
   id              String      @id @default(uuid()) @db.Uuid
   orderNumber     String      @map("order_number")
   status          OrderStatus @default(NEW)
+  paymentMethod   PaymentMethod @default(ON_DELIVERY) @map("payment_method")
   type            OrderType
   brandId         String      @map("brand_id") @db.Uuid
   branchId        String      @map("branch_id") @db.Uuid

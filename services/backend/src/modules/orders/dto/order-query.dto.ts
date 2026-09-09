@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderStatus } from '@prisma/client';
+import { Transform } from 'class-transformer';
 import { IsEnum, IsOptional, IsUUID } from 'class-validator';
 import { PaginationQueryDto } from '../../menu/dto/pagination-query.dto';
 
@@ -14,8 +15,20 @@ export class OrderQueryDto extends PaginationQueryDto {
   @IsUUID()
   branchId?: string;
 
-  @ApiPropertyOptional({ enum: OrderStatus, description: 'Filter by order status' })
+  @ApiPropertyOptional({
+    enum: OrderStatus,
+    isArray: true,
+    description: 'Filter by one or more statuses (CSV or repeated query parameter)',
+  })
   @IsOptional()
-  @IsEnum(OrderStatus)
-  status?: OrderStatus;
+  @Transform(({ value }: { value: unknown }) =>
+    (Array.isArray(value) ? value : [value]).flatMap((item) =>
+      String(item)
+        .split(',')
+        .map((status) => status.trim())
+        .filter(Boolean),
+    ),
+  )
+  @IsEnum(OrderStatus, { each: true })
+  status?: OrderStatus[];
 }

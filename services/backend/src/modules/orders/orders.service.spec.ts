@@ -5,7 +5,13 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { OrderStatus, OrderType, Prisma, ProductStatus } from '@prisma/client';
+import {
+  OrderStatus,
+  OrderType,
+  PaymentMethod,
+  Prisma,
+  ProductStatus,
+} from '@prisma/client';
 import { firstValueFrom, of, take, toArray } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -16,6 +22,7 @@ import { LoyaltyService } from '../loyalty/loyalty.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
 import { OrdersRepository } from './orders.repository';
 import { OrdersService } from './orders.service';
+import { OrdersEventsService } from './orders-events.service';
 
 const D = (value: string | number) => new Prisma.Decimal(value);
 
@@ -26,12 +33,16 @@ const MODIFIER_ID = '44444444-4444-4444-4444-444444444444';
 const ORDER_ID = '55555555-5555-5555-5555-555555555555';
 const CUSTOMER_ID = '10101010-1010-1010-1010-101010101010';
 
-function makeOrderRecord(status: OrderStatus = OrderStatus.NEW) {
+function makeOrderRecord(
+  status: OrderStatus = OrderStatus.NEW,
+  paymentMethod: PaymentMethod = PaymentMethod.ON_DELIVERY,
+) {
   return {
     id: ORDER_ID,
     orderNumber: 'AAAA-20260830-0001',
     status,
     type: OrderType.DINE_IN,
+    paymentMethod,
     brandId: BRAND_ID,
     branchId: BRANCH_ID,
     customerId: CUSTOMER_ID,
@@ -45,6 +56,7 @@ function makeOrderRecord(status: OrderStatus = OrderStatus.NEW) {
     totalAmount: D('800.00'),
     currency: 'RUB',
     estimatedReadyAt: null,
+    confirmedAt: null,
     completedAt: null,
     cancelledAt: null,
     cancelReason: null,
@@ -108,6 +120,7 @@ describe('OrdersService', () => {
     emitOrderTrackingEvent: jest.Mock;
     getOrderTrackingStream: jest.Mock;
   };
+  let ordersEvents: { emitKdsEvent: jest.Mock; getKdsStream: jest.Mock };
 
   beforeEach(async () => {
     repository = {
@@ -133,6 +146,10 @@ describe('OrdersService', () => {
       earnCashback: jest.fn().mockResolvedValue(undefined),
       refundOnCancel: jest.fn().mockResolvedValue(undefined),
     };
+    ordersEvents = {
+      emitKdsEvent: jest.fn(),
+      getKdsStream: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -141,6 +158,7 @@ describe('OrdersService', () => {
         { provide: OrderQueuesService, useValue: queues },
         { provide: PrismaService, useValue: prisma },
         { provide: LoyaltyService, useValue: loyalty },
+        { provide: OrdersEventsService, useValue: ordersEvents },
         {
           provide: CouriersEventsService,
           useValue: {
@@ -164,6 +182,15 @@ describe('OrdersService', () => {
       expect(page.data).toHaveLength(1);
       expect(page.data[0].orderNumber).toBe('AAAA-20260830-0001');
       expect(page.data[0].items[0].modifiers[0].priceDelta).toBe(50);
+      expect(repository.list).toHaveBeenCalledWith({
+        brandId: undefined,
+        branchId: undefined,
+        statuses: undefined,
+        excludePendingPayment: true,
+        customerId: undefined,
+        page: 1,
+        limit: 20,
+      });
     });
 
     it('passes filters to the repository', async () => {
@@ -171,14 +198,15 @@ describe('OrdersService', () => {
       await service.list({
         brandId: BRAND_ID,
         branchId: BRANCH_ID,
-        status: OrderStatus.READY,
+        status: [OrderStatus.READY],
         page: 2,
         limit: 10,
       });
       expect(repository.list).toHaveBeenCalledWith({
         brandId: BRAND_ID,
         branchId: BRANCH_ID,
-        status: OrderStatus.READY,
+        statuses: [OrderStatus.READY],
+        excludePendingPayment: false,
         page: 2,
         limit: 10,
       });
@@ -235,11 +263,32 @@ describe('OrdersService', () => {
       expect(createArg.subtotalAmount.toString()).toBe('900');
       expect(createArg.totalAmount.toString()).toBe('900');
       expect(createArg.status).toBe(OrderStatus.NEW);
+      expect(createArg.paymentMethod).toBe(PaymentMethod.ON_DELIVERY);
       expect(createArg.items.create[0].unitPrice.toString()).toBe('400');
       expect(createArg.items.create[0].totalAmount.toString()).toBe('900');
       expect(createArg.items.create[0].modifiers.create[0].name).toBe('Икра тобико');
       expect(queues.scheduleOrderProcessing).toHaveBeenCalledWith(ORDER_ID);
+      expect(ordersEvents.emitKdsEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'ORDER_CREATED',
+          orderId: ORDER_ID,
+          status: OrderStatus.NEW,
+        }),
+      );
       expect(result.id).toBe(ORDER_ID);
+    });
+
+    it('creates ONLINE orders as PENDING_PAYMENT and hides them from KDS', async () => {
+      repository.create.mockResolvedValue(
+        makeOrderRecord(OrderStatus.PENDING_PAYMENT, PaymentMethod.ONLINE),
+      );
+
+      await service.create({ ...dto, paymentMethod: PaymentMethod.ONLINE });
+
+      const createArg = repository.create.mock.calls[0][0];
+      expect(createArg.status).toBe(OrderStatus.PENDING_PAYMENT);
+      expect(createArg.paymentMethod).toBe(PaymentMethod.ONLINE);
+      expect(ordersEvents.emitKdsEvent).not.toHaveBeenCalled();
     });
 
     it('prefers the branch price override over base price', async () => {
@@ -426,6 +475,25 @@ describe('OrdersService', () => {
           orderId: ORDER_ID,
           status: OrderStatus.CONFIRMED,
           branchId: BRANCH_ID,
+        }),
+      );
+    });
+
+    it('publishes the first KDS event when a paid order becomes CONFIRMED', async () => {
+      repository.findById.mockResolvedValue(
+        makeOrderRecord(OrderStatus.PENDING_PAYMENT, PaymentMethod.ONLINE),
+      );
+      repository.transitionStatus.mockResolvedValue(
+        makeOrderRecord(OrderStatus.CONFIRMED, PaymentMethod.ONLINE),
+      );
+
+      await service.updateStatus(ORDER_ID, { status: OrderStatus.CONFIRMED });
+
+      expect(ordersEvents.emitKdsEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'ORDER_CREATED',
+          orderId: ORDER_ID,
+          status: OrderStatus.CONFIRMED,
         }),
       );
     });

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { OrderType } from '@prisma/client';
+import { OrderType, PaymentMethod } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
@@ -54,6 +54,15 @@ export class CreateOrderDto {
   @ApiProperty({ enum: OrderType })
   @IsEnum(OrderType)
   type!: OrderType;
+
+  @ApiPropertyOptional({
+    enum: PaymentMethod,
+    default: PaymentMethod.ON_DELIVERY,
+    description: 'ONLINE waits for payment; ON_DELIVERY goes directly to KDS',
+  })
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod = PaymentMethod.ON_DELIVERY;
 
   @ApiProperty({ description: 'Brand the order belongs to' })
   @IsUUID()

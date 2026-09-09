@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { OrderStatus, OrderType } from '@prisma/client';
+import { OrderStatus, OrderType, PaymentMethod } from '@prisma/client';
 import { PageMeta } from '../../menu/entities/pagination.entity';
 
 export class OrderItemModifierEntity {
@@ -58,6 +58,9 @@ export class OrderEntity {
   @ApiProperty({ enum: OrderType })
   type!: OrderType;
 
+  @ApiProperty({ enum: PaymentMethod })
+  paymentMethod!: PaymentMethod;
+
   @ApiProperty()
   brandId!: string;
 
@@ -93,6 +96,9 @@ export class OrderEntity {
 
   @ApiPropertyOptional()
   estimatedReadyAt!: string | null;
+
+  @ApiPropertyOptional()
+  confirmedAt!: string | null;
 
   @ApiPropertyOptional()
   completedAt!: string | null;

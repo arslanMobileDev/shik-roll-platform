@@ -3,12 +3,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   OrderStatus,
   OrderType,
+  PaymentMethod,
   PaymentProvider,
   PaymentStatus,
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
+import { OrdersEventsService } from '../orders/orders-events.service';
 import { PaymentsService } from './payments.service';
 import {
   PAYMENT_PROVIDER_ADAPTER,
@@ -23,12 +25,13 @@ const ORDER_ID = '55555555-5555-5555-5555-555555555555';
 const CUSTOMER_ID = '88888888-8888-8888-8888-888888888888';
 const PAYMENT_ID = '99999999-9999-9999-9999-999999999999';
 
-function makeOrderRecord(status: OrderStatus = OrderStatus.NEW) {
+function makeOrderRecord(status: OrderStatus = OrderStatus.PENDING_PAYMENT) {
   return {
     id: ORDER_ID,
     orderNumber: 'AAAA-20260904-0001',
     status,
     type: OrderType.TAKEAWAY,
+    paymentMethod: PaymentMethod.ONLINE,
     brandId: BRAND_ID,
     branchId: BRANCH_ID,
     customerId: CUSTOMER_ID,
@@ -39,6 +42,7 @@ function makeOrderRecord(status: OrderStatus = OrderStatus.NEW) {
     totalAmount: D('500.00'),
     currency: 'RUB',
     estimatedReadyAt: null,
+    confirmedAt: null,
     completedAt: null,
     cancelledAt: null,
     cancelReason: null,
@@ -116,6 +120,7 @@ describe('PaymentsService', () => {
   };
   let adapter: { provider: PaymentProvider; createSession: jest.Mock };
   let queues: { sendToKitchen: jest.Mock; scheduleOrderProcessing: jest.Mock };
+  let ordersEvents: { emitKdsEvent: jest.Mock };
 
   const pendingSession: PaymentSessionResult = {
     externalPaymentId: 'ext-1',
@@ -148,6 +153,7 @@ describe('PaymentsService', () => {
       sendToKitchen: jest.fn().mockResolvedValue(undefined),
       scheduleOrderProcessing: jest.fn().mockResolvedValue(undefined),
     };
+    ordersEvents = { emitKdsEvent: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -155,6 +161,7 @@ describe('PaymentsService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: PAYMENT_PROVIDER_ADAPTER, useValue: adapter },
         { provide: OrderQueuesService, useValue: queues },
+        { provide: OrdersEventsService, useValue: ordersEvents },
       ],
     }).compile();
 
@@ -239,13 +246,20 @@ describe('PaymentsService', () => {
       expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
         data: {
           orderId: ORDER_ID,
-          previousStatus: OrderStatus.NEW,
+          previousStatus: OrderStatus.PENDING_PAYMENT,
           newStatus: OrderStatus.CONFIRMED,
           reason: 'Online payment succeeded',
         },
       });
       // Task contract: a successful payment enqueues the kitchen dispatch.
       expect(queues.sendToKitchen).toHaveBeenCalledWith(ORDER_ID);
+      expect(ordersEvents.emitKdsEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'ORDER_CREATED',
+          orderId: ORDER_ID,
+          status: OrderStatus.CONFIRMED,
+        }),
+      );
     });
 
     it('returns the existing pending attempt on a repeated call (idempotent)', async () => {
@@ -338,12 +352,19 @@ describe('PaymentsService', () => {
       expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
         data: {
           orderId: ORDER_ID,
-          previousStatus: OrderStatus.NEW,
+          previousStatus: OrderStatus.PENDING_PAYMENT,
           newStatus: OrderStatus.CONFIRMED,
           reason: 'Online payment succeeded',
         },
       });
       expect(queues.sendToKitchen).toHaveBeenCalledWith(ORDER_ID);
+      expect(ordersEvents.emitKdsEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'ORDER_CREATED',
+          orderId: ORDER_ID,
+          status: OrderStatus.CONFIRMED,
+        }),
+      );
     });
 
     it('is idempotent on duplicate payment.succeeded delivery', async () => {

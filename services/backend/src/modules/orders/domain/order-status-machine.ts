@@ -2,12 +2,14 @@ import { OrderStatus } from '@prisma/client';
 
 /**
  * Order lifecycle state machine:
+ *   PENDING_PAYMENT -> CONFIRMED | CANCELLED
  *   NEW -> CONFIRMED -> COOKING -> READY -> ON_WAY -> COMPLETED
  *   READY -> COMPLETED (for takeaway / dine-in)
  *   NEW | CONFIRMED | COOKING | READY | ON_WAY -> CANCELLED
  * COMPLETED and CANCELLED are terminal.
  */
 const TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
+  PENDING_PAYMENT: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
   NEW: [OrderStatus.CONFIRMED, OrderStatus.COOKING, OrderStatus.CANCELLED],
   CONFIRMED: [OrderStatus.COOKING, OrderStatus.CANCELLED],
   COOKING: [OrderStatus.READY, OrderStatus.CANCELLED],

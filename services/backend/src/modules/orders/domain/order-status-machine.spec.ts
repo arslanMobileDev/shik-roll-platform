@@ -6,10 +6,20 @@ import {
 } from './order-status-machine';
 
 describe('order status state machine', () => {
-  const { NEW, CONFIRMED, COOKING, READY, ON_WAY, COMPLETED, CANCELLED } =
-    OrderStatus;
+  const {
+    PENDING_PAYMENT,
+    NEW,
+    CONFIRMED,
+    COOKING,
+    READY,
+    ON_WAY,
+    COMPLETED,
+    CANCELLED,
+  } = OrderStatus;
 
   it.each([
+    [PENDING_PAYMENT, CONFIRMED],
+    [PENDING_PAYMENT, CANCELLED],
     [NEW, CONFIRMED],
     [NEW, COOKING], // fast path for paid online orders (send-to-kitchen job)
     [NEW, CANCELLED],
@@ -28,6 +38,12 @@ describe('order status state machine', () => {
   });
 
   it.each([
+    [PENDING_PAYMENT, PENDING_PAYMENT],
+    [PENDING_PAYMENT, NEW],
+    [PENDING_PAYMENT, COOKING],
+    [PENDING_PAYMENT, READY],
+    [PENDING_PAYMENT, ON_WAY],
+    [PENDING_PAYMENT, COMPLETED],
     [NEW, READY],
     [NEW, ON_WAY],
     [NEW, COMPLETED],
