@@ -23,6 +23,7 @@ import { OrderQueuesService } from '../queues/order-queues.service';
 import { OrdersRepository } from './orders.repository';
 import { OrdersService } from './orders.service';
 import { OrdersEventsService } from './orders-events.service';
+import { PaymentsService } from '../payments/payments.service';
 
 const D = (value: string | number) => new Prisma.Decimal(value);
 
@@ -121,6 +122,7 @@ describe('OrdersService', () => {
     getOrderTrackingStream: jest.Mock;
   };
   let ordersEvents: { emitKdsEvent: jest.Mock; getKdsStream: jest.Mock };
+  let payments: { createPayment: jest.Mock };
 
   beforeEach(async () => {
     repository = {
@@ -150,6 +152,12 @@ describe('OrdersService', () => {
       emitKdsEvent: jest.fn(),
       getKdsStream: jest.fn(),
     };
+    payments = {
+      createPayment: jest.fn().mockResolvedValue({
+        externalPaymentId: 'mock-payment-id',
+        paymentUrl: 'https://mock-pay.shik.local/payment',
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -159,6 +167,7 @@ describe('OrdersService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: LoyaltyService, useValue: loyalty },
         { provide: OrdersEventsService, useValue: ordersEvents },
+        { provide: PaymentsService, useValue: payments },
         {
           provide: CouriersEventsService,
           useValue: {
@@ -283,11 +292,17 @@ describe('OrdersService', () => {
         makeOrderRecord(OrderStatus.PENDING_PAYMENT, PaymentMethod.ONLINE),
       );
 
-      await service.create({ ...dto, paymentMethod: PaymentMethod.ONLINE });
+      const result = await service.create({
+        ...dto,
+        paymentMethod: PaymentMethod.ONLINE,
+      });
 
       const createArg = repository.create.mock.calls[0][0];
       expect(createArg.status).toBe(OrderStatus.PENDING_PAYMENT);
       expect(createArg.paymentMethod).toBe(PaymentMethod.ONLINE);
+      expect(payments.createPayment).toHaveBeenCalledWith({ orderId: ORDER_ID });
+      expect(result.paymentId).toBe('mock-payment-id');
+      expect(result.paymentUrl).toBe('https://mock-pay.shik.local/payment');
       expect(ordersEvents.emitKdsEvent).not.toHaveBeenCalled();
     });
 

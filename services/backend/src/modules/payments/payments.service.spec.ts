@@ -11,6 +11,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
 import { OrdersEventsService } from '../orders/orders-events.service';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 import { PaymentsService } from './payments.service';
 import {
   PAYMENT_PROVIDER_ADAPTER,
@@ -118,9 +119,15 @@ describe('PaymentsService', () => {
     orderStatusHistory: { create: jest.Mock };
     $transaction: jest.Mock;
   };
-  let adapter: { provider: PaymentProvider; createSession: jest.Mock };
+  let adapter: {
+    provider: PaymentProvider;
+    createPayment: jest.Mock;
+    verifyWebhook: jest.Mock;
+    parseWebhookEvent: jest.Mock;
+  };
   let queues: { sendToKitchen: jest.Mock; scheduleOrderProcessing: jest.Mock };
   let ordersEvents: { emitKdsEvent: jest.Mock };
+  let loyalty: { refundOnCancel: jest.Mock };
 
   const pendingSession: PaymentSessionResult = {
     externalPaymentId: 'ext-1',
@@ -147,13 +154,24 @@ describe('PaymentsService', () => {
     };
     adapter = {
       provider: PaymentProvider.YOOKASSA,
-      createSession: jest.fn().mockResolvedValue(pendingSession),
+      createPayment: jest.fn().mockResolvedValue(pendingSession),
+      verifyWebhook: jest.fn().mockResolvedValue(true),
+      parseWebhookEvent: jest.fn((payload) =>
+        payload?.object?.id && payload?.event
+          ? {
+              event: payload.event,
+              paymentId: payload.object.id,
+              orderId: payload.object.metadata?.orderId ?? '',
+            }
+          : null,
+      ),
     };
     queues = {
       sendToKitchen: jest.fn().mockResolvedValue(undefined),
       scheduleOrderProcessing: jest.fn().mockResolvedValue(undefined),
     };
     ordersEvents = { emitKdsEvent: jest.fn() };
+    loyalty = { refundOnCancel: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -162,6 +180,7 @@ describe('PaymentsService', () => {
         { provide: PAYMENT_PROVIDER_ADAPTER, useValue: adapter },
         { provide: OrderQueuesService, useValue: queues },
         { provide: OrdersEventsService, useValue: ordersEvents },
+        { provide: LoyaltyService, useValue: loyalty },
       ],
     }).compile();
 
@@ -178,8 +197,8 @@ describe('PaymentsService', () => {
 
       const result = await service.createPayment({ orderId: ORDER_ID });
 
-      expect(adapter.createSession).toHaveBeenCalledTimes(1);
-      const sessionInput = adapter.createSession.mock.calls[0][0];
+      expect(adapter.createPayment).toHaveBeenCalledTimes(1);
+      const sessionInput = adapter.createPayment.mock.calls[0][0];
       expect(sessionInput.amount.toFixed(2)).toBe('500.00');
       expect(sessionInput.currency).toBe('RUB');
       expect(sessionInput.idempotenceKey).toBe(`pay_${ORDER_ID}_1`);
@@ -216,7 +235,7 @@ describe('PaymentsService', () => {
     });
 
     it('settles a synchronously succeeded session (Mock provider)', async () => {
-      adapter.createSession.mockResolvedValue({
+      adapter.createPayment.mockResolvedValue({
         ...pendingSession,
         status: PaymentStatus.SUCCEEDED,
       });
@@ -271,7 +290,7 @@ describe('PaymentsService', () => {
 
       expect(result.id).toBe(pending.id);
       expect(result.paymentUrl).toBe(pending.paymentUrl);
-      expect(adapter.createSession).not.toHaveBeenCalled();
+      expect(adapter.createPayment).not.toHaveBeenCalled();
       expect(prisma.payment.create).not.toHaveBeenCalled();
     });
 
@@ -289,7 +308,7 @@ describe('PaymentsService', () => {
       ).rejects.toMatchObject({
         response: expect.objectContaining({ code: 'ORDER_ALREADY_PAID' }),
       });
-      expect(adapter.createSession).not.toHaveBeenCalled();
+      expect(adapter.createPayment).not.toHaveBeenCalled();
     });
 
     it('404 ORDER_NOT_FOUND for a missing order', async () => {
@@ -298,7 +317,7 @@ describe('PaymentsService', () => {
       await expect(service.createPayment({ orderId: ORDER_ID })).rejects.toThrow(
         NotFoundException,
       );
-      expect(adapter.createSession).not.toHaveBeenCalled();
+      expect(adapter.createPayment).not.toHaveBeenCalled();
     });
 
     it('recovers from an idempotence-key race by returning the winning attempt', async () => {
@@ -319,7 +338,7 @@ describe('PaymentsService', () => {
     });
   });
 
-  describe('handleYooKassaWebhook', () => {
+  describe('handleWebhook', () => {
     const succeededPayload = {
       type: 'notification',
       event: 'payment.succeeded',
@@ -342,7 +361,7 @@ describe('PaymentsService', () => {
       );
       prisma.orderStatusHistory.create.mockResolvedValue({});
 
-      const result = await service.handleYooKassaWebhook(succeededPayload);
+      const result = await service.handleWebhook({}, succeededPayload);
 
       expect(result).toEqual({ status: 'processed' });
       expect(prisma.payment.update).toHaveBeenCalledWith({
@@ -372,7 +391,7 @@ describe('PaymentsService', () => {
         makePaymentRecord({ status: PaymentStatus.SUCCEEDED }),
       );
 
-      const result = await service.handleYooKassaWebhook(succeededPayload);
+      const result = await service.handleWebhook({}, succeededPayload);
 
       expect(result).toEqual({ status: 'processed' });
       expect(prisma.payment.update).not.toHaveBeenCalled();
@@ -389,7 +408,7 @@ describe('PaymentsService', () => {
         makeOrderRecord(OrderStatus.COOKING),
       );
 
-      const result = await service.handleYooKassaWebhook(succeededPayload);
+      const result = await service.handleWebhook({}, succeededPayload);
 
       expect(result).toEqual({ status: 'processed' });
       expect(prisma.payment.update).toHaveBeenCalled();
@@ -407,7 +426,7 @@ describe('PaymentsService', () => {
         makeOrderRecord(OrderStatus.CONFIRMED),
       );
 
-      const result = await service.handleYooKassaWebhook(succeededPayload);
+      const result = await service.handleWebhook({}, succeededPayload);
 
       expect(result).toEqual({ status: 'processed' });
       // No second confirmation, but the paid signal still reaches the kitchen.
@@ -421,7 +440,13 @@ describe('PaymentsService', () => {
         makePaymentRecord({ status: PaymentStatus.CANCELED }),
       );
 
-      const result = await service.handleYooKassaWebhook({
+      prisma.order.findUnique.mockResolvedValue(makeOrderRecord());
+      prisma.order.update.mockResolvedValue(
+        makeOrderRecord(OrderStatus.CANCELLED),
+      );
+      prisma.orderStatusHistory.create.mockResolvedValue({});
+
+      const result = await service.handleWebhook({}, {
         type: 'notification',
         event: 'payment.canceled',
         object: { id: 'ext-1', status: 'canceled', paid: false },
@@ -432,26 +457,38 @@ describe('PaymentsService', () => {
         where: { id: PAYMENT_ID },
         data: { status: PaymentStatus.CANCELED },
       });
-      expect(prisma.order.update).not.toHaveBeenCalled();
+      expect(prisma.order.update).toHaveBeenCalledWith({
+        where: { id: ORDER_ID },
+        data: expect.objectContaining({ status: OrderStatus.CANCELLED }),
+      });
+      expect(loyalty.refundOnCancel).toHaveBeenCalledWith(ORDER_ID);
       expect(queues.sendToKitchen).not.toHaveBeenCalled();
     });
 
     it('ignores webhooks for unknown payments', async () => {
       prisma.payment.findFirst.mockResolvedValue(null);
 
-      const result = await service.handleYooKassaWebhook(succeededPayload);
+      const result = await service.handleWebhook({}, succeededPayload);
 
       expect(result).toEqual({ status: 'ignored' });
       expect(prisma.payment.update).not.toHaveBeenCalled();
     });
 
     it('ignores malformed payloads', async () => {
-      expect(await service.handleYooKassaWebhook({})).toEqual({
+      expect(await service.handleWebhook({}, {})).toEqual({
         status: 'ignored',
       });
       expect(
-        await service.handleYooKassaWebhook({ type: 'notification' }),
+        await service.handleWebhook({}, { type: 'notification' }),
       ).toEqual({ status: 'ignored' });
+    });
+
+    it('ignores an event that cannot be verified', async () => {
+      adapter.verifyWebhook.mockResolvedValue(false);
+      expect(await service.handleWebhook({}, succeededPayload)).toEqual({
+        status: 'ignored',
+      });
+      expect(prisma.payment.findFirst).not.toHaveBeenCalled();
     });
   });
 

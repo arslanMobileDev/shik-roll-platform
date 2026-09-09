@@ -61,6 +61,12 @@ export class OrderEntity {
   @ApiProperty({ enum: PaymentMethod })
   paymentMethod!: PaymentMethod;
 
+  @ApiPropertyOptional({ description: 'External payment transaction ID' })
+  paymentId!: string | null;
+
+  @ApiPropertyOptional({ description: 'Redirect URL for online payment' })
+  paymentUrl!: string | null;
+
   @ApiProperty()
   brandId!: string;
 

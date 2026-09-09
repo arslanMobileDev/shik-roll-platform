@@ -12,6 +12,7 @@
  *                              on every 54-ФЗ receipt (set in the shop
  *                              cabinet, not sent in the API payload)
  *   YOOKASSA_SECRET_KEY        secret key for Basic auth
+ *   YOOKASSA_MOCK              force the local provider when true
  *   YOOKASSA_API_URL           default https://api.yookassa.ru/v3
  *   YOOKASSA_RETURN_URL        page the customer returns to after payment
  *   YOOKASSA_VAT_CODE          НДС code for the 54-ФЗ receipt, default 1
@@ -25,17 +26,20 @@ export const YOOKASSA_SECRET_KEY = process.env.YOOKASSA_SECRET_KEY ?? '';
 export const YOOKASSA_API_URL =
   process.env.YOOKASSA_API_URL ?? 'https://api.yookassa.ru/v3';
 export const YOOKASSA_RETURN_URL =
-  process.env.YOOKASSA_RETURN_URL ?? 'https://shik-roll.ru/payments/return';
+  process.env.YOOKASSA_RETURN_URL ?? 'https://shikroll.ru/order-status';
 export const YOOKASSA_VAT_CODE = Number(process.env.YOOKASSA_VAT_CODE ?? 1);
 export const YOOKASSA_TAX_SYSTEM_CODE = process.env.YOOKASSA_TAX_SYSTEM_CODE
   ? Number(process.env.YOOKASSA_TAX_SYSTEM_CODE)
   : null;
 
 export function paymentsProviderMode(): PaymentsProviderMode {
+  if (process.env.YOOKASSA_MOCK === 'true') return 'mock';
   const explicit = process.env.PAYMENTS_PROVIDER;
-  if (explicit === 'mock' || explicit === 'yookassa') return explicit;
-  // Task contract: mock/sandbox outside production, even if API keys leak
-  // into a dev/test/staging environment by accident.
-  if (process.env.NODE_ENV !== 'production') return 'mock';
-  return YOOKASSA_SHOP_ID && YOOKASSA_SECRET_KEY ? 'yookassa' : 'mock';
+  if (explicit === 'mock') return 'mock';
+
+  const hasCredentials = Boolean(
+    process.env.YOOKASSA_SHOP_ID && process.env.YOOKASSA_SECRET_KEY,
+  );
+  if (!hasCredentials) return 'mock';
+  return 'yookassa';
 }

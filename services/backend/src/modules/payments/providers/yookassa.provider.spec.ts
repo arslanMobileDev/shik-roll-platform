@@ -1,4 +1,4 @@
-import { BadGatewayException, BadRequestException } from '@nestjs/common';
+import { BadGatewayException } from '@nestjs/common';
 import { PaymentStatus, Prisma } from '@prisma/client';
 import { YooKassaProvider } from './yookassa.provider';
 import { CreatePaymentSessionInput } from '../payments.types';
@@ -44,7 +44,7 @@ describe('YooKassaProvider', () => {
       }),
     });
 
-    const result = await provider.createSession(makeInput());
+    const result = await provider.createPayment(makeInput());
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -95,23 +95,19 @@ describe('YooKassaProvider', () => {
         ok: true,
         json: async () => ({ id: 'ext', status: remote }),
       });
-      const result = await provider.createSession(makeInput());
+      const result = await provider.createPayment(makeInput());
       expect(result.status).toBe(local);
     }
   });
 
-  it('fails fast without a customer contact for the receipt', async () => {
-    await expect(
-      provider.createSession(makeInput({ customer: { email: null, phone: null } })),
-    ).rejects.toMatchObject({
-      response: expect.objectContaining({
-        code: 'PAYMENT_CUSTOMER_CONTACT_REQUIRED',
-      }),
+  it('omits the optional receipt without a customer contact', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'ext', status: 'pending' }),
     });
-    await expect(
-      provider.createSession(makeInput({ customer: undefined })),
-    ).rejects.toThrow(BadRequestException);
-    expect(fetchMock).not.toHaveBeenCalled();
+    await provider.createPayment(makeInput({ customer: undefined }));
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(body.receipt).toBeUndefined();
   });
 
   it('maps a provider rejection to PAYMENT_PROVIDER_ERROR', async () => {
@@ -121,10 +117,10 @@ describe('YooKassaProvider', () => {
       text: async () => '{"code":"invalid_request"}',
     });
 
-    await expect(provider.createSession(makeInput())).rejects.toMatchObject({
+    await expect(provider.createPayment(makeInput())).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'PAYMENT_PROVIDER_ERROR' }),
     });
-    await expect(provider.createSession(makeInput())).rejects.toThrow(
+    await expect(provider.createPayment(makeInput())).rejects.toThrow(
       BadGatewayException,
     );
   });
@@ -132,10 +128,51 @@ describe('YooKassaProvider', () => {
   it('maps a network failure to PAYMENT_PROVIDER_UNAVAILABLE', async () => {
     fetchMock.mockRejectedValue(new Error('socket hang up'));
 
-    await expect(provider.createSession(makeInput())).rejects.toMatchObject({
+    await expect(provider.createPayment(makeInput())).rejects.toMatchObject({
       response: expect.objectContaining({
         code: 'PAYMENT_PROVIDER_UNAVAILABLE',
       }),
     });
+  });
+
+  it('verifies a webhook against GET /v3/payments/{id}', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: 'ext-1',
+        status: 'succeeded',
+        metadata: { orderId: 'order-1' },
+      }),
+    });
+
+    await expect(
+      provider.verifyWebhook({}, {
+        type: 'notification',
+        event: 'payment.succeeded',
+        object: {
+          id: 'ext-1',
+          status: 'succeeded',
+          metadata: { orderId: 'order-1' },
+        },
+      }),
+    ).resolves.toBe(true);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'https://api.yookassa.ru/v3/payments/ext-1',
+    );
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'GET' });
+  });
+
+  it('rejects a webhook when the authoritative status does not match', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'ext-1', status: 'pending' }),
+    });
+    await expect(
+      provider.verifyWebhook({}, {
+        type: 'notification',
+        event: 'payment.succeeded',
+        object: { id: 'ext-1', status: 'succeeded' },
+      }),
+    ).resolves.toBe(false);
   });
 });

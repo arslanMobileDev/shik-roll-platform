@@ -13,6 +13,7 @@ import { concat, Observable, of } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
+import { PaymentsService } from '../payments/payments.service';
 import { lineTotal, orderSubtotal, orderTotal } from './domain/order-pricing';
 import {
   assertTransition,
@@ -40,6 +41,7 @@ export class OrdersService {
     private readonly couriersEvents: CouriersEventsService,
     private readonly loyalty: LoyaltyService,
     private readonly ordersEvents: OrdersEventsService,
+    private readonly payments: PaymentsService,
   ) {}
 
   /**
@@ -60,7 +62,7 @@ export class OrdersService {
       limit,
     });
     return {
-      data: records.map(toOrderEntity),
+      data: records.map((record) => toOrderEntity(record)),
       meta: {
         page,
         limit,
@@ -84,7 +86,7 @@ export class OrdersService {
       limit,
     });
     return {
-      data: records.map(toOrderEntity),
+      data: records.map((record) => toOrderEntity(record)),
       meta: {
         page,
         limit,
@@ -265,6 +267,17 @@ export class OrdersService {
           })
         : await this.repository.create(data);
 
+    let paymentLink:
+      | { paymentId: string | null; paymentUrl: string | null }
+      | undefined;
+    if (record.paymentMethod === PaymentMethod.ONLINE) {
+      const payment = await this.payments.createPayment({ orderId: record.id });
+      paymentLink = {
+        paymentId: payment.externalPaymentId,
+        paymentUrl: payment.paymentUrl,
+      };
+    }
+
     await this.queues.scheduleOrderProcessing(record.id);
     if (record.status !== OrderStatus.PENDING_PAYMENT) {
       this.ordersEvents.emitKdsEvent({
@@ -276,7 +289,7 @@ export class OrdersService {
         timestamp: new Date().toISOString(),
       });
     }
-    return toOrderEntity(record);
+    return toOrderEntity(record, paymentLink);
   }
 
   /**

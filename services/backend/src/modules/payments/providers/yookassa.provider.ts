@@ -1,6 +1,5 @@
 import {
   BadGatewayException,
-  BadRequestException,
   Injectable,
   Logger,
 } from '@nestjs/common';
@@ -15,8 +14,11 @@ import {
 } from '../payments.config';
 import {
   CreatePaymentSessionInput,
+  ParsedPaymentWebhookEvent,
   PaymentProviderAdapter,
   PaymentSessionResult,
+  YooKassaWebhookPayload,
+  parseYooKassaWebhookEvent,
 } from '../payments.types';
 
 /** YooKassa payment object statuses mapped onto our lifecycle. */
@@ -31,58 +33,55 @@ interface YooKassaPaymentResponse {
   id?: string;
   status?: string;
   confirmation?: { confirmation_url?: string };
+  metadata?: Record<string, string>;
 }
 
 /**
  * YooKassa HTTP API adapter (shop under Банк ВТБ): POST /v3/payments with
  * Basic auth and the Idempotence-Key header. The request carries the 54-ФЗ
- * receipt — YooKassa forwards it to the Атол Сигма online cash register
- * (receipt_registration). Fiscalisation requires a customer contact
- * (email or phone); without it the request would be rejected, so we fail
- * fast locally with a clear error code.
+ * receipt — when customer contact data is available, YooKassa forwards it
+ * to the Атол Сигма online cash register (receipt_registration).
  */
 @Injectable()
 export class YooKassaProvider implements PaymentProviderAdapter {
   readonly provider = PaymentProvider.YOOKASSA;
   private readonly logger = new Logger(YooKassaProvider.name);
 
-  async createSession(
+  async createPayment(
     input: CreatePaymentSessionInput,
   ): Promise<PaymentSessionResult> {
     const email = input.customer?.email ?? null;
     const phone = input.customer?.phone ?? null;
-    if (!email && !phone) {
-      throw new BadRequestException({
-        statusCode: 400,
-        code: 'PAYMENT_CUSTOMER_CONTACT_REQUIRED',
-        message:
-          'A customer email or phone is required to issue the 54-ФЗ receipt',
-      });
-    }
-
     const body = {
       amount: { value: input.amount.toFixed(2), currency: input.currency },
       confirmation: { type: 'redirect', return_url: YOOKASSA_RETURN_URL },
       capture: true,
       description: input.description,
       metadata: { orderId: input.orderId, paymentId: input.paymentId },
-      receipt: {
-        customer: { ...(email ? { email } : {}), ...(phone ? { phone } : {}) },
-        items: input.receiptLines.map((line) => ({
-          description: line.description.slice(0, 128),
-          quantity: line.quantity,
-          amount: {
-            value: line.unitPrice.toFixed(2),
-            currency: input.currency,
-          },
-          vat_code: YOOKASSA_VAT_CODE,
-          payment_mode: 'full_payment',
-          payment_subject: 'commodity',
-        })),
-        ...(YOOKASSA_TAX_SYSTEM_CODE
-          ? { tax_system_code: YOOKASSA_TAX_SYSTEM_CODE }
-          : {}),
-      },
+      ...(email || phone
+        ? {
+            receipt: {
+              customer: {
+                ...(email ? { email } : {}),
+                ...(phone ? { phone } : {}),
+              },
+              items: input.receiptLines.map((line) => ({
+                description: line.description.slice(0, 128),
+                quantity: line.quantity,
+                amount: {
+                  value: line.unitPrice.toFixed(2),
+                  currency: input.currency,
+                },
+                vat_code: YOOKASSA_VAT_CODE,
+                payment_mode: 'full_payment',
+                payment_subject: 'commodity',
+              })),
+              ...(YOOKASSA_TAX_SYSTEM_CODE
+                ? { tax_system_code: YOOKASSA_TAX_SYSTEM_CODE }
+                : {}),
+            },
+          }
+        : {}),
     };
 
     let response: Response;
@@ -135,5 +134,55 @@ export class YooKassaProvider implements PaymentProviderAdapter {
       paymentUrl: data.confirmation?.confirmation_url ?? null,
       status: STATUS_MAP[data.status] ?? PaymentStatus.PENDING,
     };
+  }
+
+  parseWebhookEvent(
+    body: YooKassaWebhookPayload,
+  ): ParsedPaymentWebhookEvent | null {
+    return parseYooKassaWebhookEvent(body);
+  }
+
+  async verifyWebhook(
+    _headers: Record<string, string | string[] | undefined>,
+    body: YooKassaWebhookPayload,
+  ): Promise<boolean> {
+    const event = this.parseWebhookEvent(body);
+    if (!event) return false;
+
+    try {
+      const response = await fetch(
+        `${YOOKASSA_API_URL}/payments/${encodeURIComponent(event.paymentId)}`,
+        {
+          method: 'GET',
+          headers: { Authorization: this.authorizationHeader() },
+        },
+      );
+      if (!response.ok) {
+        this.logger.warn(
+          `Webhook verification failed for payment ${event.paymentId}: HTTP ${response.status}`,
+        );
+        return false;
+      }
+
+      const payment = (await response.json()) as YooKassaPaymentResponse;
+      const expectedStatus =
+        event.event === 'payment.succeeded' ? 'succeeded' : 'canceled';
+      return (
+        payment.id === event.paymentId &&
+        payment.status === expectedStatus &&
+        (!event.orderId || payment.metadata?.orderId === event.orderId)
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Webhook verification unavailable for payment ${event.paymentId}: ${String(error)}`,
+      );
+      return false;
+    }
+  }
+
+  private authorizationHeader(): string {
+    return `Basic ${Buffer.from(
+      `${YOOKASSA_SHOP_ID}:${YOOKASSA_SECRET_KEY}`,
+    ).toString('base64')}`;
   }
 }

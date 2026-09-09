@@ -2,8 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PaymentProvider, PaymentStatus } from '@prisma/client';
 import {
   CreatePaymentSessionInput,
+  ParsedPaymentWebhookEvent,
   PaymentProviderAdapter,
   PaymentSessionResult,
+  YooKassaWebhookPayload,
+  parseYooKassaWebhookEvent,
 } from '../payments.types';
 
 /**
@@ -17,14 +20,27 @@ export class MockPaymentProvider implements PaymentProviderAdapter {
   readonly provider = PaymentProvider.YOOKASSA;
   private readonly logger = new Logger(MockPaymentProvider.name);
 
-  createSession(input: CreatePaymentSessionInput): Promise<PaymentSessionResult> {
+  createPayment(input: CreatePaymentSessionInput): Promise<PaymentSessionResult> {
     this.logger.log(
       `Mock payment session for order ${input.orderId} (${input.idempotenceKey})`,
     );
     return Promise.resolve({
       externalPaymentId: `mock-${input.paymentId}`,
       paymentUrl: `https://mock-pay.shik.local/payments/${input.paymentId}/confirm`,
-      status: PaymentStatus.SUCCEEDED,
+      status: PaymentStatus.PENDING,
     });
+  }
+
+  verifyWebhook(
+    _headers: Record<string, string | string[] | undefined>,
+    body: YooKassaWebhookPayload,
+  ): Promise<boolean> {
+    return Promise.resolve(this.parseWebhookEvent(body) !== null);
+  }
+
+  parseWebhookEvent(
+    body: YooKassaWebhookPayload,
+  ): ParsedPaymentWebhookEvent | null {
+    return parseYooKassaWebhookEvent(body);
   }
 }

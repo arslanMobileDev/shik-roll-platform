@@ -15,6 +15,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrdersEventsService } from '../orders/orders-events.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import {
   OrderPaymentStatusEntity,
@@ -44,6 +45,7 @@ export class PaymentsService {
     private readonly provider: PaymentProviderAdapter,
     private readonly queues: OrderQueuesService,
     private readonly ordersEvents: OrdersEventsService,
+    private readonly loyalty: LoyaltyService,
   ) {}
 
   /**
@@ -102,7 +104,7 @@ export class PaymentsService {
       receiptLines: this.buildReceiptLines(order),
     };
 
-    const session = await this.provider.createSession(sessionInput);
+    const session = await this.provider.createPayment(sessionInput);
 
     let payment: Payment;
     try {
@@ -147,25 +149,36 @@ export class PaymentsService {
    * are acknowledged as 'ignored' so the provider stops retrying. Repeated
    * delivery of payment.succeeded is a no-op (idempotent).
    */
-  async handleYooKassaWebhook(
+  async handleWebhook(
+    headers: Record<string, string | string[] | undefined>,
     payload: YooKassaWebhookPayload,
   ): Promise<{ status: 'processed' | 'ignored' }> {
-    if (payload?.type !== 'notification' || !payload.object?.id) {
+    const event = this.provider.parseWebhookEvent(payload);
+    if (!event) {
       return { status: 'ignored' };
     }
-    const externalId = payload.object.id;
-    const event = payload.event;
+
+    if (!(await this.provider.verifyWebhook(headers, payload))) {
+      this.logger.warn(`Unverified webhook for payment ${event.paymentId}`);
+      return { status: 'ignored' };
+    }
 
     const payment = await this.prisma.payment.findFirst({
-      where: { externalPaymentId: externalId },
+      where: { externalPaymentId: event.paymentId },
       orderBy: { createdAt: 'desc' },
     });
     if (!payment) {
-      this.logger.warn(`Webhook for unknown payment ${externalId} (${event})`);
+      this.logger.warn(
+        `Webhook for unknown payment ${event.paymentId} (${event.event})`,
+      );
+      return { status: 'ignored' };
+    }
+    if (event.orderId && event.orderId !== payment.orderId) {
+      this.logger.warn(`Webhook order mismatch for payment ${event.paymentId}`);
       return { status: 'ignored' };
     }
 
-    if (event === 'payment.succeeded' && payload.object.status === 'succeeded') {
+    if (event.event === 'payment.succeeded') {
       if (payment.status === PaymentStatus.SUCCEEDED) {
         return { status: 'processed' }; // duplicate delivery
       }
@@ -175,7 +188,7 @@ export class PaymentsService {
         );
         return { status: 'ignored' };
       }
-      const reported = payload.object.amount?.value;
+      const reported = payload.object?.amount?.value;
       if (reported && reported !== payment.amount.toFixed(2)) {
         this.logger.warn(
           `Amount mismatch on payment ${payment.id}: expected ${payment.amount.toFixed(2)}, got ${reported}`,
@@ -185,17 +198,60 @@ export class PaymentsService {
       return { status: 'processed' };
     }
 
-    if (event === 'payment.canceled' && payload.object.status === 'canceled') {
-      if (payment.status === PaymentStatus.PENDING) {
-        await this.prisma.payment.update({
-          where: { id: payment.id },
-          data: { status: PaymentStatus.CANCELED },
-        });
+    if (event.event === 'payment.canceled') {
+      if (payment.status === PaymentStatus.CANCELED) {
+        return { status: 'processed' };
       }
+      if (payment.status === PaymentStatus.SUCCEEDED) {
+        this.logger.warn(
+          `Canceled webhook for succeeded payment ${payment.id} — ignored`,
+        );
+        return { status: 'ignored' };
+      }
+      await this.applyPaymentCancellation(payment.id);
       return { status: 'processed' };
     }
 
     return { status: 'ignored' };
+  }
+
+  private async applyPaymentCancellation(paymentId: string): Promise<void> {
+    let canceledOrderId: string | undefined;
+    await this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.update({
+        where: { id: paymentId },
+        data: { status: PaymentStatus.CANCELED },
+      });
+      const order = await tx.order.findUnique({ where: { id: payment.orderId } });
+      if (
+        order &&
+        !order.deletedAt &&
+        order.status === OrderStatus.PENDING_PAYMENT
+      ) {
+        await tx.order.update({
+          where: { id: order.id },
+          data: {
+            status: OrderStatus.CANCELLED,
+            cancelledAt: new Date(),
+            cancelReason: 'Online payment canceled',
+            version: { increment: 1 },
+          },
+        });
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: order.id,
+            previousStatus: OrderStatus.PENDING_PAYMENT,
+            newStatus: OrderStatus.CANCELLED,
+            reason: 'Online payment canceled',
+          },
+        });
+        canceledOrderId = order.id;
+      }
+    });
+
+    if (canceledOrderId) {
+      await this.loyalty.refundOnCancel(canceledOrderId);
+    }
   }
 
   /** Payment status check for an order: the latest attempt, if any. */

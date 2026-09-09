@@ -14,13 +14,23 @@ function iso(value: Date | null | undefined): string | null {
   return value ? value.toISOString() : null;
 }
 
-export function toOrderEntity(record: OrderRecord): OrderEntity {
+export interface OrderPaymentLink {
+  paymentId: string | null;
+  paymentUrl: string | null;
+}
+
+export function toOrderEntity(
+  record: OrderRecord,
+  payment?: OrderPaymentLink,
+): OrderEntity {
   return {
     id: record.id,
     orderNumber: record.orderNumber,
     status: record.status,
     type: record.type,
     paymentMethod: record.paymentMethod,
+    paymentId: payment?.paymentId ?? null,
+    paymentUrl: payment?.paymentUrl ?? null,
     brandId: record.brandId,
     branchId: record.branchId,
     customerId: record.customerId,

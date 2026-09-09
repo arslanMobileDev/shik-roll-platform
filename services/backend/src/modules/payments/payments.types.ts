@@ -40,6 +40,17 @@ export interface PaymentSessionResult {
   status: PaymentStatus;
 }
 
+export type PaymentWebhookEventName =
+  | 'payment.succeeded'
+  | 'payment.canceled';
+
+export interface ParsedPaymentWebhookEvent {
+  event: PaymentWebhookEventName;
+  paymentId: string;
+  orderId: string;
+  metadata?: Record<string, string>;
+}
+
 /**
  * Port of the payments bounded context (Port/Adapter, same convention as the
  * storage layer): the service speaks only to this interface; concrete
@@ -47,7 +58,20 @@ export interface PaymentSessionResult {
  */
 export interface PaymentProviderAdapter {
   readonly provider: PaymentProvider;
-  createSession(input: CreatePaymentSessionInput): Promise<PaymentSessionResult>;
+  createPayment(input: CreatePaymentSessionInput): Promise<PaymentSessionResult>;
+
+  /**
+   * YooKassa does not sign webhook headers. The real adapter verifies the
+   * notification by fetching the authoritative payment object from API v3.
+   */
+  verifyWebhook(
+    headers: Record<string, string | string[] | undefined>,
+    body: YooKassaWebhookPayload,
+  ): Promise<boolean>;
+
+  parseWebhookEvent(
+    body: YooKassaWebhookPayload,
+  ): ParsedPaymentWebhookEvent | null;
 }
 
 /** YooKassa webhook notification payload (https://yookassa.ru/developers/using-api/webhooks). */
@@ -60,5 +84,28 @@ export interface YooKassaWebhookPayload {
     paid?: boolean;
     amount?: { value?: string; currency?: string };
     metadata?: Record<string, string>;
+  };
+}
+
+export function parseYooKassaWebhookEvent(
+  body: YooKassaWebhookPayload,
+): ParsedPaymentWebhookEvent | null {
+  if (
+    body?.type !== 'notification' ||
+    (body.event !== 'payment.succeeded' &&
+      body.event !== 'payment.canceled') ||
+    !body.object?.id
+  ) {
+    return null;
+  }
+  const expectedStatus =
+    body.event === 'payment.succeeded' ? 'succeeded' : 'canceled';
+  if (body.object.status !== expectedStatus) return null;
+
+  return {
+    event: body.event,
+    paymentId: body.object.id,
+    orderId: body.object.metadata?.orderId ?? '',
+    metadata: body.object.metadata,
   };
 }
