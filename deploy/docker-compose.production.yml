@@ -11,7 +11,10 @@ services:
     image: postgres:16-alpine
     container_name: shik_postgres
     restart: unless-stopped
-    env_file: .env.production
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -46,7 +49,7 @@ services:
     image: shik-backend:production
     container_name: shik_backend
     restart: unless-stopped
-    env_file: .env.production
+    env_file: ${SHIK_ENV_FILE:-.env.production}
     depends_on:
       postgres:
         condition: service_healthy
