@@ -12,11 +12,13 @@ import 'order_type_badge.dart';
 /// One-tap cook action available for an order in its current column.
 typedef KdsOrderAction = void Function(KdsOrderStatus nextStatus);
 
-/// UI-804 — kitchen order card.
+/// UI-804 / ADR-1618 — kitchen order card.
 ///
 /// Large order number, fulfilment type, color-coded delay timer, items with
 /// modifiers, 100% Halal badge, customer comment and a single primary action
-/// («В работу» / «Готово» / «Выдано») matching the order's column.
+/// («Начать готовить» / «Готово») matching the order's column. READY cards
+/// have no kitchen action — handout (READY → COMPLETED) belongs to POS and
+/// courier flows, never to the kitchen board.
 class OrderCard extends StatelessWidget {
   const OrderCard({
     super.key,
@@ -24,6 +26,7 @@ class OrderCard extends StatelessWidget {
     required this.onAction,
     this.isFresh = false,
     this.isPending = false,
+    this.clockOffset = Duration.zero,
     this.now,
   });
 
@@ -38,27 +41,25 @@ class OrderCard extends StatelessWidget {
   /// Status transition in flight — button disabled with a spinner.
   final bool isPending;
 
+  /// Server-clock correction, forwarded to [OrderDelayTimer].
+  final Duration clockOffset;
+
   /// Fixed clock for tests, forwarded to [OrderDelayTimer].
   final DateTime? now;
 
-  /// Next transition for the order's current column.
+  /// Next kitchen-owned transition for the order's current column.
   static ({KdsOrderStatus status, String label, IconData icon})? nextActionFor(
     KdsOrderStatus status,
   ) => switch (status) {
     KdsOrderStatus.newOrder || KdsOrderStatus.confirmed => (
       status: KdsOrderStatus.cooking,
-      label: 'В работу',
+      label: 'Начать готовить',
       icon: Icons.soup_kitchen_outlined,
     ),
     KdsOrderStatus.cooking => (
       status: KdsOrderStatus.ready,
       label: 'Готово',
       icon: Icons.check_circle_outline,
-    ),
-    KdsOrderStatus.ready => (
-      status: KdsOrderStatus.completed,
-      label: 'Выдано',
-      icon: Icons.done_all,
     ),
     _ => null,
   };
@@ -94,7 +95,7 @@ class OrderCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _OrderHeader(order: order, now: now),
+                _OrderHeader(order: order, clockOffset: clockOffset, now: now),
                 const SizedBox(height: AppSpacing.s8),
                 const Divider(),
                 for (final item in order.items) _OrderItemTile(item: item),
@@ -137,9 +138,14 @@ class OrderCard extends StatelessWidget {
 }
 
 class _OrderHeader extends StatelessWidget {
-  const _OrderHeader({required this.order, this.now});
+  const _OrderHeader({
+    required this.order,
+    this.clockOffset = Duration.zero,
+    this.now,
+  });
 
   final KdsOrder order;
+  final Duration clockOffset;
   final DateTime? now;
 
   @override
@@ -158,7 +164,11 @@ class _OrderHeader extends StatelessWidget {
                 ),
               ),
             ),
-            OrderDelayTimer(createdAt: order.createdAt, now: now),
+            OrderDelayTimer(
+              since: order.statusSince,
+              clockOffset: clockOffset,
+              now: now,
+            ),
           ],
         ),
         const SizedBox(height: AppSpacing.s8),

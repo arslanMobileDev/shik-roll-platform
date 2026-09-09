@@ -13,7 +13,10 @@ void main() {
       'load: loading → ready со списком поваров на линии',
       build: () => CookShiftCubit(
         repository: TestCookShiftRepository(
-          cooks: [buildCook(), buildCook(id: 'cook-2', name: 'Иван')],
+          cooks: [
+            buildCook(),
+            buildCook(id: 'cook-2', name: 'Иван'),
+          ],
         ),
       ),
       act: (cubit) => cubit.load(branchId),
@@ -24,11 +27,10 @@ void main() {
         isA<CookShiftState>()
             .having((s) => s.status, 'status', CookShiftStatus.ready)
             .having((s) => s.shiftId, 'shiftId', 'shift-1')
-            .having(
-              (s) => s.lineCooks.map((c) => c.id),
-              'повара на линии',
-              ['cook-1', 'cook-2'],
-            ),
+            .having((s) => s.lineCooks.map((c) => c.id), 'повара на линии', [
+              'cook-1',
+              'cook-2',
+            ]),
       ],
     );
 
@@ -61,7 +63,10 @@ void main() {
       'selectCook назначает повара станции',
       build: () => CookShiftCubit(
         repository: TestCookShiftRepository(
-          cooks: [buildCook(), buildCook(id: 'cook-2', name: 'Иван')],
+          cooks: [
+            buildCook(),
+            buildCook(id: 'cook-2', name: 'Иван'),
+          ],
         ),
       ),
       act: (cubit) async {
@@ -93,11 +98,14 @@ void main() {
 
     blocTest<CookShiftCubit, CookShiftState>(
       'clockIn добавляет повара на линию и делает его текущим',
-      build: () =>
-          CookShiftCubit(repository: TestCookShiftRepository()),
+      build: () => CookShiftCubit(repository: TestCookShiftRepository()),
       act: (cubit) async {
         await cubit.load(branchId);
-        await cubit.clockIn(pin: '1111', name: 'Ахмед', role: CookRole.sushiChef);
+        await cubit.clockIn(
+          pin: '1111',
+          name: 'Ахмед',
+          role: CookRole.sushiChef,
+        );
       },
       skip: 2,
       expect: () => [
@@ -125,7 +133,11 @@ void main() {
       ),
       act: (cubit) async {
         await cubit.load(branchId);
-        await cubit.clockIn(pin: '0000', name: 'Ахмед', role: CookRole.sushiChef);
+        await cubit.clockIn(
+          pin: '0000',
+          name: 'Ахмед',
+          role: CookRole.sushiChef,
+        );
       },
       skip: 2,
       expect: () => [
@@ -151,7 +163,10 @@ void main() {
       'clockOutCurrent закрывает смену и снимает выбор станции',
       build: () => CookShiftCubit(
         repository: TestCookShiftRepository(
-          cooks: [buildCook(), buildCook(id: 'cook-2', name: 'Иван')],
+          cooks: [
+            buildCook(),
+            buildCook(id: 'cook-2', name: 'Иван'),
+          ],
         ),
       ),
       act: (cubit) async {
@@ -213,11 +228,7 @@ void main() {
       expect: () => [
         isA<CookShiftState>()
             .having((s) => s.currentCook?.completedOrders, 'выполнено', 1)
-            .having(
-              (s) => s.currentCook?.avgPrepSeconds,
-              'среднее',
-              8 * 60,
-            ),
+            .having((s) => s.currentCook?.avgPrepSeconds, 'среднее', 8 * 60),
       ],
     );
 

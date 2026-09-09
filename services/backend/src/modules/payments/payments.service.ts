@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
@@ -16,6 +17,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { OrdersEventsService } from '../orders/orders-events.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
+import { KitchenEventsService } from '../kitchen/kitchen-events.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import {
   OrderPaymentStatusEntity,
@@ -46,6 +48,7 @@ export class PaymentsService {
     private readonly queues: OrderQueuesService,
     private readonly ordersEvents: OrdersEventsService,
     private readonly loyalty: LoyaltyService,
+    @Optional() private readonly kitchenEvents?: KitchenEventsService,
   ) {}
 
   /**
@@ -251,6 +254,7 @@ export class PaymentsService {
 
     if (canceledOrderId) {
       await this.loyalty.refundOnCancel(canceledOrderId);
+      await this.kitchenEvents?.publishOrderChanged(canceledOrderId);
     }
   }
 
@@ -356,6 +360,7 @@ export class PaymentsService {
         status: becameVisibleToKitchen.status,
         timestamp: new Date().toISOString(),
       });
+      await this.kitchenEvents?.publishOrderChanged(becameVisibleToKitchen.id);
     }
     if (dispatchToKitchen) {
       await this.queues.sendToKitchen(payment.orderId);

@@ -2,19 +2,37 @@ import 'package:equatable/equatable.dart';
 
 import '../data/kds_order_models.dart';
 
-enum KdsConnectionStatus { connecting, online, reconnecting, offline }
+/// Realtime transport state of the board (ADR-1618 recovery contract).
+enum KdsConnectionStatus {
+  /// Dialling or re-dialling the kitchen SSE stream.
+  connecting,
+
+  /// SSE live — order events arrive push-style.
+  live,
+
+  /// SSE down after repeated reconnects — 15 s snapshot polling fallback.
+  polling,
+}
 
 sealed class KdsOrdersState extends Equatable {
-  const KdsOrdersState({required this.connectionStatus});
-
-  final KdsConnectionStatus connectionStatus;
+  const KdsOrdersState();
 
   /// Orders available for rendering, if the board has any data.
   List<KdsOrder>? get orders => null;
 
-  /// Ids that arrived with the latest fetch — used for audio/visual
-  /// new-order feedback. Empty once acknowledged by the view.
+  /// Ids that newly arrived in CONFIRMED since the last acknowledgement —
+  /// used for audio/visual new-order feedback.
   Set<String> get freshOrderIds => const {};
+
+  /// Realtime transport state (connecting / live / polling fallback).
+  KdsConnectionStatus get connection => KdsConnectionStatus.connecting;
+
+  /// Orders with a status transition in flight — their cards are blocked.
+  Set<String> get mutatingOrderIds => const {};
+
+  /// `serverTime − localTime` from the latest snapshot/heartbeat; delay
+  /// timers add it to the local clock so server-stamped ages stay true.
+  Duration get serverClockOffset => Duration.zero;
 
   @override
   List<Object?> get props => [];
@@ -22,22 +40,20 @@ sealed class KdsOrdersState extends Equatable {
 
 /// Initial load in progress (board has no data yet).
 final class KdsOrdersLoading extends KdsOrdersState {
-  const KdsOrdersLoading({
-    super.connectionStatus = KdsConnectionStatus.connecting,
-  });
-
-  @override
-  List<Object?> get props => [connectionStatus];
+  const KdsOrdersLoading();
 }
 
-/// Board data available. Also the resting state after actions/polls.
+/// Board data available — the steady state for snapshots, stream events and
+/// optimistic mutations.
 final class KdsOrdersLoaded extends KdsOrdersState {
   const KdsOrdersLoaded({
     required this.orders,
     this.lastUpdatedAt,
     this.freshOrderIds = const {},
     this.actionError,
-    super.connectionStatus = KdsConnectionStatus.connecting,
+    this.connection = KdsConnectionStatus.connecting,
+    this.mutatingOrderIds = const {},
+    this.serverClockOffset = Duration.zero,
   });
 
   @override
@@ -48,21 +64,35 @@ final class KdsOrdersLoaded extends KdsOrdersState {
   @override
   final Set<String> freshOrderIds;
 
-  /// Transient status-change failure, surfaced as a snackbar by the view.
+  /// Transient status-change failure (with the backend error code), surfaced
+  /// as a snackbar by the view.
   final String? actionError;
+
+  @override
+  final KdsConnectionStatus connection;
+
+  @override
+  final Set<String> mutatingOrderIds;
+
+  @override
+  final Duration serverClockOffset;
 
   KdsOrdersLoaded copyWith({
     List<KdsOrder>? orders,
     DateTime? lastUpdatedAt,
     Set<String>? freshOrderIds,
     String? Function()? actionError,
-    KdsConnectionStatus? connectionStatus,
+    KdsConnectionStatus? connection,
+    Set<String>? mutatingOrderIds,
+    Duration? serverClockOffset,
   }) => KdsOrdersLoaded(
     orders: orders ?? this.orders,
     lastUpdatedAt: lastUpdatedAt ?? this.lastUpdatedAt,
     freshOrderIds: freshOrderIds ?? this.freshOrderIds,
     actionError: actionError != null ? actionError() : this.actionError,
-    connectionStatus: connectionStatus ?? this.connectionStatus,
+    connection: connection ?? this.connection,
+    mutatingOrderIds: mutatingOrderIds ?? this.mutatingOrderIds,
+    serverClockOffset: serverClockOffset ?? this.serverClockOffset,
   );
 
   @override
@@ -71,37 +101,18 @@ final class KdsOrdersLoaded extends KdsOrdersState {
     lastUpdatedAt,
     freshOrderIds,
     actionError,
-    connectionStatus,
+    connection,
+    mutatingOrderIds,
+    serverClockOffset,
   ];
-}
-
-/// A status transition is being sent to the API; the board stays visible and
-/// the affected card shows an in-progress affordance.
-final class KdsOrdersActionInProgress extends KdsOrdersState {
-  const KdsOrdersActionInProgress({
-    required this.orders,
-    required this.pendingOrderId,
-    required super.connectionStatus,
-  });
-
-  @override
-  final List<KdsOrder> orders;
-
-  final String pendingOrderId;
-
-  @override
-  List<Object?> get props => [orders, pendingOrderId, connectionStatus];
 }
 
 /// Fetch failed before any data was available.
 final class KdsOrdersError extends KdsOrdersState {
-  const KdsOrdersError(
-    this.message, {
-    super.connectionStatus = KdsConnectionStatus.offline,
-  });
+  const KdsOrdersError(this.message);
 
   final String message;
 
   @override
-  List<Object?> get props => [message, connectionStatus];
+  List<Object?> get props => [message];
 }

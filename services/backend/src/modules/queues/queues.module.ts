@@ -1,5 +1,6 @@
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
 import { Global, Logger, Module } from '@nestjs/common';
+import { KitchenModule } from '../kitchen/kitchen.module';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { OrderProcessingProcessor } from './order-processing.processor';
 import { OrderQueuesService, ORDER_PROCESSING_QUEUE } from './order-queues.service';
@@ -42,11 +43,13 @@ export class QueuesModule {
 
     return {
       module: QueuesModule,
-      // LoyaltyModule backs the worker's cashback/refund hooks (ADR-1614).
+      // LoyaltyModule backs the worker's cashback/refund hooks (ADR-1614);
+      // KitchenModule the board fan-out of worker-driven transitions (ADR-1618).
       imports: disabled
-        ? [LoyaltyModule]
+        ? [LoyaltyModule, KitchenModule]
         : [
             LoyaltyModule,
+            KitchenModule,
             BullModule.forRoot({
               connection: buildRedisConnection(),
               defaultJobOptions: {

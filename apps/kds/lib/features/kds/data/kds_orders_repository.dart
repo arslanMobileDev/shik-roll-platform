@@ -1,140 +1,125 @@
-import 'dart:async';
-import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:equatable/equatable.dart';
 
 import '../../../core/network/api_client.dart';
 import 'kds_order_models.dart';
 
-/// Transport-level events emitted by the kitchen SSE connection.
-enum KdsOrdersStreamEvent {
-  connecting,
-  connected,
-  reconnecting,
-  disconnected,
-  ordersChanged,
+/// Board snapshot (API-709 `GET /kitchen/orders/active`).
+///
+/// [serverTime] lets the client derive its clock offset so delay timers stay
+/// accurate even when the terminal clock drifts.
+final class KitchenBoardSnapshot extends Equatable {
+  const KitchenBoardSnapshot({required this.serverTime, required this.orders});
+
+  final DateTime serverTime;
+  final List<KdsOrder> orders;
+
+  @override
+  List<Object?> get props => [serverTime, orders];
 }
 
-/// Source of kitchen orders (API-702 `OrdersController`).
-abstract interface class KdsOrdersRepository {
-  /// `GET /orders?branchId=…&page=…&limit=…`
-  Future<List<KdsOrder>> fetchOrders({
-    required String branchId,
-    int page = 1,
-    int limit = 50,
-  });
+/// Status-transition failure with the backend error code (API-709): the bloc
+/// surfaces the code in a snackbar and force-refreshes the snapshot.
+final class KitchenOrderUpdateException implements Exception {
+  const KitchenOrderUpdateException(this.code, this.message);
 
-  /// `PATCH /orders/{id}/status`
+  /// `ORDER_NOT_FOUND` | `ORDER_BRANCH_FORBIDDEN` |
+  /// `ORDER_VERSION_CONFLICT` | `INVALID_ORDER_STATUS_TRANSITION` |
+  /// `NETWORK`.
+  final String code;
+  final String message;
+
+  @override
+  String toString() => 'KitchenOrderUpdateException($code): $message';
+}
+
+/// Source of kitchen orders (API-709 `KitchenController`).
+///
+/// Branch identity is **never** supplied by the client — the backend scopes
+/// every response to the branch of the terminal's JWT.
+abstract interface class KdsOrdersRepository {
+  /// `GET /kitchen/orders/active` — full board snapshot (NEW/CONFIRMED, COOKING,
+  /// READY, FIFO by status-entry time).
+  Future<KitchenBoardSnapshot> fetchSnapshot();
+
+  /// `PATCH /kitchen/orders/{id}/status` — kitchen-owned transition
+  /// (NEW/CONFIRMED → COOKING or COOKING → READY) with optimistic locking via
+  /// [expectedVersion].
+  ///
+  /// [cookId]/[shiftId] are audit metadata only, not authorization.
   Future<KdsOrder> updateOrderStatus({
     required String orderId,
     required KdsOrderStatus status,
+    required int expectedVersion,
     String? cookId,
     String? shiftId,
   });
-
-  /// SSE stream: `GET /orders/kds/stream?branchId=…`
-  Stream<KdsOrdersStreamEvent> watchOrders(String branchId);
 }
 
-/// Remote implementation against the live Orders API.
-final class RemoteKdsOrdersRepository implements KdsOrdersRepository {
-  RemoteKdsOrdersRepository(
-    ApiClient client, {
-    List<Duration> reconnectDelays = const [
-      Duration(seconds: 1),
-      Duration(seconds: 2),
-      Duration(seconds: 5),
-      Duration(seconds: 10),
-    ],
-  }) : _client = client,
-       assert(reconnectDelays.isNotEmpty),
-       _reconnectDelays = reconnectDelays;
+/// Remote implementation against the live Kitchen API.
+final class HttpKdsOrdersRepository implements KdsOrdersRepository {
+  HttpKdsOrdersRepository(ApiClient client) : _client = client;
 
   final ApiClient _client;
-  final List<Duration> _reconnectDelays;
 
   @override
-  Future<List<KdsOrder>> fetchOrders({
-    required String branchId,
-    int page = 1,
-    int limit = 50,
-  }) async {
+  Future<KitchenBoardSnapshot> fetchSnapshot() async {
     final response = await _client.dio.get<Map<String, dynamic>>(
-      '/orders',
-      queryParameters: {'branchId': branchId, 'page': page, 'limit': limit},
+      '/kitchen/orders/active',
     );
-    final data = (response.data?['data'] as List?) ?? const [];
-    return [for (final o in data) KdsOrder.fromJson(o as Map<String, dynamic>)];
+    final body = response.data ?? const <String, dynamic>{};
+    return KitchenBoardSnapshot(
+      serverTime:
+          DateTime.tryParse(body['serverTime'] as String? ?? '')?.toLocal() ??
+          DateTime.now(),
+      orders: [
+        for (final o in (body['orders'] as List?) ?? const [])
+          KdsOrder.fromJson(o as Map<String, dynamic>),
+      ],
+    );
   }
 
   @override
   Future<KdsOrder> updateOrderStatus({
     required String orderId,
     required KdsOrderStatus status,
+    required int expectedVersion,
     String? cookId,
     String? shiftId,
   }) async {
-    final response = await _client.dio.patch<Map<String, dynamic>>(
-      '/orders/$orderId/status',
-      data: {
-        'status': status.wireName,
-        'cookId': cookId,
-        'shiftId': shiftId,
-      },
-    );
-    final body = response.data;
-    if (body == null) {
-      throw StateError('Empty response for order $orderId status update');
-    }
-    return KdsOrder.fromJson(body);
-  }
-
-  @override
-  Stream<KdsOrdersStreamEvent> watchOrders(String branchId) async* {
-    var retryIndex = 0;
-    var isFirstAttempt = true;
-
-    while (true) {
-      yield isFirstAttempt
-          ? KdsOrdersStreamEvent.connecting
-          : KdsOrdersStreamEvent.reconnecting;
-
-      try {
-        final response = await _client.dio.get<ResponseBody>(
-          '/orders/kds/stream',
-          queryParameters: {'branchId': branchId},
-          options: Options(
-            responseType: ResponseType.stream,
-            headers: {'Accept': 'text/event-stream'},
-            receiveTimeout: Duration.zero,
-          ),
+    try {
+      final response = await _client.dio.patch<Map<String, dynamic>>(
+        '/kitchen/orders/$orderId/status',
+        data: {
+          'status': status.wireName,
+          'expectedVersion': expectedVersion,
+          'cookId': ?cookId,
+          'shiftId': ?shiftId,
+        },
+      );
+      final body = response.data;
+      if (body == null) {
+        throw const KitchenOrderUpdateException(
+          'NETWORK',
+          'Пустой ответ сервера',
         );
-
-        final stream = response.data?.stream;
-        if (stream == null) {
-          throw StateError('SSE response has no stream');
-        }
-
-        yield KdsOrdersStreamEvent.connected;
-        retryIndex = 0;
-        isFirstAttempt = false;
-
-        await for (final line in stream
-            .cast<List<int>>()
-            .transform(utf8.decoder)
-            .transform(const LineSplitter())) {
-          if (line.startsWith('data:')) {
-            yield KdsOrdersStreamEvent.ordersChanged;
-          }
-        }
-      } catch (_) {
-        // The board remains usable through polling; reconnect below.
       }
-
-      yield KdsOrdersStreamEvent.disconnected;
-      final delay = _reconnectDelays[retryIndex];
-      if (retryIndex < _reconnectDelays.length - 1) retryIndex++;
-      isFirstAttempt = false;
-      await Future<void>.delayed(delay);
+      return KdsOrder.fromJson(body);
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final code = data is Map<String, dynamic>
+          ? data['code'] as String?
+          : null;
+      throw KitchenOrderUpdateException(code ?? 'NETWORK', switch (code) {
+        'ORDER_VERSION_CONFLICT' =>
+          'Заказ уже изменён другой станцией (ORDER_VERSION_CONFLICT)',
+        'INVALID_ORDER_STATUS_TRANSITION' =>
+          'Статус заказа уже изменился (INVALID_ORDER_STATUS_TRANSITION)',
+        'ORDER_NOT_FOUND' => 'Заказ не найден (ORDER_NOT_FOUND)',
+        'ORDER_BRANCH_FORBIDDEN' =>
+          'Заказ другого филиала (ORDER_BRANCH_FORBIDDEN)',
+        _ => 'Нет связи с сервером. Попробуйте снова.',
+      });
     }
   }
 }

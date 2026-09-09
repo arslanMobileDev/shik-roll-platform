@@ -26,9 +26,7 @@ void main() {
       MaterialApp(
         home: BlocProvider.value(
           value: cubit,
-          child: Scaffold(
-            appBar: AppBar(actions: const [CookShiftHeader()]),
-          ),
+          child: Scaffold(appBar: AppBar(actions: const [CookShiftHeader()])),
         ),
       ),
     );
@@ -120,10 +118,7 @@ void main() {
   testWidgets('меню шапки: «Завершить смену» вызывает clock-out', (
     tester,
   ) async {
-    final (cubit, repository) = await pumpHeader(
-      tester,
-      cooks: [buildCook()],
-    );
+    final (cubit, repository) = await pumpHeader(tester, cooks: [buildCook()]);
     cubit.selectCook('cook-1');
     await tester.pumpAndSettle();
 

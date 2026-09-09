@@ -7,12 +7,14 @@ import { CouriersModule } from '../couriers/couriers.module';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { OrdersEventsModule } from './orders-events.module';
+import { KitchenModule } from '../kitchen/kitchen.module';
 
 @Module({
   imports: [
     PrismaModule,
     CouriersModule,
     LoyaltyModule,
+    KitchenModule,
     OrdersEventsModule,
     PaymentsModule,
   ],

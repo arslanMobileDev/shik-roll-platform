@@ -1,5 +1,5 @@
 name: kds
-description: "SHIK Platform KDS — kitchen display system (DB-602 / API-702 v1.2.0)."
+description: "SHIK Platform KDS — kitchen display system (ADR-1618 / API-709 v1.0.0)."
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -12,7 +12,9 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_bloc: ^9.1.1
+  flutter_secure_storage: ^10.0.0
   get_it: ^9.2.1
+  web: ^1.1.0
 
 dev_dependencies:
   flutter_test:

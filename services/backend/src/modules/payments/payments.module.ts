@@ -7,6 +7,7 @@ import { PaymentsService } from './payments.service';
 import { PAYMENT_PROVIDER_ADAPTER, PaymentProviderAdapter } from './payments.types';
 import { MockPaymentProvider } from './providers/mock-payment.provider';
 import { YooKassaProvider } from './providers/yookassa.provider';
+import { KitchenModule } from '../kitchen/kitchen.module';
 
 /**
  * Payments bounded context. The active provider adapter is selected once at
@@ -14,7 +15,7 @@ import { YooKassaProvider } from './providers/yookassa.provider';
  * YOOKASSA_SHOP_ID/YOOKASSA_SECRET_KEY), the dev Mock otherwise.
  */
 @Module({
-  imports: [OrdersEventsModule, LoyaltyModule],
+  imports: [OrdersEventsModule, LoyaltyModule, KitchenModule],
   controllers: [PaymentsController],
   providers: [
     PaymentsService,

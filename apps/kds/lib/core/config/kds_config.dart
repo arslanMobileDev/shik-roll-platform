@@ -1,11 +1,13 @@
 /// Runtime configuration for the KDS app, supplied via `--dart-define`.
 ///
-/// The local backend is used by default. Pass an empty `API_BASE_URL` only
-/// when the in-memory demo repositories are explicitly required.
+/// When [apiBaseUrl] is empty the app runs in demo mode: a local PIN
+/// (`0000`), an in-memory demo order stream and a silent events client keep
+/// the kitchen board usable for development and widget tests without a
+/// backend.
 abstract final class KdsConfig {
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:3000',
+    defaultValue: '',
   );
 
   static const String defaultBrandId = String.fromEnvironment(
@@ -13,11 +15,7 @@ abstract final class KdsConfig {
     defaultValue: 'brand-shik-roll',
   );
 
-  static const String defaultBranchId = String.fromEnvironment(
-    'BRANCH_ID',
-    defaultValue: '47ad77ce-acf4-4778-a185-974d3a4a2413',
-  );
-
-  /// Auto-refresh interval for the kitchen board (API polling).
-  static const Duration pollInterval = Duration(seconds: 10);
+  /// Fallback snapshot-polling interval while the kitchen SSE stream is down
+  /// (ADR-1618 recovery contract).
+  static const Duration fallbackPollInterval = Duration(seconds: 15);
 }

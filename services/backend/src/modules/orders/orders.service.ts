@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   OrderStatus,
@@ -31,6 +32,7 @@ import {
   CouriersEventsService,
   OrderTrackingEvent,
 } from '../couriers/couriers-events.service';
+import { KitchenEventsService } from '../kitchen/kitchen-events.service';
 
 @Injectable()
 export class OrdersService {
@@ -42,6 +44,7 @@ export class OrdersService {
     private readonly loyalty: LoyaltyService,
     private readonly ordersEvents: OrdersEventsService,
     private readonly payments: PaymentsService,
+    @Optional() private readonly kitchenEvents?: KitchenEventsService,
   ) {}
 
   /**
@@ -288,6 +291,7 @@ export class OrdersService {
         status: record.status,
         timestamp: new Date().toISOString(),
       });
+      await this.kitchenEvents?.publishOrderChanged(record.id);
     }
     return toOrderEntity(record, paymentLink);
   }
@@ -351,6 +355,7 @@ export class OrdersService {
       status: updated.status,
       timestamp: new Date().toISOString(),
     });
+    await this.kitchenEvents?.publishOrderChanged(updated.id);
 
     // Loyalty (ADR-1614): cashback accrues exactly once on the transition to
     // COMPLETED; a cancellation refunds the points spent at checkout. Both

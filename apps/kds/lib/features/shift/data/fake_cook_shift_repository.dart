@@ -72,7 +72,10 @@ final class FakeCookShiftRepository implements CookShiftRepository {
   }
 
   @override
-  Future<void> clockOut({required String cookId, required String shiftId}) async {
+  Future<void> clockOut({
+    required String cookId,
+    required String shiftId,
+  }) async {
     for (final branchId in _cooksByBranch.keys.toList()) {
       _cooksByBranch[branchId] = [
         for (final cook in _line(branchId))

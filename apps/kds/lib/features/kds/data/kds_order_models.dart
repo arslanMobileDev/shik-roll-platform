@@ -1,6 +1,9 @@
 import 'package:equatable/equatable.dart';
 
-/// Order lifecycle status (API-702 `OrderEntity.status`).
+/// Order lifecycle status on the kitchen board (API-709 `KitchenOrderStatus`).
+///
+/// The kitchen API serves NEW/CONFIRMED/COOKING/READY; terminal values exist
+/// so removal events and optimistic transitions stay typed.
 enum KdsOrderStatus {
   newOrder('NEW'),
   confirmed('CONFIRMED'),
@@ -16,11 +19,11 @@ enum KdsOrderStatus {
   static KdsOrderStatus fromWire(String value) =>
       KdsOrderStatus.values.firstWhere(
         (s) => s.wireName == value,
-        orElse: () => KdsOrderStatus.newOrder,
+        orElse: () => KdsOrderStatus.confirmed,
       );
 }
 
-/// Fulfilment type (API-702 `OrderEntity.type`).
+/// Fulfilment type (API-709 `KitchenOrderDto.type`).
 enum KdsOrderType {
   dineIn('DINE_IN'),
   takeaway('TAKEAWAY'),
@@ -36,7 +39,7 @@ enum KdsOrderType {
   );
 }
 
-/// Modifier applied to an order line (API-702 `OrderItemModifierEntity`).
+/// Modifier applied to an order line (API-709 `KitchenOrderItemDto.modifiers`).
 final class KdsOrderItemModifier extends Equatable {
   const KdsOrderItemModifier({
     required this.id,
@@ -59,7 +62,7 @@ final class KdsOrderItemModifier extends Equatable {
   List<Object?> get props => [id, name, quantity];
 }
 
-/// Single line of an order (API-702 `OrderItemEntity`).
+/// Single line of an order (API-709 `KitchenOrderItemDto`).
 final class KdsOrderItem extends Equatable {
   const KdsOrderItem({
     required this.id,
@@ -90,16 +93,26 @@ final class KdsOrderItem extends Equatable {
   List<Object?> get props => [id, name, quantity, comment, modifiers];
 }
 
-/// Kitchen-facing order (API-702 `OrderEntity`, trimmed to KDS concerns —
-/// money fields are cashier-facing and intentionally not mapped here).
+DateTime _parseServerTime(String? value, {DateTime? fallback}) =>
+    DateTime.tryParse(value ?? '')?.toLocal() ??
+    fallback ??
+    DateTime.fromMillisecondsSinceEpoch(0);
+
+/// Kitchen-facing order (API-709 `KitchenOrderDto`).
+///
+/// The DTO intentionally carries no customer phone/address and no payment
+/// data. Timestamps are server-stamped: [confirmedAt] when the order entered
+/// the board, [cookingStartedAt]/[readyAt] on kitchen transitions.
 final class KdsOrder extends Equatable {
   const KdsOrder({
     required this.id,
     required this.orderNumber,
+    required this.version,
     required this.status,
     required this.type,
-    required this.branchId,
-    required this.createdAt,
+    required this.confirmedAt,
+    this.cookingStartedAt,
+    this.readyAt,
     this.tableNumber,
     this.comment,
     this.items = const [],
@@ -107,29 +120,58 @@ final class KdsOrder extends Equatable {
 
   final String id;
   final String orderNumber;
+
+  /// Optimistic-concurrency version — echoed as `expectedVersion` on status
+  /// transitions (API-709 `PATCH /kitchen/orders/{id}/status`).
+  final int version;
   final KdsOrderStatus status;
   final KdsOrderType type;
-  final String branchId;
-  final DateTime createdAt;
+
+  /// Server timestamp of entering CONFIRMED (board arrival).
+  final DateTime confirmedAt;
+
+  /// Server timestamp of the CONFIRMED → COOKING transition, if it happened.
+  final DateTime? cookingStartedAt;
+
+  /// Server timestamp of the COOKING → READY transition, if it happened.
+  final DateTime? readyAt;
+
   final String? tableNumber;
   final String? comment;
   final List<KdsOrderItem> items;
 
   /// Kitchen-visible statuses: everything still on the board.
   bool get isActive =>
-      status != KdsOrderStatus.completed && status != KdsOrderStatus.cancelled;
+      status == KdsOrderStatus.newOrder ||
+      status == KdsOrderStatus.confirmed ||
+      status == KdsOrderStatus.cooking ||
+      status == KdsOrderStatus.ready;
 
-  /// «В очереди» column buckets NEW and CONFIRMED together.
-  bool get isQueued =>
-      status == KdsOrderStatus.newOrder || status == KdsOrderStatus.confirmed;
+  /// Moment the order entered its current status (server clock). Drives the
+  /// per-column delay timer and the FIFO order inside a column.
+  DateTime get statusSince => switch (status) {
+    KdsOrderStatus.cooking => cookingStartedAt ?? confirmedAt,
+    KdsOrderStatus.ready => readyAt ?? cookingStartedAt ?? confirmedAt,
+    _ => confirmedAt,
+  };
 
-  KdsOrder copyWith({KdsOrderStatus? status}) => KdsOrder(
+  KdsOrder copyWith({
+    KdsOrderStatus? status,
+    int? version,
+    DateTime? confirmedAt,
+    DateTime? Function()? cookingStartedAt,
+    DateTime? Function()? readyAt,
+  }) => KdsOrder(
     id: id,
     orderNumber: orderNumber,
+    version: version ?? this.version,
     status: status ?? this.status,
     type: type,
-    branchId: branchId,
-    createdAt: createdAt,
+    confirmedAt: confirmedAt ?? this.confirmedAt,
+    cookingStartedAt: cookingStartedAt != null
+        ? cookingStartedAt()
+        : this.cookingStartedAt,
+    readyAt: readyAt != null ? readyAt() : this.readyAt,
     tableNumber: tableNumber,
     comment: comment,
     items: items,
@@ -138,12 +180,16 @@ final class KdsOrder extends Equatable {
   factory KdsOrder.fromJson(Map<String, dynamic> json) => KdsOrder(
     id: json['id'] as String? ?? '',
     orderNumber: json['orderNumber'] as String? ?? '',
-    status: KdsOrderStatus.fromWire(json['status'] as String? ?? 'NEW'),
+    version: (json['version'] as num?)?.toInt() ?? 1,
+    status: KdsOrderStatus.fromWire(json['status'] as String? ?? 'CONFIRMED'),
     type: KdsOrderType.fromWire(json['type'] as String? ?? 'DINE_IN'),
-    branchId: json['branchId'] as String? ?? '',
-    createdAt:
-        DateTime.tryParse(json['createdAt'] as String? ?? '')?.toLocal() ??
-        DateTime.fromMillisecondsSinceEpoch(0),
+    confirmedAt: _parseServerTime(json['confirmedAt'] as String?),
+    cookingStartedAt: json['cookingStartedAt'] == null
+        ? null
+        : _parseServerTime(json['cookingStartedAt'] as String?),
+    readyAt: json['readyAt'] == null
+        ? null
+        : _parseServerTime(json['readyAt'] as String?),
     tableNumber: json['tableNumber'] as String?,
     comment: json['comment'] as String?,
     items: [
@@ -156,10 +202,12 @@ final class KdsOrder extends Equatable {
   List<Object?> get props => [
     id,
     orderNumber,
+    version,
     status,
     type,
-    branchId,
-    createdAt,
+    confirmedAt,
+    cookingStartedAt,
+    readyAt,
     tableNumber,
     comment,
     items,

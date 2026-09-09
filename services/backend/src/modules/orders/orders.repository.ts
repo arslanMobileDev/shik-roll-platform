@@ -79,6 +79,8 @@ export class OrdersRepository {
   ): Promise<OrderRecord> {
     const terminalPatch: Prisma.OrderUncheckedUpdateInput = {};
     if (to === OrderStatus.CONFIRMED) terminalPatch.confirmedAt = new Date();
+    if (to === OrderStatus.COOKING) terminalPatch.cookingStartedAt = new Date();
+    if (to === OrderStatus.READY) terminalPatch.readyAt = new Date();
     if (to === OrderStatus.COMPLETED) terminalPatch.completedAt = new Date();
     if (to === OrderStatus.CANCELLED) {
       terminalPatch.cancelledAt = new Date();

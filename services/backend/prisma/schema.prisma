@@ -98,6 +98,7 @@ model Branch {
   availability  BranchMenuItemAvailability[]
   stopList      StopListEntry[]
   orders        Order[]
+  kitchenTerminals KitchenTerminal[]
 
   @@unique([code], map: "uq_branches_code")
   @@index([status], map: "idx_branches_status")
@@ -467,6 +468,8 @@ model MenuItemModifierGroup {
 // Money: Decimal(10,2) in RUB (same task-authorized deviation as the catalog).
 // Order status transitions are governed by the state machine in
 // modules/orders (NEW -> CONFIRMED -> COOKING -> READY -> COMPLETED | CANCELLED).
+// The kitchen terminal is the single production owner of
+// NEW/CONFIRMED -> COOKING -> READY.
 // ---------------------------------------------------------------------------
 
 enum OrderType {
@@ -515,6 +518,11 @@ model Order {
   completedAt     DateTime?   @map("completed_at") @db.Timestamptz(6)
   cancelledAt     DateTime?   @map("cancelled_at") @db.Timestamptz(6)
   cancelReason    String?     @map("cancel_reason")
+  // Kitchen POS (ADR-1618): server timestamps of the kitchen-owned transitions
+  // NEW/CONFIRMED -> COOKING -> READY. confirmedAt is written by payment
+  // confirmation; cookingStartedAt and readyAt by a kitchen mutation.
+  cookingStartedAt DateTime?  @map("cooking_started_at") @db.Timestamptz(6)
+  readyAt          DateTime?  @map("ready_at") @db.Timestamptz(6)
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt       DateTime?   @map("deleted_at") @db.Timestamptz(6)
@@ -664,6 +672,12 @@ model OrderStatusHistory {
   previousStatus OrderStatus @map("previous_status")
   newStatus      OrderStatus @map("new_status")
   changedBy      String?     @map("changed_by") @db.Uuid
+  // Kitchen POS audit (ADR-1618): the terminal that ran the mutation plus the
+  // cook/shift attribution sent with it. Nullable — non-kitchen transitions
+  // (operator, courier, worker) leave these empty.
+  kitchenTerminalId String? @map("kitchen_terminal_id") @db.Uuid
+  cookId            String? @map("cook_id")
+  shiftId           String? @map("shift_id")
   reason         String?
   changedAt      DateTime    @default(now()) @map("changed_at") @db.Timestamptz(6)
 
@@ -688,6 +702,29 @@ model Courier {
   orders      Order[]
 
   @@map("couriers")
+}
+
+// ---------------------------------------------------------------------------
+// Kitchen POS terminals (ADR-1618). Bounded context: kitchen.
+// A terminal authenticates with its code + 4-digit PIN (bcrypt) and receives
+// a branch-scoped KITCHEN access token; terminalId/branchId always come from
+// that JWT, never from the client.
+// ---------------------------------------------------------------------------
+
+model KitchenTerminal {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  name      String
+  pinHash   String   @map("pin_hash")
+  branchId  String   @map("branch_id") @db.Uuid
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_kitchen_terminals_branches")
+
+  @@index([branchId, isActive], map: "idx_kitchen_terminals_branch_id_is_active")
+  @@map("kitchen_terminals")
 }
 
 // ---------------------------------------------------------------------------

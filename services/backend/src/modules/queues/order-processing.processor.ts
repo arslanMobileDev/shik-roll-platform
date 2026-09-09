@@ -1,11 +1,12 @@
 import { InjectQueue, OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { OrderStatus, Prisma } from '@prisma/client';
 import { Job, Queue } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { lineTotal, orderSubtotal, orderTotal } from '../orders/domain/order-pricing';
 import { canTransition } from '../orders/domain/order-status-machine';
+import { KitchenEventsService } from '../kitchen/kitchen-events.service';
 import {
   ORDER_PROCESSING_QUEUE,
   ProcessOrderJobData,
@@ -53,6 +54,7 @@ export class OrderProcessingProcessor extends WorkerHost {
     private readonly loyalty: LoyaltyService,
     @InjectQueue(ORDER_PROCESSING_QUEUE)
     private readonly queue: Queue<ProcessOrderJobData | StatusTimerJobData>,
+    @Optional() private readonly kitchenEvents?: KitchenEventsService,
   ) {
     super();
   }
@@ -249,6 +251,7 @@ export class OrderProcessingProcessor extends WorkerHost {
       }),
     ]);
     this.logger.log(`Order ${orderId}: ${from} -> ${to} (${options.reason ?? 'n/a'})`);
+    await this.kitchenEvents?.publishOrderChanged(orderId);
 
     // Loyalty (ADR-1614): a worker-driven terminal transition follows the same
     // rules as the operator path — COMPLETED accrues cashback, CANCELLED

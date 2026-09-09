@@ -5,7 +5,7 @@ Document Name: ARCHITECTURE DECISION RECORDS INDEX
 
 Book: Enterprise Architecture Decision Records
 
-Version: 1.3.0
+Version: 1.4.0
 
 Status: APPROVED
 
@@ -105,6 +105,7 @@ APPROVED означает, что индекс утвержден как дей�
 | ADR-1615 | Realtime Order Timeline | ACCEPTED | docs/16-adr/1615-adr-realtime-order-timeline.md |
 | ADR-1616 | Customer User Settings | ACCEPTED | docs/16-adr/1616-adr-customer-user-settings.md |
 | ADR-1617 | Courier Mobile Architecture | ACCEPTED | docs/16-adr/1617-adr-courier-mobile-architecture.md |
+| ADR-1618 | Kitchen POS Architecture | ACCEPTED | docs/16-adr/1618-adr-kitchen-pos-architecture.md |
 
 ---
 
