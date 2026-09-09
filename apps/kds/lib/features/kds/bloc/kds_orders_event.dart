@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../data/kds_order_models.dart';
+import '../data/kds_orders_repository.dart';
 
 sealed class KdsOrdersEvent extends Equatable {
   const KdsOrdersEvent();
@@ -27,6 +28,16 @@ final class KdsOrdersRefreshed extends KdsOrdersEvent {
 /// Internal timer tick (every [KdsConfig.pollInterval]).
 final class KdsOrdersPollTicked extends KdsOrdersEvent {
   const KdsOrdersPollTicked();
+}
+
+/// Internal SSE transport state/event forwarded by the repository.
+final class KdsOrdersStreamEventReceived extends KdsOrdersEvent {
+  const KdsOrdersStreamEventReceived(this.streamEvent);
+
+  final KdsOrdersStreamEvent streamEvent;
+
+  @override
+  List<Object?> get props => [streamEvent];
 }
 
 /// One-tap cook action: «В работу» → COOKING, «Готово» → READY,

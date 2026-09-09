@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -18,7 +20,7 @@ import 'widgets/kds_status_column.dart';
 /// Three status columns («В очереди» → «Готовятся» → «Готовы»), auto-refresh
 /// via [KdsOrdersBloc] polling, manual refresh in the header and audio/visual
 /// feedback when new orders arrive.
-class KdsScreen extends StatelessWidget {
+class KdsScreen extends StatefulWidget {
   const KdsScreen({super.key, this.onNewOrders, this.now});
 
   /// Override for the new-order audio alert (tests inject a spy; production
@@ -27,6 +29,23 @@ class KdsScreen extends StatelessWidget {
 
   /// Fixed clock for deterministic delay timers in tests.
   final DateTime? now;
+
+  @override
+  State<KdsScreen> createState() => _KdsScreenState();
+}
+
+class _KdsScreenState extends State<KdsScreen> {
+  static const _alertDebounce = Duration(milliseconds: 500);
+
+  final Map<String, KdsOrder> _pendingAlertOrders = {};
+  Timer? _alertTimer;
+  bool _soundEnabled = true;
+
+  @override
+  void dispose() {
+    _alertTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,11 +89,25 @@ class KdsScreen extends StatelessWidget {
         const <KdsOrder>[];
     if (fresh.isEmpty) return;
 
-    final alerter = onNewOrders;
-    if (alerter != null) {
-      alerter(fresh);
-    } else {
-      SystemSound.play(SystemSoundType.alert);
+    for (final order in fresh) {
+      _pendingAlertOrders[order.id] = order;
+    }
+    _alertTimer?.cancel();
+    _alertTimer = Timer(_alertDebounce, () => _showNewOrdersAlert(context));
+  }
+
+  void _showNewOrdersAlert(BuildContext context) {
+    if (!mounted || _pendingAlertOrders.isEmpty) return;
+    final fresh = List<KdsOrder>.unmodifiable(_pendingAlertOrders.values);
+    _pendingAlertOrders.clear();
+
+    if (_soundEnabled) {
+      final alerter = widget.onNewOrders;
+      if (alerter != null) {
+        alerter(fresh);
+      } else {
+        SystemSound.play(SystemSoundType.alert);
+      }
     }
 
     ScaffoldMessenger.of(context)
@@ -103,6 +136,11 @@ class KdsScreen extends StatelessWidget {
         actions: [
           const CookShiftHeader(),
           const SizedBox(width: AppSpacing.s12),
+          BlocSelector<KdsOrdersBloc, KdsOrdersState, KdsConnectionStatus>(
+            selector: (state) => state.connectionStatus,
+            builder: (context, status) => _ConnectionIndicator(status: status),
+          ),
+          const SizedBox(width: AppSpacing.s4),
           BlocSelector<KdsOrdersBloc, KdsOrdersState, DateTime?>(
             selector: (state) =>
                 state is KdsOrdersLoaded ? state.lastUpdatedAt : null,
@@ -111,15 +149,28 @@ class KdsScreen extends StatelessWidget {
               final hh = updatedAt.hour.toString().padLeft(2, '0');
               final mm = updatedAt.minute.toString().padLeft(2, '0');
               final ss = updatedAt.second.toString().padLeft(2, '0');
-              return Center(
-                child: Text(
-                  'Обновлено $hh:$mm:$ss',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: AppColors.gray600),
+              return Tooltip(
+                message: 'Обновлено $hh:$mm:$ss',
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.s4),
+                  child: Icon(
+                    Icons.schedule,
+                    size: 16,
+                    color: AppColors.gray600,
+                  ),
                 ),
               );
             },
+          ),
+          IconButton(
+            key: const Key('kds-sound-toggle'),
+            tooltip: _soundEnabled ? 'Выключить звук' : 'Включить звук',
+            icon: Icon(
+              _soundEnabled
+                  ? Icons.volume_up_outlined
+                  : Icons.volume_off_outlined,
+            ),
+            onPressed: () => setState(() => _soundEnabled = !_soundEnabled),
           ),
           IconButton(
             key: const Key('kds-refresh-button'),
@@ -140,8 +191,40 @@ class KdsScreen extends StatelessWidget {
             onRetry: () =>
                 context.read<KdsOrdersBloc>().add(const KdsOrdersRefreshed()),
           ),
-          _ => _KdsBoard(state: state, now: now),
+          _ => _KdsBoard(state: state, now: widget.now),
         },
+      ),
+    );
+  }
+}
+
+class _ConnectionIndicator extends StatelessWidget {
+  const _ConnectionIndicator({required this.status});
+
+  final KdsConnectionStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (status) {
+      KdsConnectionStatus.online => ('Онлайн', AppColors.success),
+      KdsConnectionStatus.connecting => ('Подключение…', AppColors.warning),
+      KdsConnectionStatus.reconnecting => (
+        'Переподключение…',
+        AppColors.warning,
+      ),
+      KdsConnectionStatus.offline => ('Нет сети', AppColors.error),
+    };
+
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        key: const Key('kds-connection-indicator'),
+        label: 'Статус соединения: $label',
+        child: Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
       ),
     );
   }

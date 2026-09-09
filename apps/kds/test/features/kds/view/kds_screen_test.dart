@@ -3,7 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kds/features/kds/bloc/kds_orders_bloc.dart';
 import 'package:kds/features/kds/bloc/kds_orders_event.dart';
+import 'package:kds/features/kds/bloc/kds_orders_state.dart';
 import 'package:kds/features/kds/data/kds_order_models.dart';
+import 'package:kds/features/kds/data/kds_orders_repository.dart';
 import 'package:kds/features/kds/view/kds_screen.dart';
 import 'package:kds/features/kds/view/widgets/order_card.dart';
 import 'package:kds/features/shift/bloc/cook_shift_cubit.dart';
@@ -134,7 +136,9 @@ void main() {
     expect(find.text('#301'), findsOneWidget);
   });
 
-  testWidgets('новый заказ: звуковой сигнал и снэкбар', (tester) async {
+  testWidgets('пачка новых заказов: один звуковой сигнал и снэкбар', (
+    tester,
+  ) async {
     final alerted = <List<KdsOrder>>[];
     final (bloc, repository, _) = await pumpScreen(
       tester,
@@ -149,14 +153,26 @@ void main() {
       ),
     );
     bloc.add(const KdsOrdersPollTicked());
+    await tester.pump();
+
+    repository.orders.add(
+      buildOrder(
+        id: 'fresh-2',
+        orderNumber: '402',
+        status: KdsOrderStatus.newOrder,
+      ),
+    );
+    bloc.add(const KdsOrdersPollTicked());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
 
     expect(alerted, hasLength(1));
-    expect(alerted.single.map((o) => o.id), ['fresh']);
-    expect(find.text('Новый заказ: #401'), findsOneWidget);
+    expect(alerted.single.map((o) => o.id), ['fresh', 'fresh-2']);
+    expect(find.text('Новый заказ: #401, #402'), findsOneWidget);
     // Карточка подсвечена.
     final card = tester.widget<OrderCard>(
-      find.byKey(const Key('order-card-fresh')),
+      find.byKey(const Key('order-card-fresh-2')),
     );
     expect(card.isFresh, isTrue);
 
@@ -167,6 +183,42 @@ void main() {
       find.byKey(const Key('order-card-fresh')),
     );
     expect(cardAfter.isFresh, isFalse);
+  });
+
+  testWidgets('звук можно отключить, визуальное оповещение сохраняется', (
+    tester,
+  ) async {
+    final alerted = <List<KdsOrder>>[];
+    final (bloc, repository, _) = await pumpScreen(
+      tester,
+      onNewOrders: alerted.add,
+    );
+
+    await tester.tap(find.byKey(const Key('kds-sound-toggle')));
+    await tester.pump();
+    expect(find.byTooltip('Включить звук'), findsOneWidget);
+
+    repository.orders.add(buildOrder(id: 'muted', orderNumber: '403'));
+    bloc.add(const KdsOrdersPollTicked());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pumpAndSettle();
+
+    expect(alerted, isEmpty);
+    expect(find.text('Новый заказ: #403'), findsOneWidget);
+  });
+
+  testWidgets('индикатор показывает состояние SSE', (tester) async {
+    final (bloc, repository, _) = await pumpScreen(tester);
+
+    repository.streamController.add(KdsOrdersStreamEvent.disconnected);
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Нет сети'), findsOneWidget);
+
+    repository.streamController.add(KdsOrdersStreamEvent.connected);
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Онлайн'), findsOneWidget);
+    expect(bloc.state.connectionStatus, KdsConnectionStatus.online);
   });
 
   testWidgets('выбранный повар: cookId/shiftId уходят в смену статуса', (

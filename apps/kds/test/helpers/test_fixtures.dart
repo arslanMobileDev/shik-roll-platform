@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:kds/features/kds/data/kds_order_models.dart';
 import 'package:kds/features/kds/data/kds_orders_repository.dart';
 import 'package:kds/features/shift/data/cook_shift_models.dart';
@@ -62,6 +64,9 @@ final class TestKdsOrdersRepository implements KdsOrdersRepository {
   attributionCalls = [];
   Object? fetchError;
   Object? updateError;
+  final StreamController<KdsOrdersStreamEvent> streamController =
+      StreamController<KdsOrdersStreamEvent>.broadcast();
+  int fetchCalls = 0;
 
   @override
   Future<List<KdsOrder>> fetchOrders({
@@ -69,6 +74,7 @@ final class TestKdsOrdersRepository implements KdsOrdersRepository {
     int page = 1,
     int limit = 50,
   }) async {
+    fetchCalls++;
     if (fetchError != null) throw fetchError!;
     return List.unmodifiable(orders.where((o) => o.branchId == branchId));
   }
@@ -90,7 +96,8 @@ final class TestKdsOrdersRepository implements KdsOrdersRepository {
   }
 
   @override
-  Stream<void> watchOrders(String branchId) => const Stream.empty();
+  Stream<KdsOrdersStreamEvent> watchOrders(String branchId) =>
+      streamController.stream;
 }
 
 ActiveCook buildCook({

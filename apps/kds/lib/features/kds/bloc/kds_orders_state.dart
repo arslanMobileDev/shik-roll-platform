@@ -2,8 +2,12 @@ import 'package:equatable/equatable.dart';
 
 import '../data/kds_order_models.dart';
 
+enum KdsConnectionStatus { connecting, online, reconnecting, offline }
+
 sealed class KdsOrdersState extends Equatable {
-  const KdsOrdersState();
+  const KdsOrdersState({required this.connectionStatus});
+
+  final KdsConnectionStatus connectionStatus;
 
   /// Orders available for rendering, if the board has any data.
   List<KdsOrder>? get orders => null;
@@ -18,7 +22,12 @@ sealed class KdsOrdersState extends Equatable {
 
 /// Initial load in progress (board has no data yet).
 final class KdsOrdersLoading extends KdsOrdersState {
-  const KdsOrdersLoading();
+  const KdsOrdersLoading({
+    super.connectionStatus = KdsConnectionStatus.connecting,
+  });
+
+  @override
+  List<Object?> get props => [connectionStatus];
 }
 
 /// Board data available. Also the resting state after actions/polls.
@@ -28,6 +37,7 @@ final class KdsOrdersLoaded extends KdsOrdersState {
     this.lastUpdatedAt,
     this.freshOrderIds = const {},
     this.actionError,
+    super.connectionStatus = KdsConnectionStatus.connecting,
   });
 
   @override
@@ -46,11 +56,13 @@ final class KdsOrdersLoaded extends KdsOrdersState {
     DateTime? lastUpdatedAt,
     Set<String>? freshOrderIds,
     String? Function()? actionError,
+    KdsConnectionStatus? connectionStatus,
   }) => KdsOrdersLoaded(
     orders: orders ?? this.orders,
     lastUpdatedAt: lastUpdatedAt ?? this.lastUpdatedAt,
     freshOrderIds: freshOrderIds ?? this.freshOrderIds,
     actionError: actionError != null ? actionError() : this.actionError,
+    connectionStatus: connectionStatus ?? this.connectionStatus,
   );
 
   @override
@@ -59,6 +71,7 @@ final class KdsOrdersLoaded extends KdsOrdersState {
     lastUpdatedAt,
     freshOrderIds,
     actionError,
+    connectionStatus,
   ];
 }
 
@@ -68,6 +81,7 @@ final class KdsOrdersActionInProgress extends KdsOrdersState {
   const KdsOrdersActionInProgress({
     required this.orders,
     required this.pendingOrderId,
+    required super.connectionStatus,
   });
 
   @override
@@ -76,15 +90,18 @@ final class KdsOrdersActionInProgress extends KdsOrdersState {
   final String pendingOrderId;
 
   @override
-  List<Object?> get props => [orders, pendingOrderId];
+  List<Object?> get props => [orders, pendingOrderId, connectionStatus];
 }
 
 /// Fetch failed before any data was available.
 final class KdsOrdersError extends KdsOrdersState {
-  const KdsOrdersError(this.message);
+  const KdsOrdersError(
+    this.message, {
+    super.connectionStatus = KdsConnectionStatus.offline,
+  });
 
   final String message;
 
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [message, connectionStatus];
 }

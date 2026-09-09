@@ -16,6 +16,7 @@ class KdsOrdersBloc extends Bloc<KdsOrdersEvent, KdsOrdersState> {
     on<KdsOrdersStarted>(_onStarted);
     on<KdsOrdersRefreshed>(_onRefreshed);
     on<KdsOrdersPollTicked>(_onPollTicked);
+    on<KdsOrdersStreamEventReceived>(_onStreamEventReceived);
     on<KdsOrderStatusChangeRequested>(_onStatusChangeRequested);
     on<KdsOrdersNewOrdersAcknowledged>(_onNewOrdersAcknowledged);
   }
@@ -60,7 +61,11 @@ class KdsOrdersBloc extends Bloc<KdsOrdersEvent, KdsOrdersState> {
     if (current == null) return;
 
     emit(
-      KdsOrdersActionInProgress(orders: current, pendingOrderId: event.orderId),
+      KdsOrdersActionInProgress(
+        orders: current,
+        pendingOrderId: event.orderId,
+        connectionStatus: state.connectionStatus,
+      ),
     );
     try {
       await repository.updateOrderStatus(
@@ -76,9 +81,55 @@ class KdsOrdersBloc extends Bloc<KdsOrdersEvent, KdsOrdersState> {
           orders: current,
           lastUpdatedAt: DateTime.now(),
           actionError: 'Не удалось обновить статус: $e',
+          connectionStatus: state.connectionStatus,
         ),
       );
     }
+  }
+
+  void _onStreamEventReceived(
+    KdsOrdersStreamEventReceived event,
+    Emitter<KdsOrdersState> emit,
+  ) {
+    switch (event.streamEvent) {
+      case KdsOrdersStreamEvent.connecting:
+        _emitConnectionStatus(emit, KdsConnectionStatus.connecting);
+      case KdsOrdersStreamEvent.connected:
+        _emitConnectionStatus(emit, KdsConnectionStatus.online);
+        // A full sync closes the gap that may have formed while SSE was down.
+        add(const KdsOrdersPollTicked());
+      case KdsOrdersStreamEvent.reconnecting:
+        _emitConnectionStatus(emit, KdsConnectionStatus.reconnecting);
+      case KdsOrdersStreamEvent.disconnected:
+        _emitConnectionStatus(emit, KdsConnectionStatus.offline);
+      case KdsOrdersStreamEvent.ordersChanged:
+        add(const KdsOrdersPollTicked());
+    }
+  }
+
+  void _emitConnectionStatus(
+    Emitter<KdsOrdersState> emit,
+    KdsConnectionStatus status,
+  ) {
+    if (state.connectionStatus == status) return;
+    emit(
+      switch (state) {
+        KdsOrdersLoading() => KdsOrdersLoading(connectionStatus: status),
+        final KdsOrdersLoaded loaded => loaded.copyWith(
+          connectionStatus: status,
+        ),
+        KdsOrdersActionInProgress(:final orders, :final pendingOrderId) =>
+          KdsOrdersActionInProgress(
+            orders: orders,
+            pendingOrderId: pendingOrderId,
+            connectionStatus: status,
+          ),
+        KdsOrdersError(:final message) => KdsOrdersError(
+          message,
+          connectionStatus: status,
+        ),
+      },
+    );
   }
 
   void _onNewOrdersAcknowledged(
@@ -97,7 +148,9 @@ class KdsOrdersBloc extends Bloc<KdsOrdersEvent, KdsOrdersState> {
   }) async {
     final branchId = _branchId;
     if (branchId == null) return;
-    if (showLoading) emit(const KdsOrdersLoading());
+    if (showLoading) {
+      emit(KdsOrdersLoading(connectionStatus: state.connectionStatus));
+    }
 
     try {
       final fetched = await repository.fetchOrders(branchId: branchId);
@@ -116,11 +169,17 @@ class KdsOrdersBloc extends Bloc<KdsOrdersEvent, KdsOrdersState> {
           orders: orders,
           lastUpdatedAt: DateTime.now(),
           freshOrderIds: state.orders == null ? const {} : fresh,
+          connectionStatus: state.connectionStatus,
         ),
       );
     } catch (e) {
       if (state.orders == null) {
-        emit(KdsOrdersError('Не удалось загрузить заказы: $e'));
+        emit(
+          KdsOrdersError(
+            'Не удалось загрузить заказы: $e',
+            connectionStatus: state.connectionStatus,
+          ),
+        );
       }
     }
   }
@@ -143,9 +202,15 @@ class KdsOrdersBloc extends Bloc<KdsOrdersEvent, KdsOrdersState> {
   void _startSseSubscription(String branchId) {
     _sseSubscription?.cancel();
     _sseSubscription = repository.watchOrders(branchId).listen(
-      (_) => add(const KdsOrdersPollTicked()),
+      (event) => add(KdsOrdersStreamEventReceived(event)),
       onError: (_) {
-        // Ошибки стрима не ломают работу, fallback-поллинг подстраховывает
+        if (!isClosed) {
+          add(
+            const KdsOrdersStreamEventReceived(
+              KdsOrdersStreamEvent.disconnected,
+            ),
+          );
+        }
       },
     );
   }

@@ -4,6 +4,7 @@ import 'package:kds/features/kds/bloc/kds_orders_bloc.dart';
 import 'package:kds/features/kds/bloc/kds_orders_event.dart';
 import 'package:kds/features/kds/bloc/kds_orders_state.dart';
 import 'package:kds/features/kds/data/kds_order_models.dart';
+import 'package:kds/features/kds/data/kds_orders_repository.dart';
 
 import '../../../helpers/test_fixtures.dart';
 
@@ -49,6 +50,37 @@ void main() {
             ),
       ],
     );
+
+    test('SSE reconnect обновляет индикатор и синхронизирует заказы', () async {
+      final repository = TestKdsOrdersRepository(
+        orders: [buildOrder(id: 'a')],
+      );
+      final bloc = buildBloc(repository);
+      addTearDown(() async {
+        await bloc.close();
+        await repository.streamController.close();
+      });
+
+      bloc.add(const KdsOrdersStarted(branchId: branchId));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      repository.streamController.add(KdsOrdersStreamEvent.disconnected);
+      await Future<void>.delayed(Duration.zero);
+      expect(stateConnectionStatus(bloc), KdsConnectionStatus.offline);
+
+      repository.streamController.add(KdsOrdersStreamEvent.reconnecting);
+      await Future<void>.delayed(Duration.zero);
+      expect(stateConnectionStatus(bloc), KdsConnectionStatus.reconnecting);
+
+      final callsBeforeReconnect = repository.fetchCalls;
+      repository.streamController.add(KdsOrdersStreamEvent.connected);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(stateConnectionStatus(bloc), KdsConnectionStatus.online);
+      expect(repository.fetchCalls, greaterThan(callsBeforeReconnect));
+    });
 
     blocTest<KdsOrdersBloc, KdsOrdersState>(
       'ошибка начальной загрузки → Error',
@@ -262,3 +294,6 @@ void main() {
     );
   });
 }
+
+KdsConnectionStatus stateConnectionStatus(KdsOrdersBloc bloc) =>
+    bloc.state.connectionStatus;

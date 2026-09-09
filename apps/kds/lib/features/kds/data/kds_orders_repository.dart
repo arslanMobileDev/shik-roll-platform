@@ -5,6 +5,15 @@ import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import 'kds_order_models.dart';
 
+/// Transport-level events emitted by the kitchen SSE connection.
+enum KdsOrdersStreamEvent {
+  connecting,
+  connected,
+  reconnecting,
+  disconnected,
+  ordersChanged,
+}
+
 /// Source of kitchen orders (API-702 `OrdersController`).
 abstract interface class KdsOrdersRepository {
   /// `GET /orders?branchId=…&page=…&limit=…`
@@ -23,14 +32,25 @@ abstract interface class KdsOrdersRepository {
   });
 
   /// SSE stream: `GET /orders/kds/stream?branchId=…`
-  Stream<void> watchOrders(String branchId);
+  Stream<KdsOrdersStreamEvent> watchOrders(String branchId);
 }
 
 /// Remote implementation against the live Orders API.
 final class RemoteKdsOrdersRepository implements KdsOrdersRepository {
-  RemoteKdsOrdersRepository(ApiClient client) : _client = client;
+  RemoteKdsOrdersRepository(
+    ApiClient client, {
+    List<Duration> reconnectDelays = const [
+      Duration(seconds: 1),
+      Duration(seconds: 2),
+      Duration(seconds: 5),
+      Duration(seconds: 10),
+    ],
+  }) : _client = client,
+       assert(reconnectDelays.isNotEmpty),
+       _reconnectDelays = reconnectDelays;
 
   final ApiClient _client;
+  final List<Duration> _reconnectDelays;
 
   @override
   Future<List<KdsOrder>> fetchOrders({
@@ -69,8 +89,15 @@ final class RemoteKdsOrdersRepository implements KdsOrdersRepository {
   }
 
   @override
-  Stream<void> watchOrders(String branchId) async* {
+  Stream<KdsOrdersStreamEvent> watchOrders(String branchId) async* {
+    var retryIndex = 0;
+    var isFirstAttempt = true;
+
     while (true) {
+      yield isFirstAttempt
+          ? KdsOrdersStreamEvent.connecting
+          : KdsOrdersStreamEvent.reconnecting;
+
       try {
         final response = await _client.dio.get<ResponseBody>(
           '/orders/kds/stream',
@@ -84,22 +111,30 @@ final class RemoteKdsOrdersRepository implements KdsOrdersRepository {
 
         final stream = response.data?.stream;
         if (stream == null) {
-          await Future<void>.delayed(const Duration(seconds: 3));
-          continue;
+          throw StateError('SSE response has no stream');
         }
+
+        yield KdsOrdersStreamEvent.connected;
+        retryIndex = 0;
+        isFirstAttempt = false;
 
         await for (final line in stream
             .cast<List<int>>()
             .transform(utf8.decoder)
             .transform(const LineSplitter())) {
           if (line.startsWith('data:')) {
-            yield null;
+            yield KdsOrdersStreamEvent.ordersChanged;
           }
         }
       } catch (_) {
-        // Fallback delay on connection drop before reconnecting
-        await Future<void>.delayed(const Duration(seconds: 3));
+        // The board remains usable through polling; reconnect below.
       }
+
+      yield KdsOrdersStreamEvent.disconnected;
+      final delay = _reconnectDelays[retryIndex];
+      if (retryIndex < _reconnectDelays.length - 1) retryIndex++;
+      isFirstAttempt = false;
+      await Future<void>.delayed(delay);
     }
   }
 }
