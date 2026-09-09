@@ -12,11 +12,15 @@ import '../data/payment.dart';
 typedef PaymentUrlLauncher = Future<bool> Function(Uri url);
 
 Future<bool> launchExternalPaymentUrl(Uri url) =>
-    launchUrl(url, mode: LaunchMode.externalApplication);
+    launchUrl(
+      url,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: '_self',
+    );
 
-/// Opens the YooKassa redirect in the system browser. Once the URL has been
-/// handed to the browser, the route underneath becomes live order tracking;
-/// it is visible when the customer returns to the app.
+/// Opens YooKassa in the system browser on native platforms and in the current
+/// tab on Web. After a successful native launch, the route underneath becomes
+/// live order tracking and is visible when the customer returns to the app.
 class PaymentStatusScreen extends StatefulWidget {
   const PaymentStatusScreen({
     super.key,
