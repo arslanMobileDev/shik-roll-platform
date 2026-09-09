@@ -1,10 +1,14 @@
-/// Способ оплаты на чекауте гостя (DB-602 / API-702).
-enum PaymentMethod { yookassa, cash, terminal }
+/// Способ оплаты в контракте `POST /orders`.
+enum PaymentMethod { online, onDelivery }
 
 extension PaymentMethodLabel on PaymentMethod {
   String get label => switch (this) {
-    PaymentMethod.yookassa => 'Онлайн (СБП, Картой через ЮKassa)',
-    PaymentMethod.cash => 'Наличными при получении',
-    PaymentMethod.terminal => 'Картой курьеру / на стойке',
+    PaymentMethod.online => 'Онлайн-оплата (СБП, Карты)',
+    PaymentMethod.onDelivery => 'При получении (Картой курьеру / Наличными)',
+  };
+
+  String get wireName => switch (this) {
+    PaymentMethod.online => 'ONLINE',
+    PaymentMethod.onDelivery => 'ON_DELIVERY',
   };
 }

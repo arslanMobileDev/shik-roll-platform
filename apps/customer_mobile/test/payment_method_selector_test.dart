@@ -32,21 +32,23 @@ void main() {
     );
   }
 
-  testWidgets('три способа оплаты с подписями из контракта', (tester) async {
+  testWidgets('два способа оплаты с подписями из контракта', (tester) async {
     await pumpSelector(tester);
 
-    expect(find.text('Онлайн (СБП, Картой через ЮKassa)'), findsOneWidget);
-    expect(find.text('Наличными при получении'), findsOneWidget);
-    expect(find.text('Картой курьеру / на стойке'), findsOneWidget);
+    expect(find.text('Онлайн-оплата (СБП, Карты)'), findsOneWidget);
+    expect(
+      find.text('При получении (Картой курьеру / Наличными)'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('по умолчанию выбрана онлайн-оплата ЮKassa', (tester) async {
     await pumpSelector(tester);
 
-    expect(cubit.state.paymentMethod, PaymentMethod.yookassa);
+    expect(cubit.state.paymentMethod, PaymentMethod.online);
     // Ровно одна карточка отмечена.
     expect(find.byIcon(Icons.check_circle), findsOneWidget);
-    expect(find.byIcon(Icons.circle_outlined), findsNWidgets(2));
+    expect(find.byIcon(Icons.circle_outlined), findsOneWidget);
   });
 
   testWidgets('тап по карточке переключает выбор в CheckoutCubit', (
@@ -54,20 +56,16 @@ void main() {
   ) async {
     await pumpSelector(tester);
 
-    await tester.tap(find.byKey(const ValueKey('payment-method-cash')));
+    await tester.tap(find.byKey(const ValueKey('payment-method-onDelivery')));
     await tester.pump();
-    expect(cubit.state.paymentMethod, PaymentMethod.cash);
+    expect(cubit.state.paymentMethod, PaymentMethod.onDelivery);
     expect(
-      find.byKey(const ValueKey('payment-method-check-cash')),
+      find.byKey(const ValueKey('payment-method-check-onDelivery')),
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const ValueKey('payment-method-terminal')));
+    await tester.tap(find.byKey(const ValueKey('payment-method-online')));
     await tester.pump();
-    expect(cubit.state.paymentMethod, PaymentMethod.terminal);
-
-    await tester.tap(find.byKey(const ValueKey('payment-method-yookassa')));
-    await tester.pump();
-    expect(cubit.state.paymentMethod, PaymentMethod.yookassa);
+    expect(cubit.state.paymentMethod, PaymentMethod.online);
   });
 }

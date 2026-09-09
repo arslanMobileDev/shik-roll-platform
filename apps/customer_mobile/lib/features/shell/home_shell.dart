@@ -111,7 +111,10 @@ class _HomeShellState extends State<HomeShell> {
                 index: _tab,
                 children: [
                   const MenuScreen(),
-                  CartScreen(onGoToMenu: () => setState(() => _tab = 0)),
+                  CartScreen(
+                    onGoToMenu: () => setState(() => _tab = 0),
+                    orderTrackingRepository: widget.orderTrackingRepository,
+                  ),
                   OrderHistoryScreen(
                     onGoToCart: () => setState(() => _tab = 1),
                     orderTrackingRepository: widget.orderTrackingRepository,

@@ -38,9 +38,8 @@ class _PaymentMethodCard extends StatelessWidget {
   final bool selected;
 
   IconData get _icon => switch (method) {
-    PaymentMethod.yookassa => Icons.account_balance_wallet_outlined,
-    PaymentMethod.cash => Icons.payments_outlined,
-    PaymentMethod.terminal => Icons.credit_card_outlined,
+    PaymentMethod.online => Icons.account_balance_wallet_outlined,
+    PaymentMethod.onDelivery => Icons.payments_outlined,
   };
 
   @override

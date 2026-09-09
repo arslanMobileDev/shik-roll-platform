@@ -9,6 +9,8 @@ final class GuestOrder extends Equatable {
     required this.orderNumber,
     required this.status,
     required this.totalAmount,
+    this.paymentId,
+    this.paymentUrl,
   });
 
   factory GuestOrder.fromJson(Map<String, dynamic> json) {
@@ -22,6 +24,8 @@ final class GuestOrder extends Equatable {
         orderNumber: '$orderNumber',
         status: json['status'] as String? ?? 'NEW',
         totalAmount: Money.fromRubles((json['totalAmount'] as num?) ?? 0),
+        paymentId: json['paymentId'] as String?,
+        paymentUrl: (json['paymentUrl'] ?? json['payment_url']) as String?,
       );
     } on TypeError catch (e) {
       throw FormatException('Malformed order payload: $e');
@@ -39,6 +43,17 @@ final class GuestOrder extends Equatable {
   /// Grand total computed by the backend; arrives in rubles.
   final Money totalAmount;
 
+  /// Provider transaction id and redirect URL returned for ONLINE orders.
+  final String? paymentId;
+  final String? paymentUrl;
+
   @override
-  List<Object?> get props => [id, orderNumber, status, totalAmount];
+  List<Object?> get props => [
+    id,
+    orderNumber,
+    status,
+    totalAmount,
+    paymentId,
+    paymentUrl,
+  ];
 }

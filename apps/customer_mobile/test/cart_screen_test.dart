@@ -17,9 +17,13 @@ import 'package:customer_mobile/features/menu/bloc/order_type.dart';
 import 'package:customer_mobile/features/menu/data/menu_models.dart';
 import 'package:customer_mobile/features/payments/data/fake_payments_repository.dart';
 import 'package:customer_mobile/features/payments/data/payments_repository.dart';
+import 'package:customer_mobile/features/orders/data/order_tracking_repository.dart';
+import 'package:customer_mobile/features/profile/bloc/user_settings_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'fake_user_settings_repository.dart';
 
 final _roll = () {
   const sauceGroup = ModifierGroup(
@@ -125,25 +129,36 @@ Future<CustomerCartBloc> _pumpCart(
   );
   final auth = authBloc ?? await _loggedInAuthBloc();
   await tester.pumpWidget(
-    MaterialApp(
-      home: MultiBlocProvider(
-        providers: [
-          BlocProvider<CustomerCartBloc>.value(value: cartBloc),
-          BlocProvider<CheckoutCubit>.value(value: checkoutCubit),
-          BlocProvider<OrderTypeCubit>(create: (_) => OrderTypeCubit()),
-          BlocProvider<AuthBloc>.value(value: auth),
-          // Без загруженного баланса секция списания бонусов скрыта —
-          // сценарии этого файла лояльность не задействуют.
-          BlocProvider<LoyaltyCubit>(
-            create: (_) => LoyaltyCubit(
-              repository: FakeLoyaltyRepository(
-                latency: Duration.zero,
-                balance: 0,
+    BlocProvider<UserSettingsCubit>(
+      create: (_) => UserSettingsCubit(FakeUserSettingsRepository()),
+      child: MaterialApp(
+        home: MultiBlocProvider(
+          providers: [
+            BlocProvider<CustomerCartBloc>.value(value: cartBloc),
+            BlocProvider<CheckoutCubit>.value(value: checkoutCubit),
+            BlocProvider<OrderTypeCubit>(create: (_) => OrderTypeCubit()),
+            BlocProvider<AuthBloc>.value(value: auth),
+            // Без загруженного баланса секция списания бонусов скрыта —
+            // сценарии этого файла лояльность не задействуют.
+            BlocProvider<LoyaltyCubit>(
+              create: (_) => LoyaltyCubit(
+                repository: FakeLoyaltyRepository(
+                  latency: Duration.zero,
+                  balance: 0,
+                ),
               ),
             ),
+          ],
+          child: Scaffold(
+            body: CartScreen(
+              onGoToMenu: onGoToMenu ?? () {},
+            orderTrackingRepository: FakeOrderTrackingRepository(
+              latency: Duration.zero,
+              script: const ['NEW'],
+            ),
+            ),
           ),
-        ],
-        child: Scaffold(body: CartScreen(onGoToMenu: onGoToMenu ?? () {})),
+        ),
       ),
     ),
   );
@@ -277,50 +292,29 @@ void main() {
     expect(tester.widget<TextField>(_addressField).enabled, isFalse);
   });
 
-  testWidgets('успешное оформление: экран поздравления, корзина очищена', (
+  testWidgets('успешное оформление: экран трекинга, корзина очищена', (
     tester,
   ) async {
-    var backToMenu = false;
-    final cart = await _pumpCart(tester, onGoToMenu: () => backToMenu = true);
+    final cart = await _pumpCart(tester);
     cart.add(const CartItemAdded(item: _drink));
     await tester.pump();
 
     await _selectPickup(tester);
     await _acceptOffer(tester);
+    await tester.tap(find.byKey(const ValueKey('payment-method-onDelivery')));
+    await tester.pump();
 
     await tester.tap(_submitButton);
     await tester.pump();
     await tester.pump();
 
-    // Онлайн-оплата по умолчанию: экран оплаты ЮKassa с демо-ссылкой.
-    expect(find.text('Счёт на оплату выставлен'), findsOneWidget);
-    expect(find.byKey(const ValueKey('payment-url')), findsOneWidget);
-
-    // Демо-оплата завершает заказ.
-    await tester.tap(find.byKey(const ValueKey('mock-pay-button')));
-    await tester.pump();
-    await tester.pump();
-
-    // Экран поздравления с номером заказа и таймером ожидания.
-    expect(find.text('Заказ #1042 принят!'), findsOneWidget);
-    expect(find.text('Готовим для вас'), findsOneWidget);
-    expect(find.byKey(const ValueKey('paid-online-badge')), findsOneWidget);
-    expect(find.text('30:00'), findsOneWidget);
-
-    // Таймер тикает.
-    await tester.pump(const Duration(seconds: 1));
-    expect(find.text('29:59'), findsOneWidget);
+    expect(find.text('Отслеживание заказа'), findsOneWidget);
 
     // Корзина очищена после успешного чекаута.
     expect(cart.state.isEmpty, isTrue);
 
-    // Возврат в меню: закрываем экран и дергаем колбэк оболочки.
-    await tester.tap(find.byKey(const ValueKey('back-to-menu-button')));
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
     await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pump();
-
-    expect(backToMenu, isTrue);
     expect(find.text('Корзина пуста'), findsOneWidget);
   });
 
@@ -333,6 +327,8 @@ void main() {
 
     await _selectPickup(tester);
     await _acceptOffer(tester);
+    await tester.tap(find.byKey(const ValueKey('payment-method-onDelivery')));
+    await tester.pump();
 
     // Тап по «Оформить заказ» открывает модальный вход, заказ не уходит.
     await tester.tap(_submitButton);
@@ -360,20 +356,11 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    // Онлайн-оплата по умолчанию: проходим демо-оплату ЮKassa.
-    expect(find.text('Счёт на оплату выставлен'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('mock-pay-button')));
-    await tester.pump();
-    await tester.pump();
-
-    expect(find.text('Заказ #1042 принят!'), findsOneWidget);
+    expect(find.text('Отслеживание заказа'), findsOneWidget);
     expect(cart.state.isEmpty, isTrue);
     expect(auth.state.isAuthenticated, isTrue);
 
-    // Закрываем экран поздравления, чтобы его таймер не остался висеть.
-    await tester.tap(find.byKey(const ValueKey('back-to-menu-button')));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
     await tester.pump();
   });
 }

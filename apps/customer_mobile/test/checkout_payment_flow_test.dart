@@ -1,7 +1,7 @@
 import 'package:bloc_test/bloc_test.dart';
-import 'package:customer_mobile/core/auth/auth_session.dart';
 import 'package:customer_mobile/core/auth/auth_token_provider.dart';
 import 'package:customer_mobile/core/auth/auth_token_storage.dart';
+import 'package:customer_mobile/core/auth/auth_session.dart';
 import 'package:customer_mobile/core/utils/money.dart';
 import 'package:customer_mobile/features/auth/bloc/auth_bloc.dart';
 import 'package:customer_mobile/features/auth/bloc/auth_event.dart';
@@ -11,7 +11,6 @@ import 'package:customer_mobile/features/cart/bloc/checkout_cubit.dart';
 import 'package:customer_mobile/features/cart/bloc/customer_cart_bloc.dart';
 import 'package:customer_mobile/features/cart/data/cart_line.dart';
 import 'package:customer_mobile/features/cart/data/create_order_request.dart';
-import 'package:customer_mobile/features/cart/data/fake_orders_repository.dart';
 import 'package:customer_mobile/features/cart/data/guest_order.dart';
 import 'package:customer_mobile/features/cart/data/orders_repository.dart';
 import 'package:customer_mobile/features/cart/view/cart_screen.dart';
@@ -19,14 +18,17 @@ import 'package:customer_mobile/features/loyalty/bloc/loyalty_cubit.dart';
 import 'package:customer_mobile/features/loyalty/data/loyalty_repository.dart';
 import 'package:customer_mobile/features/menu/bloc/order_type.dart';
 import 'package:customer_mobile/features/menu/data/menu_models.dart';
-import 'package:customer_mobile/features/payments/data/fake_payments_repository.dart';
+import 'package:customer_mobile/features/orders/data/order_tracking_repository.dart';
 import 'package:customer_mobile/features/payments/data/payment.dart';
 import 'package:customer_mobile/features/payments/data/payment_method.dart';
 import 'package:customer_mobile/features/payments/data/payments_repository.dart';
+import 'package:customer_mobile/features/profile/bloc/user_settings_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+
+import 'fake_user_settings_repository.dart';
 
 class _MockOrdersRepository extends Mock implements CustomerOrdersRepository {}
 
@@ -46,21 +48,21 @@ const _drink = MenuItem(
   available: true,
   modifierGroups: [],
 );
-
 final _line = CartLine.fromSelection(item: _drink);
 
-const _successOrder = GuestOrder(
+const _onlineOrder = GuestOrder(
   id: 'order-uuid-1',
   orderNumber: '5551',
+  status: 'PENDING_PAYMENT',
+  totalAmount: Money.kopecks(15000),
+  paymentId: 'payment-uuid-1',
+  paymentUrl: 'https://yoomoney.ru/checkout/order-uuid-1',
+);
+const _deliveryOrder = GuestOrder(
+  id: 'order-uuid-2',
+  orderNumber: '5552',
   status: 'NEW',
   totalAmount: Money.kopecks(15000),
-);
-
-const _pendingPayment = Payment(
-  id: 'payment-uuid-1',
-  paymentUrl:
-      'https://yoomoney.ru/checkout/payments/v2/demo?orderId=order-uuid-1',
-  status: PaymentStatus.pending,
 );
 
 void main() {
@@ -74,138 +76,123 @@ void main() {
     );
   });
 
-  late _MockOrdersRepository ordersRepository;
-  late _MockPaymentsRepository paymentsRepository;
+  group('CheckoutCubit payment contract', () {
+    late _MockOrdersRepository orders;
+    late _MockPaymentsRepository legacyPayments;
 
-  setUp(() {
-    ordersRepository = _MockOrdersRepository();
-    paymentsRepository = _MockPaymentsRepository();
-  });
+    setUp(() {
+      orders = _MockOrdersRepository();
+      legacyPayments = _MockPaymentsRepository();
+    });
 
-  CheckoutCubit buildCubit() => CheckoutCubit(
-    repository: ordersRepository,
-    paymentsRepository: paymentsRepository,
-  );
+    CheckoutCubit buildCubit() =>
+        CheckoutCubit(repository: orders, paymentsRepository: legacyPayments);
 
-  group('CheckoutCubit + платежи', () {
     blocTest<CheckoutCubit, CheckoutState>(
-      'ЮKassa: после создания заказа создаётся платёж с orderId заказа',
+      'ONLINE uses paymentUrl from POST /orders and does not call /payments/create',
       build: buildCubit,
       seed: () => const CheckoutState(offerAccepted: true),
       act: (cubit) async {
         when(
-          () => ordersRepository.createOrder(any()),
-        ).thenAnswer((_) async => _successOrder);
-        when(
-          () => paymentsRepository.createPayment(any()),
-        ).thenAnswer((_) async => _pendingPayment);
+          () => orders.createOrder(any()),
+        ).thenAnswer((_) async => _onlineOrder);
         await cubit.submit(orderType: OrderType.pickup, lines: [_line]);
       },
       expect: () => [
-        predicate<CheckoutState>((s) => s.status == CheckoutStatus.submitting),
         predicate<CheckoutState>(
-          (s) =>
-              s.status == CheckoutStatus.success &&
-              s.placedOrder?.id == 'order-uuid-1' &&
-              s.payment?.paymentUrl == _pendingPayment.paymentUrl &&
-              s.payment?.status == PaymentStatus.pending,
+          (state) => state.status == CheckoutStatus.submitting,
+        ),
+        predicate<CheckoutState>(
+          (state) =>
+              state.status == CheckoutStatus.success &&
+              state.payment?.paymentUrl == _onlineOrder.paymentUrl &&
+              state.payment?.status == PaymentStatus.pending,
         ),
       ],
       verify: (_) {
-        verify(
-          () => paymentsRepository.createPayment('order-uuid-1'),
-        ).called(1);
+        verifyNever(() => legacyPayments.createPayment(any()));
+        final request =
+            verify(() => orders.createOrder(captureAny())).captured.single
+                as CreateOrderRequest;
+        expect(request.paymentMethod, PaymentMethod.online);
+        expect(request.toJson()['paymentMethod'], 'ONLINE');
       },
     );
 
     blocTest<CheckoutCubit, CheckoutState>(
-      'наличными: платёж не создаётся, заказ сразу успешен',
+      'ON_DELIVERY completes without a payment redirect',
       build: buildCubit,
       seed: () => const CheckoutState(
         offerAccepted: true,
-        paymentMethod: PaymentMethod.cash,
+        paymentMethod: PaymentMethod.onDelivery,
       ),
       act: (cubit) async {
         when(
-          () => ordersRepository.createOrder(any()),
-        ).thenAnswer((_) async => _successOrder);
+          () => orders.createOrder(any()),
+        ).thenAnswer((_) async => _deliveryOrder);
         await cubit.submit(orderType: OrderType.pickup, lines: [_line]);
       },
       expect: () => [
-        predicate<CheckoutState>((s) => s.status == CheckoutStatus.submitting),
         predicate<CheckoutState>(
-          (s) =>
-              s.status == CheckoutStatus.success &&
-              s.placedOrder?.id == 'order-uuid-1' &&
-              s.payment == null,
+          (state) => state.status == CheckoutStatus.submitting,
+        ),
+        predicate<CheckoutState>(
+          (state) =>
+              state.status == CheckoutStatus.success && state.payment == null,
         ),
       ],
       verify: (_) {
-        verifyNever(() => paymentsRepository.createPayment(any()));
+        final request =
+            verify(() => orders.createOrder(captureAny())).captured.single
+                as CreateOrderRequest;
+        expect(request.toJson()['paymentMethod'], 'ON_DELIVERY');
+        verifyNever(() => legacyPayments.createPayment(any()));
       },
     );
 
     blocTest<CheckoutCubit, CheckoutState>(
-      'картой курьеру: платёж не создаётся, заказ сразу успешен',
-      build: buildCubit,
-      seed: () => const CheckoutState(
-        offerAccepted: true,
-        paymentMethod: PaymentMethod.terminal,
-      ),
-      act: (cubit) async {
-        when(
-          () => ordersRepository.createOrder(any()),
-        ).thenAnswer((_) async => _successOrder);
-        await cubit.submit(orderType: OrderType.pickup, lines: [_line]);
-      },
-      verify: (_) {
-        verifyNever(() => paymentsRepository.createPayment(any()));
-      },
-    );
-
-    blocTest<CheckoutCubit, CheckoutState>(
-      'ошибка создания платежа: failure с сообщением, заказ остаётся',
+      'ONLINE without paymentUrl reports a checkout error',
       build: buildCubit,
       seed: () => const CheckoutState(offerAccepted: true),
       act: (cubit) async {
-        when(
-          () => ordersRepository.createOrder(any()),
-        ).thenAnswer((_) async => _successOrder);
-        when(() => paymentsRepository.createPayment(any())).thenThrow(
-          const PaymentsException(
-            'Сервер временно недоступен. Попробуйте оплатить позже.',
+        when(() => orders.createOrder(any())).thenAnswer(
+          (_) async => const GuestOrder(
+            id: 'order-without-url',
+            orderNumber: '5553',
+            status: 'PENDING_PAYMENT',
+            totalAmount: Money.kopecks(15000),
           ),
         );
         await cubit.submit(orderType: OrderType.pickup, lines: [_line]);
       },
       expect: () => [
-        predicate<CheckoutState>((s) => s.status == CheckoutStatus.submitting),
         predicate<CheckoutState>(
-          (s) =>
-              s.status == CheckoutStatus.failure &&
-              s.errorMessage ==
-                  'Сервер временно недоступен. Попробуйте оплатить позже.' &&
-              s.payment == null,
+          (state) => state.status == CheckoutStatus.submitting,
         ),
-      ],
-    );
-
-    blocTest<CheckoutCubit, CheckoutState>(
-      'выбор способа оплаты обновляет состояние',
-      build: buildCubit,
-      act: (cubit) => cubit.paymentMethodSelected(PaymentMethod.cash),
-      expect: () => [
-        predicate<CheckoutState>((s) => s.paymentMethod == PaymentMethod.cash),
+        predicate<CheckoutState>(
+          (state) =>
+              state.status == CheckoutStatus.failure &&
+              state.errorMessage?.contains('не вернул ссылку') == true,
+        ),
       ],
     );
   });
 
-  group('Виджет-флоу онлайн-оплаты', () {
-    Future<CustomerCartBloc> pumpCart(
-      WidgetTester tester, {
-      CustomerPaymentsRepository? payments,
-    }) async {
-      final cartBloc = CustomerCartBloc();
+  group('checkout widget flow', () {
+    Future<({CustomerCartBloc cart, List<Uri> launched})> pumpCart(
+      WidgetTester tester,
+    ) async {
+      final cart = CustomerCartBloc();
+      final orders = _MockOrdersRepository();
+      final payments = _MockPaymentsRepository();
+      final launched = <Uri>[];
+      when(() => orders.createOrder(any())).thenAnswer((invocation) async {
+        final request =
+            invocation.positionalArguments.single as CreateOrderRequest;
+        return request.paymentMethod == PaymentMethod.online
+            ? _onlineOrder
+            : _deliveryOrder;
+      });
       final storage = InMemoryAuthTokenStorage();
       await storage.save(
         const StoredAuthSession(
@@ -216,43 +203,54 @@ void main() {
           name: 'Тест',
         ),
       );
-      final authBloc = AuthBloc(
+      final auth = AuthBloc(
         repository: FakeAuthRepository(latency: Duration.zero),
         tokenStorage: storage,
         tokenProvider: AuthTokenProvider(),
       )..add(const AuthStarted());
-      await authBloc.stream.firstWhere((s) => s.isAuthenticated);
+      await auth.stream.firstWhere((state) => state.isAuthenticated);
       await tester.pumpWidget(
-        MaterialApp(
-          home: MultiBlocProvider(
-            providers: [
-              BlocProvider<CustomerCartBloc>.value(value: cartBloc),
-              BlocProvider<CheckoutCubit>(
-                create: (_) => CheckoutCubit(
-                  repository: FakeCustomerOrdersRepository(
-                    latency: Duration.zero,
-                  ),
-                  paymentsRepository:
-                      payments ??
-                      FakeCustomerPaymentsRepository(latency: Duration.zero),
-                ),
-              ),
-              BlocProvider<OrderTypeCubit>(create: (_) => OrderTypeCubit()),
-              BlocProvider<AuthBloc>.value(value: authBloc),
-              BlocProvider<LoyaltyCubit>(
-                create: (_) => LoyaltyCubit(
-                  repository: FakeLoyaltyRepository(
-                    latency: Duration.zero,
-                    balance: 0,
+        BlocProvider<UserSettingsCubit>(
+          create: (_) => UserSettingsCubit(FakeUserSettingsRepository()),
+          child: MaterialApp(
+            home: MultiBlocProvider(
+              providers: [
+                BlocProvider<CustomerCartBloc>.value(value: cart),
+                BlocProvider<CheckoutCubit>(
+                  create: (_) => CheckoutCubit(
+                    repository: orders,
+                    paymentsRepository: payments,
                   ),
                 ),
+                BlocProvider<OrderTypeCubit>(create: (_) => OrderTypeCubit()),
+                BlocProvider<AuthBloc>.value(value: auth),
+                BlocProvider<LoyaltyCubit>(
+                  create: (_) => LoyaltyCubit(
+                    repository: FakeLoyaltyRepository(
+                      latency: Duration.zero,
+                      balance: 0,
+                    ),
+                  ),
+                ),
+              ],
+              child: Scaffold(
+                body: CartScreen(
+                  onGoToMenu: () {},
+                orderTrackingRepository: FakeOrderTrackingRepository(
+                  latency: Duration.zero,
+                  script: const ['NEW'],
+                ),
+                  paymentUrlLauncher: (uri) async {
+                    launched.add(uri);
+                    return true;
+                  },
+                ),
               ),
-            ],
-            child: Scaffold(body: CartScreen(onGoToMenu: () {})),
+            ),
           ),
         ),
       );
-      return cartBloc;
+      return (cart: cart, launched: launched);
     }
 
     Future<void> prepareCheckout(WidgetTester tester) async {
@@ -264,72 +262,39 @@ void main() {
       await tester.pump();
     }
 
-    Future<void> closeSuccessScreen(WidgetTester tester) async {
-      await tester.tap(find.byKey(const ValueKey('back-to-menu-button')));
+    testWidgets('ONLINE launches YooKassa and opens order tracking', (
+      tester,
+    ) async {
+      final flow = await pumpCart(tester);
+      flow.cart.add(const CartItemAdded(item: _drink));
       await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
+      await prepareCheckout(tester);
+      await tester.tap(find.byKey(const ValueKey('checkout-submit-button')));
       await tester.pump();
-    }
+      await tester.pump();
+      await tester.pump();
 
-    testWidgets(
-      'ЮKassa: экран оплаты с mock-ссылкой → демо-оплата → «Оплачено онлайн»',
-      (tester) async {
-        final cart = await pumpCart(tester);
-        cart.add(const CartItemAdded(item: _drink));
-        await tester.pump();
-        await prepareCheckout(tester);
+      expect(flow.launched.single.toString(), _onlineOrder.paymentUrl);
+      expect(find.text('Отслеживание заказа'), findsOneWidget);
+      expect(flow.cart.state.isEmpty, isTrue);
+    });
 
-        await tester.tap(find.byKey(const ValueKey('checkout-submit-button')));
-        await tester.pump();
-        await tester.pump();
+    testWidgets('ON_DELIVERY skips the browser and opens order tracking', (
+      tester,
+    ) async {
+      final flow = await pumpCart(tester);
+      flow.cart.add(const CartItemAdded(item: _drink));
+      await tester.pump();
+      await prepareCheckout(tester);
+      await tester.tap(find.byKey(const ValueKey('payment-method-onDelivery')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('checkout-submit-button')));
+      await tester.pump();
+      await tester.pump();
 
-        // Экран статуса оплаты с confirmation URL из POST /payments/create.
-        expect(find.text('Счёт на оплату выставлен'), findsOneWidget);
-        final urlWidget = tester.widget<SelectableText>(
-          find.byKey(const ValueKey('payment-url')),
-        );
-        expect(urlWidget.data, contains('yoomoney.ru'));
-        expect(urlWidget.data, contains('demo-order-1042'));
-
-        // Мок-оплата → экран успеха с бейджем «Оплачено онлайн (ЮKassa)».
-        await tester.tap(find.byKey(const ValueKey('mock-pay-button')));
-        await tester.pump();
-        await tester.pump();
-
-        expect(find.text('Заказ #1042 принят!'), findsOneWidget);
-        expect(find.byKey(const ValueKey('paid-online-badge')), findsOneWidget);
-        expect(find.text('Оплачено онлайн (ЮKassa)'), findsOneWidget);
-        expect(cart.state.isEmpty, isTrue);
-
-        await closeSuccessScreen(tester);
-      },
-    );
-
-    testWidgets(
-      'наличными: сразу экран успеха без бейджа, платёж не создаётся',
-      (tester) async {
-        final payments = _MockPaymentsRepository();
-        final cart = await pumpCart(tester, payments: payments);
-        cart.add(const CartItemAdded(item: _drink));
-        await tester.pump();
-        await prepareCheckout(tester);
-
-        await tester.ensureVisible(
-          find.byKey(const ValueKey('payment-method-cash')),
-        );
-        await tester.tap(find.byKey(const ValueKey('payment-method-cash')));
-        await tester.pump();
-
-        await tester.tap(find.byKey(const ValueKey('checkout-submit-button')));
-        await tester.pump();
-        await tester.pump();
-
-        expect(find.text('Заказ #1042 принят!'), findsOneWidget);
-        expect(find.byKey(const ValueKey('paid-online-badge')), findsNothing);
-        verifyNever(() => payments.createPayment(any()));
-
-        await closeSuccessScreen(tester);
-      },
-    );
+      expect(flow.launched, isEmpty);
+      expect(find.text('Отслеживание заказа'), findsOneWidget);
+      expect(flow.cart.state.isEmpty, isTrue);
+    });
   });
 }

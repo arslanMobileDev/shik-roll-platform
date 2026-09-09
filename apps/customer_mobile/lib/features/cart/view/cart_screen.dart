@@ -13,6 +13,8 @@ import '../../loyalty/bloc/loyalty_cubit.dart';
 import '../../loyalty/view/bonus_spend_section.dart';
 import '../../menu/bloc/order_type.dart';
 import '../../menu/view/widgets/order_type_toggle.dart';
+import '../../orders/data/order_tracking_repository.dart';
+import '../../orders/presentation/screens/order_tracking_screen.dart';
 import '../../payments/view/payment_status_screen.dart';
 import '../../payments/view/widgets/payment_method_selector.dart';
 import '../bloc/cart_event.dart';
@@ -20,15 +22,21 @@ import '../bloc/cart_state.dart';
 import '../bloc/checkout_cubit.dart';
 import '../bloc/customer_cart_bloc.dart';
 import '../data/cart_line.dart';
-import 'order_success_screen.dart';
 
 /// Guest cart tab: positions with modifiers, delivery/pickup switch,
 /// address & comment, offer consent and the checkout button.
 class CartScreen extends StatelessWidget {
-  const CartScreen({super.key, required this.onGoToMenu});
+  const CartScreen({
+    super.key,
+    required this.onGoToMenu,
+    required this.orderTrackingRepository,
+    this.paymentUrlLauncher = launchExternalPaymentUrl,
+  });
 
   /// Switches the shell back to the menu tab.
   final VoidCallback onGoToMenu;
+  final OrderTrackingRepository orderTrackingRepository;
+  final PaymentUrlLauncher paymentUrlLauncher;
 
   @override
   Widget build(BuildContext context) {
@@ -39,21 +47,39 @@ class CartScreen extends StatelessWidget {
           case CheckoutStatus.success:
             final order = state.placedOrder!;
             final payment = state.payment;
-            context.read<CustomerCartBloc>().add(const CartCleared());
+            final cart = context.read<CustomerCartBloc>().state;
+            final loyaltyCubit = context.read<LoyaltyCubit>();
+            final orderType = context.read<OrderTypeCubit>().state;
             context.read<CheckoutCubit>().reset();
+            context.read<CustomerCartBloc>().add(const CartCleared());
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => payment != null && !payment.isSucceeded
-                    // Онлайн-оплата ЮKassa: сначала эмуляция страницы оплаты.
+                builder: (_) => payment != null
                     ? PaymentStatusScreen(
                         order: order,
                         payment: payment,
+                        trackingRepository: orderTrackingRepository,
+                        loyaltyCubit: loyaltyCubit,
                         onBackToMenu: onGoToMenu,
+                        urlLauncher: paymentUrlLauncher,
                       )
-                    : OrderSuccessScreen(
-                        order: order,
-                        onBackToMenu: onGoToMenu,
-                        paidOnline: payment?.isSucceeded ?? false,
+                    : OrderTrackingScreen(
+                        orderId: order.id,
+                        orderNumber: order.orderNumber,
+                        trackingRepository: orderTrackingRepository,
+                        deliveryAddress: orderType == OrderType.delivery
+                            ? state.address.trim()
+                            : null,
+                        items: [
+                          for (final line in cart.lines)
+                            {
+                              'name': line.item.name,
+                              'count': line.quantity,
+                              'price': line.total.rubles,
+                            },
+                        ],
+                        totalPrice: cart.total.rubles,
+                        loyaltyCubit: loyaltyCubit,
                       ),
               ),
             );

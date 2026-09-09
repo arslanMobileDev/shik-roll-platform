@@ -21,7 +21,7 @@ final class CheckoutState extends Equatable {
     this.address = '',
     this.comment = '',
     this.offerAccepted = false,
-    this.paymentMethod = PaymentMethod.yookassa,
+    this.paymentMethod = PaymentMethod.online,
     this.bonusSpendEnabled = false,
     this.status = CheckoutStatus.editing,
     this.errorMessage,
@@ -101,15 +101,16 @@ final class CheckoutState extends Equatable {
   ];
 }
 
-/// Sends the guest order through [CustomerOrdersRepository]; for online
-/// payment additionally creates a YooKassa payment via
-/// [CustomerPaymentsRepository] (`POST /payments/create`, API-702).
+/// Sends the guest order through [CustomerOrdersRepository]. For ONLINE
+/// orders the same `POST /orders` response contains the YooKassa redirect;
+/// checkout does not create a duplicate payment session.
 class CheckoutCubit extends Cubit<CheckoutState> {
-  CheckoutCubit({required this._repository, required this._paymentsRepository})
-    : super(const CheckoutState());
+  CheckoutCubit({
+    required this._repository,
+    required CustomerPaymentsRepository paymentsRepository,
+  }) : super(const CheckoutState());
 
   final CustomerOrdersRepository _repository;
-  final CustomerPaymentsRepository _paymentsRepository;
 
   void addressChanged(String value) =>
       emit(state.copyWith(address: value, status: CheckoutStatus.editing));
@@ -157,13 +158,9 @@ class CheckoutCubit extends Cubit<CheckoutState> {
       final order = await _repository.createOrder(
         _buildRequest(orderType, lines, bonusPoints),
       );
-      // Онлайн-оплата: сразу после создания заказа выставляем счёт в ЮKassa.
-      final payment = switch (state.paymentMethod) {
-        PaymentMethod.yookassa => await _paymentsRepository.createPayment(
-          order.id,
-        ),
-        _ => null,
-      };
+      final payment = state.paymentMethod == PaymentMethod.online
+          ? _paymentFromOrder(order)
+          : null;
       emit(
         state.copyWith(
           status: CheckoutStatus.success,
@@ -172,10 +169,6 @@ class CheckoutCubit extends Cubit<CheckoutState> {
         ),
       );
     } on OrdersException catch (e) {
-      emit(
-        state.copyWith(status: CheckoutStatus.failure, errorMessage: e.message),
-      );
-    } on PaymentsException catch (e) {
       emit(
         state.copyWith(status: CheckoutStatus.failure, errorMessage: e.message),
       );
@@ -195,6 +188,7 @@ class CheckoutCubit extends Cubit<CheckoutState> {
     return CreateOrderRequest(
       branchId: AppConfig.defaultBranchId,
       orderType: orderType,
+      paymentMethod: state.paymentMethod,
       deliveryAddress: orderType == OrderType.delivery ? address : null,
       comment: comment.isEmpty ? null : comment,
       useBonusPoints: state.bonusSpendEnabled ? bonusPoints : 0,
@@ -209,6 +203,23 @@ class CheckoutCubit extends Cubit<CheckoutState> {
             ],
           ),
       ],
+    );
+  }
+
+  Payment _paymentFromOrder(GuestOrder order) {
+    final url = Uri.tryParse(order.paymentUrl ?? '');
+    if (url == null ||
+        !url.hasScheme ||
+        (url.scheme != 'https' && url.scheme != 'http') ||
+        url.host.isEmpty) {
+      throw const OrdersException(
+        'Сервер не вернул ссылку на онлайн-оплату. Попробуйте ещё раз.',
+      );
+    }
+    return Payment(
+      id: order.paymentId ?? order.id,
+      paymentUrl: url.toString(),
+      status: PaymentStatus.pending,
     );
   }
 }

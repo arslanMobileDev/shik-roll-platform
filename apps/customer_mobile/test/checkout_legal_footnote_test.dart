@@ -15,6 +15,7 @@ import 'package:customer_mobile/features/loyalty/data/loyalty_repository.dart';
 import 'package:customer_mobile/features/menu/bloc/order_type.dart';
 import 'package:customer_mobile/features/menu/data/menu_models.dart';
 import 'package:customer_mobile/features/payments/data/fake_payments_repository.dart';
+import 'package:customer_mobile/features/orders/data/order_tracking_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -70,7 +71,14 @@ Future<void> _pumpCart(WidgetTester tester) async {
             ),
           ),
         ],
-        child: Scaffold(body: CartScreen(onGoToMenu: () {})),
+        child: Scaffold(
+          body: CartScreen(
+            onGoToMenu: () {},
+            orderTrackingRepository: FakeOrderTrackingRepository(
+              latency: Duration.zero,
+            ),
+          ),
+        ),
       ),
     ),
   );

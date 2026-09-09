@@ -17,9 +17,13 @@ import 'package:customer_mobile/features/loyalty/data/loyalty_repository.dart';
 import 'package:customer_mobile/features/menu/bloc/order_type.dart';
 import 'package:customer_mobile/features/menu/data/menu_models.dart';
 import 'package:customer_mobile/features/payments/data/fake_payments_repository.dart';
+import 'package:customer_mobile/features/orders/data/order_tracking_repository.dart';
+import 'package:customer_mobile/features/profile/bloc/user_settings_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'fake_user_settings_repository.dart';
 
 /// Ролл за 390,00 ₽: лимит списания 30% = 117 бонусов (ADR-1614).
 const _roll = MenuItem(
@@ -111,23 +115,34 @@ Future<CustomerCartBloc> _pumpCart(
       );
   await loyalty.loadBalance();
   await tester.pumpWidget(
-    MaterialApp(
-      home: MultiBlocProvider(
-        providers: [
-          BlocProvider<CustomerCartBloc>.value(value: cartBloc),
-          BlocProvider<CheckoutCubit>(
-            create: (_) => CheckoutCubit(
-              repository: ordersRepository ?? _CapturingOrdersRepository(),
-              paymentsRepository: FakeCustomerPaymentsRepository(
-                latency: Duration.zero,
+    BlocProvider<UserSettingsCubit>(
+      create: (_) => UserSettingsCubit(FakeUserSettingsRepository()),
+      child: MaterialApp(
+        home: MultiBlocProvider(
+          providers: [
+            BlocProvider<CustomerCartBloc>.value(value: cartBloc),
+            BlocProvider<CheckoutCubit>(
+              create: (_) => CheckoutCubit(
+                repository: ordersRepository ?? _CapturingOrdersRepository(),
+                paymentsRepository: FakeCustomerPaymentsRepository(
+                  latency: Duration.zero,
+                ),
               ),
             ),
+            BlocProvider<OrderTypeCubit>(create: (_) => OrderTypeCubit()),
+            BlocProvider<AuthBloc>.value(value: authBloc),
+            BlocProvider<LoyaltyCubit>.value(value: loyalty),
+          ],
+          child: Scaffold(
+            body: CartScreen(
+              onGoToMenu: () {},
+            orderTrackingRepository: FakeOrderTrackingRepository(
+              latency: Duration.zero,
+              script: const ['NEW'],
+            ),
+            ),
           ),
-          BlocProvider<OrderTypeCubit>(create: (_) => OrderTypeCubit()),
-          BlocProvider<AuthBloc>.value(value: authBloc),
-          BlocProvider<LoyaltyCubit>.value(value: loyalty),
-        ],
-        child: Scaffold(body: CartScreen(onGoToMenu: () {})),
+        ),
       ),
     ),
   );
@@ -251,6 +266,8 @@ void main() {
     await tester.ensureVisible(_offerCheckbox);
     await tester.tap(_offerCheckbox);
     await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('payment-method-onDelivery')));
+    await tester.pump();
     await tester.tap(_submitButton);
     await tester.pump();
     await tester.pump();
@@ -260,13 +277,7 @@ void main() {
     expect(request!.useBonusPoints, 117);
     expect(request.toJson()['useBonusPoints'], 117);
 
-    // Закрываем экран оплаты, чтобы не оставлять pending-таймеры.
-    await tester.tap(find.byKey(const ValueKey('mock-pay-button')));
-    await tester.pump();
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('back-to-menu-button')));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
     await tester.pump();
   });
 
@@ -286,6 +297,8 @@ void main() {
     await tester.ensureVisible(_offerCheckbox);
     await tester.tap(_offerCheckbox);
     await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('payment-method-onDelivery')));
+    await tester.pump();
     await tester.tap(_submitButton);
     await tester.pump();
     await tester.pump();
@@ -294,12 +307,7 @@ void main() {
     expect(orders.lastRequest!.useBonusPoints, 0);
     expect(orders.lastRequest!.toJson().containsKey('useBonusPoints'), isFalse);
 
-    await tester.tap(find.byKey(const ValueKey('mock-pay-button')));
-    await tester.pump();
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('back-to-menu-button')));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
     await tester.pump();
   });
 

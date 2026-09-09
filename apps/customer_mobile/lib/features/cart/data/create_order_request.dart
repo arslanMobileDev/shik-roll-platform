@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../menu/bloc/order_type.dart';
+import '../../payments/data/payment_method.dart';
 
 /// Wire mapping for the guest order type (`POST /orders` contract).
 extension OrderTypeWire on OrderType {
@@ -21,6 +22,7 @@ final class CreateOrderRequest extends Equatable {
     required this.branchId,
     required this.orderType,
     required this.items,
+    this.paymentMethod = PaymentMethod.online,
     this.deliveryAddress,
     this.comment,
     this.useBonusPoints = 0,
@@ -29,6 +31,7 @@ final class CreateOrderRequest extends Equatable {
   final String branchId;
   final OrderType orderType;
   final List<OrderItemRequest> items;
+  final PaymentMethod paymentMethod;
 
   /// Expected when [orderType] is [OrderType.delivery].
   final String? deliveryAddress;
@@ -42,6 +45,7 @@ final class CreateOrderRequest extends Equatable {
     'branchId': branchId,
     'brandId': '37b84f4c-0a70-4263-bfa0-cc04ba0d4b99',
     'type': orderType.wireName,
+    'paymentMethod': paymentMethod.wireName,
     if (deliveryAddress != null && deliveryAddress!.isNotEmpty)
       'deliveryAddress': deliveryAddress,
     if (comment != null && comment!.isNotEmpty) 'comment': comment,
@@ -54,6 +58,7 @@ final class CreateOrderRequest extends Equatable {
     branchId,
     orderType,
     items,
+    paymentMethod,
     deliveryAddress,
     comment,
     useBonusPoints,

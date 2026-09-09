@@ -3,6 +3,7 @@ import 'package:customer_mobile/core/utils/money.dart';
 import 'package:customer_mobile/features/cart/data/create_order_request.dart';
 import 'package:customer_mobile/features/cart/data/orders_repository.dart';
 import 'package:customer_mobile/features/menu/bloc/order_type.dart';
+import 'package:customer_mobile/features/payments/data/payment_method.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -12,15 +13,14 @@ class _MockDio extends Mock implements Dio {}
 const _request = CreateOrderRequest(
   branchId: 'branch-1',
   orderType: OrderType.delivery,
+  paymentMethod: PaymentMethod.online,
   deliveryAddress: 'ул. Пушкина, 10',
   comment: 'Позвонить за час',
   items: [
     OrderItemRequest(
       menuItemId: 'item-1',
       quantity: 2,
-      selectedModifiers: [
-        SelectedModifierRequest(modifierItemId: 'mod-1'),
-      ],
+      selectedModifiers: [SelectedModifierRequest(modifierItemId: 'mod-1')],
     ),
   ],
 );
@@ -56,7 +56,9 @@ void main() {
 
   setUp(() {
     dio = _MockDio();
-    repository = RemoteCustomerOrdersRepository(ApiClient(baseUrl: '', dio: dio));
+    repository = RemoteCustomerOrdersRepository(
+      ApiClient(baseUrl: '', dio: dio),
+    );
   });
 
   group('RemoteCustomerOrdersRepository', () {
@@ -73,6 +75,8 @@ void main() {
           'orderNumber': '5551',
           'status': 'NEW',
           'totalAmount': 780.0,
+          'paymentId': 'yk-payment-1',
+          'paymentUrl': 'https://yoomoney.ru/checkout/yk-payment-1',
         }),
       );
 
@@ -82,6 +86,8 @@ void main() {
       expect(order.orderNumber, '5551');
       expect(order.status, 'NEW');
       expect(order.totalAmount, const Money.kopecks(78000));
+      expect(order.paymentId, 'yk-payment-1');
+      expect(order.paymentUrl, 'https://yoomoney.ru/checkout/yk-payment-1');
     });
 
     test('тело запроса отправляется по контракту POST /orders', () async {
@@ -111,6 +117,10 @@ void main() {
       ).captured;
       expect(captured, hasLength(1));
       expect(captured.single, _request.toJson());
+      expect(
+        (captured.single as Map<String, dynamic>)['paymentMethod'],
+        'ONLINE',
+      );
     });
 
     test('числовой orderNumber приводится к строке', () async {
@@ -148,23 +158,17 @@ void main() {
         ),
       );
 
-      expect(
-        repository.createOrder(_request),
-        throwsA(isA<OrdersException>()),
-      );
+      expect(repository.createOrder(_request), throwsA(isA<OrdersException>()));
     });
 
-    test('ответ без номера заказа → OrdersException о некорректном ответе',
-        () {
+    test('ответ без номера заказа → OrdersException о некорректном ответе', () {
       when(
         () => dio.post<Map<String, dynamic>>(
           '/orders',
           data: any(named: 'data'),
           options: any(named: 'options'),
         ),
-      ).thenAnswer(
-        (_) async => _okResponse(const {'id': 'order-uuid-1'}),
-      );
+      ).thenAnswer((_) async => _okResponse(const {'id': 'order-uuid-1'}));
 
       expect(
         repository.createOrder(_request),

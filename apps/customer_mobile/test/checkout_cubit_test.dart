@@ -8,6 +8,7 @@ import 'package:customer_mobile/features/cart/data/orders_repository.dart';
 import 'package:customer_mobile/features/menu/bloc/order_type.dart';
 import 'package:customer_mobile/features/menu/data/menu_models.dart';
 import 'package:customer_mobile/features/payments/data/fake_payments_repository.dart';
+import 'package:customer_mobile/features/payments/data/payment_method.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -32,8 +33,10 @@ final _line = CartLine.fromSelection(item: _drink);
 const _successOrder = GuestOrder(
   id: 'order-uuid-1',
   orderNumber: '5551',
-  status: 'NEW',
+  status: 'PENDING_PAYMENT',
   totalAmount: Money.kopecks(15000),
+  paymentId: 'payment-uuid-1',
+  paymentUrl: 'https://yoomoney.ru/checkout/order-uuid-1',
 );
 
 void main() {
@@ -60,13 +63,12 @@ void main() {
           latency: Duration.zero,
         ),
       ),
-      seed: () => const CheckoutState(
-        address: 'ул. Пушкина, 10',
-        offerAccepted: true,
-      ),
+      seed: () =>
+          const CheckoutState(address: 'ул. Пушкина, 10', offerAccepted: true),
       act: (cubit) async {
-        when(() => repository.createOrder(any()))
-            .thenAnswer((_) async => _successOrder);
+        when(
+          () => repository.createOrder(any()),
+        ).thenAnswer((_) async => _successOrder);
         await cubit.submit(orderType: OrderType.delivery, lines: [_line]);
       },
       expect: () => [
@@ -93,21 +95,23 @@ void main() {
         offerAccepted: true,
       ),
       act: (cubit) async {
-        when(() => repository.createOrder(any()))
-            .thenAnswer((_) async => _successOrder);
+        when(
+          () => repository.createOrder(any()),
+        ).thenAnswer((_) async => _successOrder);
         await cubit.submit(orderType: OrderType.delivery, lines: [_line]);
       },
       verify: (cubit) {
         expect(cubit.state.status, CheckoutStatus.success);
-        final captured = verify(
-          () => repository.createOrder(captureAny()),
-        ).captured.single as CreateOrderRequest;
+        final captured =
+            verify(() => repository.createOrder(captureAny())).captured.single
+                as CreateOrderRequest;
         expect(captured.orderType, OrderType.delivery);
         expect(captured.deliveryAddress, 'ул. Пушкина, 10');
         expect(captured.branchId, isNotEmpty);
         expect(captured.comment, 'Без лука');
         expect(captured.items.single.menuItemId, 'item-lemonade');
         expect(captured.items.single.quantity, 1);
+        expect(captured.paymentMethod.wireName, 'ONLINE');
       },
     );
 
@@ -119,10 +123,8 @@ void main() {
           latency: Duration.zero,
         ),
       ),
-      seed: () => const CheckoutState(
-        address: 'ул. Пушкина, 10',
-        offerAccepted: true,
-      ),
+      seed: () =>
+          const CheckoutState(address: 'ул. Пушкина, 10', offerAccepted: true),
       act: (cubit) async {
         when(() => repository.createOrder(any())).thenThrow(
           const OrdersException(
@@ -184,15 +186,16 @@ void main() {
       ),
       seed: () => const CheckoutState(offerAccepted: true),
       act: (cubit) async {
-        when(() => repository.createOrder(any()))
-            .thenAnswer((_) async => _successOrder);
+        when(
+          () => repository.createOrder(any()),
+        ).thenAnswer((_) async => _successOrder);
         await cubit.submit(orderType: OrderType.pickup, lines: [_line]);
       },
       verify: (cubit) {
         expect(cubit.state.status, CheckoutStatus.success);
-        final captured = verify(
-          () => repository.createOrder(captureAny()),
-        ).captured.single as CreateOrderRequest;
+        final captured =
+            verify(() => repository.createOrder(captureAny())).captured.single
+                as CreateOrderRequest;
         expect(captured.deliveryAddress, isNull);
         expect(captured.orderType, OrderType.pickup);
       },
