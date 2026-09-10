@@ -40,13 +40,13 @@ class CartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Одноразовые эффекты (ADR-001): навигация и SnackBar реагируют только на
+    // смену фазы; редактирование формы внутри одной фазы listener не будит.
     return BlocListener<CheckoutCubit, CheckoutState>(
-      listenWhen: (previous, next) => previous.status != next.status,
+      listenWhen: (previous, next) => previous.runtimeType != next.runtimeType,
       listener: (context, state) {
-        switch (state.status) {
-          case CheckoutStatus.success:
-            final order = state.placedOrder!;
-            final payment = state.payment;
+        switch (state) {
+          case CheckoutSuccess(:final placedOrder, :final payment):
             final cart = context.read<CustomerCartBloc>().state;
             final loyaltyCubit = context.read<LoyaltyCubit>();
             final orderType = context.read<OrderTypeCubit>().state;
@@ -56,7 +56,7 @@ class CartScreen extends StatelessWidget {
               MaterialPageRoute<void>(
                 builder: (_) => payment != null
                     ? PaymentStatusScreen(
-                        order: order,
+                        order: placedOrder,
                         payment: payment,
                         trackingRepository: orderTrackingRepository,
                         loyaltyCubit: loyaltyCubit,
@@ -64,8 +64,8 @@ class CartScreen extends StatelessWidget {
                         urlLauncher: paymentUrlLauncher,
                       )
                     : OrderTrackingScreen(
-                        orderId: order.id,
-                        orderNumber: order.orderNumber,
+                        orderId: placedOrder.id,
+                        orderNumber: placedOrder.orderNumber,
                         trackingRepository: orderTrackingRepository,
                         deliveryAddress: orderType == OrderType.delivery
                             ? state.address.trim()
@@ -83,15 +83,11 @@ class CartScreen extends StatelessWidget {
                       ),
               ),
             );
-          case CheckoutStatus.failure:
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  state.errorMessage ?? 'Не удалось оформить заказ',
-                ),
-              ),
-            );
-          case CheckoutStatus.editing || CheckoutStatus.submitting:
+          case CheckoutFailure(:final errorMessage):
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(errorMessage)));
+          case CheckoutEditing() || CheckoutSubmitting():
             break;
         }
       },
@@ -156,7 +152,7 @@ class _CartContent extends StatelessWidget {
     final orderType = context.watch<OrderTypeCubit>().state;
     final checkout = context.watch<CheckoutCubit>().state;
     final loyalty = context.watch<LoyaltyCubit>().state;
-    final submitting = checkout.status == CheckoutStatus.submitting;
+    final submitting = checkout is CheckoutSubmitting;
     final canSubmit = checkout.canSubmit(
       orderType: orderType,
       cartIsEmpty: cart.isEmpty,
