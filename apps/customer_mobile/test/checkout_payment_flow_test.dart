@@ -69,6 +69,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(
       const CreateOrderRequest(
+        brandId: '',
         branchId: '',
         orderType: OrderType.delivery,
         items: [],
@@ -236,10 +237,10 @@ void main() {
               child: Scaffold(
                 body: CartScreen(
                   onGoToMenu: () {},
-                orderTrackingRepository: FakeOrderTrackingRepository(
-                  latency: Duration.zero,
-                  script: const ['NEW'],
-                ),
+                  orderTrackingRepository: FakeOrderTrackingRepository(
+                    latency: Duration.zero,
+                    script: const ['NEW'],
+                  ),
                   paymentUrlLauncher: (uri) async {
                     launched.add(uri);
                     return true;

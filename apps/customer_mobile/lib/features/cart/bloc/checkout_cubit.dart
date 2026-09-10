@@ -138,9 +138,15 @@ class CheckoutCubit extends Cubit<CheckoutState> {
   CheckoutCubit({
     required this._repository,
     required CustomerPaymentsRepository paymentsRepository,
-  }) : super(const CheckoutEditing());
+    String? brandId,
+    String? branchId,
+  }) : _brandId = brandId ?? AppConfig.defaultBrandId,
+       _branchId = branchId ?? AppConfig.defaultBranchId,
+       super(const CheckoutEditing());
 
   final CustomerOrdersRepository _repository;
+  final String _brandId;
+  final String _branchId;
 
   void addressChanged(String value) =>
       emit(CheckoutEditing(form: state.form.copyWith(address: value)));
@@ -204,7 +210,8 @@ class CheckoutCubit extends Cubit<CheckoutState> {
     final address = state.address.trim();
     final comment = state.comment.trim();
     return CreateOrderRequest(
-      branchId: AppConfig.defaultBranchId,
+      brandId: _brandId,
+      branchId: _branchId,
       orderType: orderType,
       paymentMethod: state.paymentMethod,
       deliveryAddress: orderType == OrderType.delivery ? address : null,

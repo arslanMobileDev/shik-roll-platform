@@ -8,6 +8,7 @@ import { QueuesModule } from './modules/queues/queues.module';
 import { CouriersModule } from './modules/couriers/couriers.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -21,5 +22,6 @@ import { LoyaltyModule } from './modules/loyalty/loyalty.module';
     KitchenModule,
     LoyaltyModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

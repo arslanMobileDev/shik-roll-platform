@@ -33,13 +33,26 @@ export const YOOKASSA_TAX_SYSTEM_CODE = process.env.YOOKASSA_TAX_SYSTEM_CODE
   : null;
 
 export function paymentsProviderMode(): PaymentsProviderMode {
-  if (process.env.YOOKASSA_MOCK === 'true') return 'mock';
-  const explicit = process.env.PAYMENTS_PROVIDER;
-  if (explicit === 'mock') return 'mock';
+  const production = process.env.NODE_ENV === 'production';
+  const mockRequested =
+    process.env.YOOKASSA_MOCK === 'true' ||
+    process.env.PAYMENTS_PROVIDER === 'mock';
+  if (production && mockRequested) {
+    throw new Error('Mock payment provider is forbidden in production');
+  }
+  if (mockRequested) return 'mock';
 
+  const explicit = process.env.PAYMENTS_PROVIDER;
   const hasCredentials = Boolean(
     process.env.YOOKASSA_SHOP_ID && process.env.YOOKASSA_SECRET_KEY,
   );
-  if (!hasCredentials) return 'mock';
+  if (!hasCredentials) {
+    if (production || explicit === 'yookassa') {
+      throw new Error(
+        'YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY are required for YooKassa',
+      );
+    }
+    return 'mock';
+  }
   return 'yookassa';
 }

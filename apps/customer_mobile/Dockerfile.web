@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+FROM ghcr.io/cirruslabs/flutter:3.44.0 AS builder
+
+ARG API_BASE_URL
+ARG BRAND_ID
+ARG BRANCH_ID
+WORKDIR /app
+COPY pubspec.yaml pubspec.lock ./
+RUN flutter pub get
+COPY . .
+RUN test -n "$API_BASE_URL" && test -n "$BRAND_ID" && test -n "$BRANCH_ID"
+RUN flutter build web --release \
+    --dart-define=API_BASE_URL="$API_BASE_URL" \
+    --dart-define=BRAND_ID="$BRAND_ID" \
+    --dart-define=BRANCH_ID="$BRANCH_ID"
+
+FROM nginx:1.27-alpine
+COPY web-nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/build/web /usr/share/nginx/html
+EXPOSE 80
+HEALTHCHECK --interval=15s --timeout=3s --retries=3 \
+  CMD wget -qO- http://127.0.0.1/healthz || exit 1

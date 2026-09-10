@@ -1,11 +1,10 @@
-import { InjectQueue, OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { OrderStatus, Prisma } from '@prisma/client';
-import { Job, Queue } from 'bullmq';
+import { Job } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { lineTotal, orderSubtotal, orderTotal } from '../orders/domain/order-pricing';
-import { canTransition } from '../orders/domain/order-status-machine';
 import { KitchenEventsService } from '../kitchen/kitchen-events.service';
 import {
   ORDER_PROCESSING_QUEUE,
@@ -13,35 +12,11 @@ import {
   SEND_TO_KITCHEN_JOB,
 } from './order-queues.service';
 
-const STATUS_TIMER_JOB = 'status-timer';
-
-/**
- * Legacy development automation is opt-in. Kitchen order statuses are manual
- * by default and are changed through PATCH /orders/:id/status.
- */
-export function automaticOrderStatusTransitionsEnabled(): boolean {
-  return process.env.ORDER_AUTO_STATUS_ADVANCE_ENABLED === 'true';
-}
-
-export interface StatusTimerJobData {
-  orderId: string;
-  to: OrderStatus;
-}
-
-/**
- * Timer emulation for the order lifecycle (dev harness): after background
- * processing confirms an order, COOKING and READY follow on delays.
- * Overridable via env for tests/dev.
- */
-const STATUS_TIMER_DELAYS_MS: ReadonlyArray<{ to: OrderStatus; delayMs: number }> = [
-  { to: OrderStatus.COOKING, delayMs: Number(process.env.ORDER_TIMER_COOKING_MS ?? 30_000) },
-  { to: OrderStatus.READY, delayMs: Number(process.env.ORDER_TIMER_READY_MS ?? 90_000) },
-];
-
 /**
  * 'order-processing' worker: server-side totals recalculation, stop-list
- * verification and emulated status timers. Retry strategy comes from the
- * queue defaults (3 attempts, exponential backoff from 1s) — BullMQ re-runs
+ * verification. It never advances kitchen or courier statuses. Retry
+ * strategy comes from the queue defaults (3 attempts, exponential backoff
+ * from 1s) — BullMQ re-runs
  * the job on throw, and the failed handler logs terminal failures.
  */
 @Injectable()
@@ -52,23 +27,23 @@ export class OrderProcessingProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly loyalty: LoyaltyService,
-    @InjectQueue(ORDER_PROCESSING_QUEUE)
-    private readonly queue: Queue<ProcessOrderJobData | StatusTimerJobData>,
     @Optional() private readonly kitchenEvents?: KitchenEventsService,
   ) {
     super();
   }
 
-  async process(job: Job<ProcessOrderJobData | StatusTimerJobData>): Promise<void> {
+  async process(job: Job<ProcessOrderJobData>): Promise<void> {
     switch (job.name) {
       case 'process-order':
         await this.processOrder(job as Job<ProcessOrderJobData>);
         return;
       case SEND_TO_KITCHEN_JOB:
-        await this.sendToKitchen(job as Job<ProcessOrderJobData>);
-        return;
-      case STATUS_TIMER_JOB:
-        await this.advanceStatus(job as Job<StatusTimerJobData>);
+        // Backward-compatible drain for jobs queued by older releases. The
+        // paid order is already published to KDS by PaymentsService; workers
+        // must never change its status.
+        this.logger.log(
+          `send-to-kitchen: order ${job.data.orderId} awaits a cook action`,
+        );
         return;
       default:
         this.logger.warn(`Unknown job name: ${job.name}`);
@@ -146,82 +121,7 @@ export class OrderProcessingProcessor extends WorkerHost {
       }),
     ]);
 
-    // 3. Legacy dev harness only: confirm and schedule lifecycle timers.
-    // Production/default mode leaves kitchen status changes to the cook.
-    if (!automaticOrderStatusTransitionsEnabled()) {
-      this.logger.log(`process-order: manual status mode for order ${orderId}`);
-      return;
-    }
-
-    if (order.status === OrderStatus.NEW) {
-      await this.transitionWithHistory(orderId, OrderStatus.NEW, OrderStatus.CONFIRMED, {
-        reason: 'AUTO_CONFIRM',
-      });
-      for (const step of STATUS_TIMER_DELAYS_MS) {
-        await this.queue.add(
-          STATUS_TIMER_JOB,
-          { orderId, to: step.to },
-          { delay: step.delayMs, jobId: `status-timer:${orderId}:${step.to}` },
-        );
-      }
-    }
-  }
-
-  /**
-   * Kitchen dispatch for a paid order (payments contract): CONFIRMED ->
-   * COOKING, guarded by the state machine so a duplicate or late job
-   * (order already cooking, cancelled, ...) is a logged no-op.
-   */
-  private async sendToKitchen(job: Job<ProcessOrderJobData>): Promise<void> {
-    const { orderId } = job.data;
-    if (!automaticOrderStatusTransitionsEnabled()) {
-      this.logger.log(`send-to-kitchen: manual status mode for order ${orderId}`);
-      return;
-    }
-
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, deletedAt: null },
-      select: { status: true },
-    });
-    if (!order) {
-      this.logger.warn(`send-to-kitchen: order ${orderId} not found, skipping`);
-      return;
-    }
-    if (!canTransition(order.status, OrderStatus.COOKING)) {
-      this.logger.log(
-        `send-to-kitchen: skipping ${order.status} -> COOKING for order ${orderId} (not allowed)`,
-      );
-      return;
-    }
-    await this.transitionWithHistory(orderId, order.status, OrderStatus.COOKING, {
-      reason: 'PAID_ONLINE',
-    });
-  }
-
-  private async advanceStatus(job: Job<StatusTimerJobData>): Promise<void> {
-    const { orderId, to } = job.data;
-    if (!automaticOrderStatusTransitionsEnabled()) {
-      this.logger.log(`status-timer: manual status mode for order ${orderId}`);
-      return;
-    }
-
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, deletedAt: null },
-      select: { status: true },
-    });
-    if (!order) {
-      this.logger.warn(`status-timer: order ${orderId} not found, skipping`);
-      return;
-    }
-    // Timer emulation must never break the state machine: skip transitions
-    // that no longer apply (e.g. the operator already moved or cancelled).
-    if (!canTransition(order.status, to)) {
-      this.logger.log(
-        `status-timer: skipping ${order.status} -> ${to} for order ${orderId} (not allowed)`,
-      );
-      return;
-    }
-    await this.transitionWithHistory(orderId, order.status, to, { reason: 'AUTO_TIMER' });
+    this.logger.log(`process-order: order ${orderId} validated; status unchanged`);
   }
 
   private async transitionWithHistory(

@@ -2,23 +2,13 @@ import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { allowedCorsOrigins } from './config/cors.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  const corsOrigins = (process.env.CORS_ORIGIN ?? '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
   app.enableCors({
-    // Production is deny-by-default when CORS_ORIGIN is missing. Local
-    // development keeps the previous permissive behaviour.
-    origin:
-      corsOrigins.length > 0
-        ? corsOrigins
-        : process.env.NODE_ENV === 'production'
-          ? false
-          : true,
+    origin: allowedCorsOrigins(),
     credentials: true,
   });
 

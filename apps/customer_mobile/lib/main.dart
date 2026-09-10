@@ -8,20 +8,17 @@ import 'core/auth/auth_token_storage.dart';
 import 'core/config/app_config.dart';
 import 'core/network/api_client.dart';
 import 'features/auth/data/auth_repository.dart';
-import 'features/auth/data/fake_auth_repository.dart';
-import 'features/cart/data/fake_orders_repository.dart';
 import 'features/cart/data/orders_repository.dart';
 import 'features/loyalty/data/loyalty_repository.dart';
-import 'features/menu/data/fake_customer_menu_repository.dart';
 import 'features/menu/data/menu_repository.dart';
 import 'features/orders/data/order_history_repository.dart';
 import 'features/orders/data/order_tracking_repository.dart';
-import 'features/payments/data/fake_payments_repository.dart';
 import 'features/payments/data/payments_repository.dart';
 import 'features/profile/data/user_settings_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  AppConfig.validate();
 
   // Mobile portrait orientation.
   await SystemChrome.setPreferredOrientations(const [
@@ -32,58 +29,45 @@ Future<void> main() async {
   // Live guest session token, shared by the authorized repositories.
   final tokenProvider = AuthTokenProvider();
 
-  final CustomerMenuRepository repository = AppConfig.useRemoteMenu
-      ? RemoteCustomerMenuRepository(ApiClient(baseUrl: AppConfig.apiBaseUrl))
-      : FakeCustomerMenuRepository(latency: const Duration(milliseconds: 200));
+  final CustomerMenuRepository repository = RemoteCustomerMenuRepository(
+    ApiClient(baseUrl: AppConfig.apiBaseUrl),
+  );
 
-  final CustomerOrdersRepository ordersRepository = AppConfig.useRemoteMenu
-      ? RemoteCustomerOrdersRepository(
-          ApiClient(baseUrl: AppConfig.apiBaseUrl),
-          tokenProvider,
-        )
-      : FakeCustomerOrdersRepository(
-          latency: const Duration(milliseconds: 600),
-        );
+  final CustomerOrdersRepository ordersRepository =
+      RemoteCustomerOrdersRepository(
+        ApiClient(baseUrl: AppConfig.apiBaseUrl),
+        tokenProvider,
+      );
 
-  final CustomerPaymentsRepository paymentsRepository = AppConfig.useRemoteMenu
-      ? RemoteCustomerPaymentsRepository(
-          ApiClient(baseUrl: AppConfig.apiBaseUrl),
-          tokenProvider,
-        )
-      : FakeCustomerPaymentsRepository(
-          latency: const Duration(milliseconds: 400),
-        );
+  final CustomerPaymentsRepository paymentsRepository =
+      RemoteCustomerPaymentsRepository(
+        ApiClient(baseUrl: AppConfig.apiBaseUrl),
+        tokenProvider,
+      );
 
-  final AuthRepository authRepository = AppConfig.useRemoteMenu
-      ? RemoteAuthRepository(
-          ApiClient(baseUrl: AppConfig.apiBaseUrl),
-          tokenProvider,
-        )
-      : FakeAuthRepository();
+  final AuthRepository authRepository = RemoteAuthRepository(
+    ApiClient(baseUrl: AppConfig.apiBaseUrl),
+    tokenProvider,
+  );
 
-  final OrderHistoryRepository orderHistoryRepository = AppConfig.useRemoteMenu
-      ? RemoteOrderHistoryRepository(
-          ApiClient(baseUrl: AppConfig.apiBaseUrl),
-          tokenProvider,
-        )
-      : FakeOrderHistoryRepository();
+  final OrderHistoryRepository orderHistoryRepository =
+      RemoteOrderHistoryRepository(
+        ApiClient(baseUrl: AppConfig.apiBaseUrl),
+        tokenProvider,
+      );
 
   // Realtime-трекинг статуса заказа (ADR-1615): SSE + fallback-поллинг.
   final OrderTrackingRepository orderTrackingRepository =
-      AppConfig.useRemoteMenu
-      ? RemoteOrderTrackingRepository(
-          ApiClient(baseUrl: AppConfig.apiBaseUrl),
-          tokenProvider,
-        )
-      : FakeOrderTrackingRepository();
+      RemoteOrderTrackingRepository(
+        ApiClient(baseUrl: AppConfig.apiBaseUrl),
+        tokenProvider,
+      );
 
   // Программа лояльности (ADR-1614): баланс бонусов и лента акций.
-  final LoyaltyRepository loyaltyRepository = AppConfig.useRemoteMenu
-      ? RemoteLoyaltyRepository(
-          ApiClient(baseUrl: AppConfig.apiBaseUrl),
-          tokenProvider,
-        )
-      : FakeLoyaltyRepository(latency: const Duration(milliseconds: 300));
+  final LoyaltyRepository loyaltyRepository = RemoteLoyaltyRepository(
+    ApiClient(baseUrl: AppConfig.apiBaseUrl),
+    tokenProvider,
+  );
 
   // Локальные UI-настройки гостя (ADR-1616).
   final userSettingsRepository = SharedPreferencesUserSettingsRepository(

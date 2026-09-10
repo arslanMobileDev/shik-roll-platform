@@ -1,40 +1,26 @@
 import {
   assertKitchenConfig,
-  kdsStatusEmulationEnabled,
 } from './kitchen.config';
 
-describe('kitchen config — ADR-1618 emulation guard', () => {
-  const originalNodeEnv = process.env.NODE_ENV;
-
+describe('kitchen config — automatic status simulation guard', () => {
   afterEach(() => {
     delete process.env.KDS_STATUS_EMULATION_ENABLED;
-    process.env.NODE_ENV = originalNodeEnv;
+    delete process.env.ORDER_AUTO_STATUS_ADVANCE_ENABLED;
   });
 
-  it('emulation is off unless explicitly enabled', () => {
-    delete process.env.KDS_STATUS_EMULATION_ENABLED;
-    expect(kdsStatusEmulationEnabled()).toBe(false);
+  it('rejects the old KDS emulation flag in every environment', () => {
+    process.env.KDS_STATUS_EMULATION_ENABLED = 'true';
+    expect(() => assertKitchenConfig()).toThrow(/simulation was removed/);
+  });
+
+  it('rejects the old worker auto-advance flag in every environment', () => {
+    process.env.ORDER_AUTO_STATUS_ADVANCE_ENABLED = 'true';
+    expect(() => assertKitchenConfig()).toThrow(/simulation was removed/);
+  });
+
+  it('allows startup when both legacy flags are absent or false', () => {
     process.env.KDS_STATUS_EMULATION_ENABLED = 'false';
-    expect(kdsStatusEmulationEnabled()).toBe(false);
-    process.env.KDS_STATUS_EMULATION_ENABLED = 'true';
-    expect(kdsStatusEmulationEnabled()).toBe(true);
-  });
-
-  it('stops startup when emulation is enabled in production', () => {
-    process.env.KDS_STATUS_EMULATION_ENABLED = 'true';
-    process.env.NODE_ENV = 'production';
-    expect(() => assertKitchenConfig()).toThrow(/forbidden in production/);
-  });
-
-  it('allows emulation outside production', () => {
-    process.env.KDS_STATUS_EMULATION_ENABLED = 'true';
-    process.env.NODE_ENV = 'development';
-    expect(() => assertKitchenConfig()).not.toThrow();
-  });
-
-  it('allows production without emulation', () => {
-    delete process.env.KDS_STATUS_EMULATION_ENABLED;
-    process.env.NODE_ENV = 'production';
+    process.env.ORDER_AUTO_STATUS_ADVANCE_ENABLED = 'false';
     expect(() => assertKitchenConfig()).not.toThrow();
   });
 });

@@ -43,6 +43,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(
       const CreateOrderRequest(
+        brandId: '',
         branchId: '',
         orderType: OrderType.delivery,
         items: [],
@@ -59,6 +60,8 @@ void main() {
       'успешный submit: submitting → success с реальным номером заказа',
       build: () => CheckoutCubit(
         repository: repository,
+        brandId: 'brand-test',
+        branchId: 'branch-test',
         paymentsRepository: FakeCustomerPaymentsRepository(
           latency: Duration.zero,
         ),
@@ -86,6 +89,8 @@ void main() {
       'submit отправляет запрос по контракту: филиал, тип, адрес, позиции',
       build: () => CheckoutCubit(
         repository: repository,
+        brandId: 'brand-test',
+        branchId: 'branch-test',
         paymentsRepository: FakeCustomerPaymentsRepository(
           latency: Duration.zero,
         ),
@@ -110,7 +115,8 @@ void main() {
                 as CreateOrderRequest;
         expect(captured.orderType, OrderType.delivery);
         expect(captured.deliveryAddress, 'ул. Пушкина, 10');
-        expect(captured.branchId, isNotEmpty);
+        expect(captured.brandId, 'brand-test');
+        expect(captured.branchId, 'branch-test');
         expect(captured.comment, 'Без лука');
         expect(captured.items.single.menuItemId, 'item-lemonade');
         expect(captured.items.single.quantity, 1);
@@ -158,9 +164,8 @@ void main() {
           latency: Duration.zero,
         ),
       ),
-      seed: () => const CheckoutEditing(
-        form: CheckoutForm(address: 'ул. Пушкина, 10'),
-      ),
+      seed: () =>
+          const CheckoutEditing(form: CheckoutForm(address: 'ул. Пушкина, 10')),
       act: (cubit) =>
           cubit.submit(orderType: OrderType.delivery, lines: [_line]),
       expect: () => <CheckoutState>[],

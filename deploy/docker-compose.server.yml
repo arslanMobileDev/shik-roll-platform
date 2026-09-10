@@ -1,0 +1,126 @@
+name: shik-production
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: shik_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [shik_network]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: shik_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks: [shik_network]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ../services/backend
+      dockerfile: Dockerfile.production
+    image: shik-backend:production
+    container_name: shik_backend
+    restart: unless-stopped
+    env_file: ${SHIK_ENV_FILE:-.env.production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [shik_network]
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  customer-web:
+    build:
+      context: ../apps/customer_mobile
+      dockerfile: Dockerfile.web
+      args:
+        API_BASE_URL: ${API_BASE_URL:?API_BASE_URL is required}
+        BRAND_ID: ${BRAND_ID:?BRAND_ID is required}
+        BRANCH_ID: ${BRANCH_ID:?BRANCH_ID is required}
+    image: shik-customer-web:production
+    container_name: shik_customer_web
+    restart: unless-stopped
+    networks: [shik_network]
+
+  kds-web:
+    build:
+      context: ../apps/kds
+      dockerfile: Dockerfile.web
+      args:
+        API_BASE_URL: ${API_BASE_URL:?API_BASE_URL is required}
+    image: shik-kds-web:production
+    container_name: shik_kds_web
+    restart: unless-stopped
+    networks: [shik_network]
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: shik_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/.rendered/nginx.conf:/etc/nginx/nginx.conf:ro
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    depends_on:
+      backend:
+        condition: service_healthy
+      customer-web:
+        condition: service_healthy
+      kds-web:
+        condition: service_healthy
+    networks: [shik_network]
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: shik_certbot
+    restart: unless-stopped
+    profiles: [certbot]
+    volumes:
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    entrypoint: >-
+      /bin/sh -c 'trap exit TERM;
+      while :; do certbot renew --webroot -w /var/www/certbot --quiet;
+      sleep 12h; done;'
+
+networks:
+  shik_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  certbot_conf:
+  certbot_www:
