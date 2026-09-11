@@ -25,6 +25,7 @@ final class CreateOrderRequest extends Equatable {
     required this.items,
     this.paymentMethod = PaymentMethod.online,
     this.deliveryAddress,
+    this.scheduledFor,
     this.comment,
     this.useBonusPoints = 0,
   });
@@ -37,6 +38,11 @@ final class CreateOrderRequest extends Equatable {
 
   /// Expected when [orderType] is [OrderType.delivery].
   final String? deliveryAddress;
+
+  /// Время «ко времени» (ISO-8601 UTC); отсутствует = ASAP. Backend DTO
+  /// пока не читает поле (whitelist отбрасывает) — контракт расширен
+  /// client-first, поддержка на сервере — отдельная задача.
+  final DateTime? scheduledFor;
   final String? comment;
 
   /// Bonus points to spend (ADR-1614): integer, 1 point = 1 RUB, max 30% of
@@ -50,6 +56,8 @@ final class CreateOrderRequest extends Equatable {
     'paymentMethod': paymentMethod.wireName,
     if (deliveryAddress != null && deliveryAddress!.isNotEmpty)
       'deliveryAddress': deliveryAddress,
+    if (scheduledFor != null)
+      'scheduledFor': scheduledFor!.toUtc().toIso8601String(),
     if (comment != null && comment!.isNotEmpty) 'comment': comment,
     if (useBonusPoints > 0) 'useBonusPoints': useBonusPoints,
     'items': [for (final item in items) item.toJson()],
@@ -63,6 +71,7 @@ final class CreateOrderRequest extends Equatable {
     items,
     paymentMethod,
     deliveryAddress,
+    scheduledFor,
     comment,
     useBonusPoints,
   ];

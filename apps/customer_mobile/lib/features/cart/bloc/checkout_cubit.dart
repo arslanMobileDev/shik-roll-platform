@@ -11,20 +11,40 @@ import '../data/create_order_request.dart';
 import '../data/guest_order.dart';
 import '../data/orders_repository.dart';
 
-/// Редактируемые поля формы чекаута: адрес, комментарий, согласие с офертой,
-/// способ оплаты и переключатель списания бонусов. Форма переживает смену фаз
+/// Редактируемые поля формы чекаута: структурированный адрес доставки,
+/// время (ASAP / ко времени), комментарий, согласие с офертой, способ оплаты
+/// и переключатель списания бонусов. Форма переживает смену фаз
 /// [CheckoutState] (ADR-001): после сетевой ошибки введённые данные не теряются.
 final class CheckoutForm extends Equatable {
   const CheckoutForm({
-    this.address = '',
+    this.street = '',
+    this.house = '',
+    this.apartment = '',
+    this.entrance = '',
+    this.floor = '',
+    this.intercom = '',
     this.comment = '',
+    this.scheduledAt,
     this.offerAccepted = false,
     this.paymentMethod = PaymentMethod.online,
     this.bonusSpendEnabled = false,
   });
 
-  final String address;
+  final String street;
+  final String house;
+  final String apartment;
+
+  /// Подъезд.
+  final String entrance;
+  final String floor;
+
+  /// Домофон.
+  final String intercom;
   final String comment;
+
+  /// Время «ко времени»; `null` — как можно скорее (ASAP).
+  /// Nullable: сброс только через `copyWith(clearScheduledAt: true)`.
+  final DateTime? scheduledAt;
   final bool offerAccepted;
 
   /// Выбранный способ оплаты; по умолчанию — онлайн-эквайринг ЮKassa.
@@ -34,16 +54,44 @@ final class CheckoutForm extends Equatable {
   /// `useBonusPoints`, рассчитанным по балансу и лимиту 30% от чека.
   final bool bonusSpendEnabled;
 
+  /// Минимально валидный адрес доставки: улица и дом.
+  bool get hasDeliveryAddress =>
+      street.trim().isNotEmpty && house.trim().isNotEmpty;
+
+  /// «ул. Пушкина, д. 10, кв. 5, подъезд 2, этаж 3, домофон 45» — одной
+  /// строкой под wire-контракт `deliveryAddress` (string, max 500 на бэкенде).
+  String get composedAddress => [
+    if (street.trim().isNotEmpty) street.trim(),
+    if (house.trim().isNotEmpty) 'д. ${house.trim()}',
+    if (apartment.trim().isNotEmpty) 'кв. ${apartment.trim()}',
+    if (entrance.trim().isNotEmpty) 'подъезд ${entrance.trim()}',
+    if (floor.trim().isNotEmpty) 'этаж ${floor.trim()}',
+    if (intercom.trim().isNotEmpty) 'домофон ${intercom.trim()}',
+  ].join(', ');
+
   CheckoutForm copyWith({
-    String? address,
+    String? street,
+    String? house,
+    String? apartment,
+    String? entrance,
+    String? floor,
+    String? intercom,
     String? comment,
+    DateTime? scheduledAt,
+    bool clearScheduledAt = false,
     bool? offerAccepted,
     PaymentMethod? paymentMethod,
     bool? bonusSpendEnabled,
   }) {
     return CheckoutForm(
-      address: address ?? this.address,
+      street: street ?? this.street,
+      house: house ?? this.house,
+      apartment: apartment ?? this.apartment,
+      entrance: entrance ?? this.entrance,
+      floor: floor ?? this.floor,
+      intercom: intercom ?? this.intercom,
       comment: comment ?? this.comment,
+      scheduledAt: clearScheduledAt ? null : scheduledAt ?? this.scheduledAt,
       offerAccepted: offerAccepted ?? this.offerAccepted,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       bonusSpendEnabled: bonusSpendEnabled ?? this.bonusSpendEnabled,
@@ -52,8 +100,14 @@ final class CheckoutForm extends Equatable {
 
   @override
   List<Object?> get props => [
-    address,
+    street,
+    house,
+    apartment,
+    entrance,
+    floor,
+    intercom,
     comment,
+    scheduledAt,
     offerAccepted,
     paymentMethod,
     bonusSpendEnabled,
@@ -71,21 +125,22 @@ sealed class CheckoutState extends Equatable {
   final CheckoutForm form;
 
   // Прокси к полям формы: виджеты читают их, не зная о [CheckoutForm].
-  String get address => form.address;
+  String get composedAddress => form.composedAddress;
   String get comment => form.comment;
+  DateTime? get scheduledAt => form.scheduledAt;
   bool get offerAccepted => form.offerAccepted;
   PaymentMethod get paymentMethod => form.paymentMethod;
   bool get bonusSpendEnabled => form.bonusSpendEnabled;
 
   /// The «Оформить заказ» button is enabled only when the cart has lines,
-  /// the offer is accepted and — for delivery — the address is filled.
+  /// the offer is accepted and — for delivery — street and house are filled.
   /// Пока идёт отправка ([CheckoutSubmitting]) повторный submit невозможен —
   /// это и есть droppable-семантика защиты от double-tap (ADR-001).
   bool canSubmit({required OrderType orderType, required bool cartIsEmpty}) {
     if (this is CheckoutSubmitting || cartIsEmpty || !offerAccepted) {
       return false;
     }
-    if (orderType == OrderType.delivery && address.trim().isEmpty) {
+    if (orderType == OrderType.delivery && !form.hasDeliveryAddress) {
       return false;
     }
     return true;
@@ -148,11 +203,36 @@ class CheckoutCubit extends Cubit<CheckoutState> {
   final String _brandId;
   final String _branchId;
 
-  void addressChanged(String value) =>
-      emit(CheckoutEditing(form: state.form.copyWith(address: value)));
+  void streetChanged(String value) =>
+      emit(CheckoutEditing(form: state.form.copyWith(street: value)));
+
+  void houseChanged(String value) =>
+      emit(CheckoutEditing(form: state.form.copyWith(house: value)));
+
+  void apartmentChanged(String value) =>
+      emit(CheckoutEditing(form: state.form.copyWith(apartment: value)));
+
+  void entranceChanged(String value) =>
+      emit(CheckoutEditing(form: state.form.copyWith(entrance: value)));
+
+  void floorChanged(String value) =>
+      emit(CheckoutEditing(form: state.form.copyWith(floor: value)));
+
+  void intercomChanged(String value) =>
+      emit(CheckoutEditing(form: state.form.copyWith(intercom: value)));
 
   void commentChanged(String value) =>
       emit(CheckoutEditing(form: state.form.copyWith(comment: value)));
+
+  /// ASAP: сброс выбранного времени (явный clear-флаг, см. [CheckoutForm]).
+  void asapSelected() => emit(
+    CheckoutEditing(form: state.form.copyWith(clearScheduledAt: true)),
+  );
+
+  /// «Ко времени»: фиксируем выбранное слот-время.
+  void scheduledSelected(DateTime value) => emit(
+    CheckoutEditing(form: state.form.copyWith(scheduledAt: value)),
+  );
 
   void offerToggled(bool accepted) =>
       emit(CheckoutEditing(form: state.form.copyWith(offerAccepted: accepted)));
@@ -207,14 +287,16 @@ class CheckoutCubit extends Cubit<CheckoutState> {
     List<CartLine> lines,
     int bonusPoints,
   ) {
-    final address = state.address.trim();
     final comment = state.comment.trim();
     return CreateOrderRequest(
       brandId: _brandId,
       branchId: _branchId,
       orderType: orderType,
       paymentMethod: state.paymentMethod,
-      deliveryAddress: orderType == OrderType.delivery ? address : null,
+      deliveryAddress: orderType == OrderType.delivery
+          ? state.composedAddress
+          : null,
+      scheduledFor: state.scheduledAt,
       comment: comment.isEmpty ? null : comment,
       useBonusPoints: state.bonusSpendEnabled ? bonusPoints : 0,
       items: [

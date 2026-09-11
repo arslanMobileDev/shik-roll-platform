@@ -74,7 +74,9 @@ const _drink = MenuItem(
 
 final _submitButton = find.byKey(const ValueKey('checkout-submit-button'));
 final _offerCheckbox = find.byKey(const ValueKey('offer-checkbox'));
-final _addressField = find.byKey(const ValueKey('address-field'));
+final _streetField = find.byKey(const ValueKey('street-field'));
+final _houseField = find.byKey(const ValueKey('house-field'));
+final _timeToggle = find.byKey(const ValueKey('delivery-time-toggle'));
 
 bool _submitEnabled(WidgetTester tester) =>
     tester.widget<FilledButton>(_submitButton).onPressed != null;
@@ -118,6 +120,13 @@ Future<CustomerCartBloc> _pumpCart(
   VoidCallback? onGoToMenu,
   AuthBloc? authBloc,
 }) async {
+  // Экран чекаута длинный, а ListView ленивый: даём тестовому surface
+  // достаточную высоту, чтобы все дети (адрес, время, оферта, оплата)
+  // были построены и доступны finder'ам без скроллинга.
+  tester.view.physicalSize = const Size(800, 2600);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
   final cartBloc = CustomerCartBloc();
   final checkoutCubit = CheckoutCubit(
     repository:
@@ -273,7 +282,7 @@ void main() {
     expect(_submitEnabled(tester), isFalse);
   });
 
-  testWidgets('при доставке кнопка требует заполненный адрес', (tester) async {
+  testWidgets('при доставке кнопка требует улицу и дом', (tester) async {
     final cart = await _pumpCart(tester);
     cart.add(const CartItemAdded(item: _drink));
     await tester.pump();
@@ -282,14 +291,72 @@ void main() {
     await _acceptOffer(tester);
     expect(_submitEnabled(tester), isFalse);
 
-    await tester.ensureVisible(_addressField);
-    await tester.enterText(_addressField, 'ул. Пушкина, д. 10, кв. 5');
+    // Одной улицы недостаточно.
+    await tester.ensureVisible(_streetField);
+    await tester.enterText(_streetField, 'ул. Пушкина');
+    await tester.pump();
+    expect(_submitEnabled(tester), isFalse);
+
+    await tester.ensureVisible(_houseField);
+    await tester.enterText(_houseField, '10');
     await tester.pump();
     expect(_submitEnabled(tester), isTrue);
 
-    // Поле адреса отключено при самовывозе.
+    // При самовывозе форма адреса скрыта, адрес не требуется.
     await _selectPickup(tester);
-    expect(tester.widget<TextField>(_addressField).enabled, isFalse);
+    expect(_streetField, findsNothing);
+    expect(_houseField, findsNothing);
+    expect(_submitEnabled(tester), isTrue);
+  });
+
+  testWidgets('блок сумм: товары, доставка и итог', (tester) async {
+    final cart = await _pumpCart(tester);
+    cart.add(const CartItemAdded(item: _drink));
+    await tester.pump();
+
+    expect(find.text('Сумма заказа'), findsOneWidget);
+    // Текст «Доставка» совпадает с сегментом OrderTypeToggle — строку сумм
+    // ищем по ключу.
+    final feeRow = find.byKey(const ValueKey('delivery-fee-row'));
+    expect(feeRow, findsOneWidget);
+    // deliveryFee по умолчанию 0 — доставка бесплатна.
+    expect(
+      find.descendant(of: feeRow, matching: find.text('Бесплатно')),
+      findsOneWidget,
+    );
+    expect(find.text('Итого'), findsOneWidget);
+    expect(
+      find.text('Оформить заказ на ${const Money.kopecks(15000).format()}'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('время получения: ASAP по умолчанию, «Ко времени» ловит слот', (
+    tester,
+  ) async {
+    final cart = await _pumpCart(tester);
+    cart.add(const CartItemAdded(item: _drink));
+    await tester.pump();
+
+    // ASAP: кнопки выбранного времени нет.
+    expect(find.byKey(const ValueKey('scheduled-time-button')), findsNothing);
+
+    await tester.ensureVisible(_timeToggle);
+    await tester.tap(find.text('Ко времени'));
+    await tester.pumpAndSettle();
+
+    // Диалог выбора времени открыт; подтверждаем слот по умолчанию.
+    expect(find.byType(TimePickerDialog), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    // Слот зафиксирован: видна кнопка с выбранным временем.
+    expect(find.byKey(const ValueKey('scheduled-time-button')), findsOneWidget);
+
+    // Возврат к ASAP сбрасывает слот.
+    await tester.tap(find.text('Как можно скорее'));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('scheduled-time-button')), findsNothing);
   });
 
   testWidgets('успешное оформление: экран трекинга, корзина очищена', (
