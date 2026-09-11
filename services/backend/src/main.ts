@@ -1,11 +1,16 @@
 import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { allowedCorsOrigins } from './config/cors.config';
+import { serveMenuUploads } from './modules/uploads/uploads-static';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Local equivalent of the production Nginx static location (ADR-008).
+  serveMenuUploads(app);
 
   app.enableCors({
     origin: allowedCorsOrigins(),
@@ -43,6 +48,7 @@ async function bootstrap() {
     .addTag('loyalty')
     .addTag('promotions')
     .addTag('kitchen')
+    .addTag('uploads')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);

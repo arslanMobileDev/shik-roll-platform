@@ -46,6 +46,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      # Обработанные изображения меню (ADR-008); тот же volume раздаёт nginx.
+      - uploads_data:/app/uploads
     networks: [shik_network]
     healthcheck:
       test:
@@ -93,6 +96,8 @@ services:
       - ./nginx/.rendered/nginx.conf:/etc/nginx/nginx.conf:ro
       - certbot_conf:/etc/letsencrypt
       - certbot_www:/var/www/certbot
+      # Статика /uploads/menu/ — read-only, публикует только backend (ADR-008).
+      - uploads_data:/srv/uploads:ro
     depends_on:
       backend:
         condition: service_healthy
@@ -124,3 +129,4 @@ volumes:
   redis_data:
   certbot_conf:
   certbot_www:
+  uploads_data:

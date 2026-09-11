@@ -28,7 +28,11 @@ RUN pnpm install --prod --frozen-lockfile \
   && pnpm exec prisma generate
 COPY --from=builder /app/dist ./dist
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
-RUN chmod +x ./docker-entrypoint.sh \
+# uploads/ is the mount point of the persistent uploads volume (ADR-008); it
+# must exist and belong to node so a fresh named volume inherits writable
+# ownership (the image-level chown cannot fix a foreign bind mount).
+RUN mkdir -p ./uploads \
+  && chmod +x ./docker-entrypoint.sh \
   && chown -R node:node /app
 USER node
 EXPOSE 3000
