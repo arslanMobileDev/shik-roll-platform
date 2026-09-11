@@ -23,6 +23,8 @@ import '../bloc/checkout_cubit.dart';
 import '../bloc/customer_cart_bloc.dart';
 import 'widgets/cart_empty_view.dart';
 import 'widgets/cart_item_tile.dart';
+import 'widgets/delivery_address_form.dart';
+import 'widgets/delivery_time_selector.dart';
 
 /// Guest cart tab: positions with modifiers, delivery/pickup switch,
 /// address & comment, offer consent and the checkout button.
@@ -69,7 +71,7 @@ class CartScreen extends StatelessWidget {
                         orderNumber: placedOrder.orderNumber,
                         trackingRepository: orderTrackingRepository,
                         deliveryAddress: orderType == OrderType.delivery
-                            ? state.address.trim()
+                            ? state.composedAddress
                             : null,
                         items: [
                           for (final line in cart.lines)
@@ -140,16 +142,13 @@ class _CartContent extends StatelessWidget {
                 const SizedBox(height: AppSpacing.s8),
                 const OrderTypeToggle(),
                 const SizedBox(height: AppSpacing.s16),
-                TextField(
-                  key: const ValueKey('address-field'),
-                  enabled: orderType == OrderType.delivery,
-                  onChanged: context.read<CheckoutCubit>().addressChanged,
-                  decoration: const InputDecoration(
-                    labelText: 'Адрес доставки',
-                    hintText: 'Улица, дом, квартира',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
+                if (orderType == OrderType.delivery) ...[
+                  const DeliveryAddressForm(),
+                  const SizedBox(height: AppSpacing.s12),
+                ],
+                Text('Время получения', style: theme.textTheme.titleSmall),
+                const SizedBox(height: AppSpacing.s8),
+                const DeliveryTimeSelector(),
                 const SizedBox(height: AppSpacing.s12),
                 TextField(
                   key: const ValueKey('comment-field'),
@@ -172,6 +171,7 @@ class _CartContent extends StatelessWidget {
           ),
           _CheckoutBar(
             total: cart.total,
+            deliveryFee: cart.deliveryFee,
             appliedBonusPoints: appliedBonusPoints,
             canSubmit: canSubmit,
             submitting: submitting,
@@ -310,12 +310,16 @@ class _LegalFootnoteState extends State<_LegalFootnote> {
 class _CheckoutBar extends StatelessWidget {
   const _CheckoutBar({
     required this.total,
+    required this.deliveryFee,
     required this.appliedBonusPoints,
     required this.canSubmit,
     required this.submitting,
   });
 
   final Money total;
+
+  /// Стоимость доставки из [CartState]; ноль — «Бесплатно».
+  final Money deliveryFee;
 
   /// Бонусы к списанию (ADR-1614): 1 балл = 1 ₽, уже усечено до
   /// `min(баланс, floor(30% от чека))`; 0 — списание выключено.
@@ -327,7 +331,7 @@ class _CheckoutBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bonusDiscount = Money.kopecks(appliedBonusPoints * 100);
-    final payable = total - bonusDiscount;
+    final payable = total + deliveryFee - bonusDiscount;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.s16,
@@ -338,15 +342,27 @@ class _CheckoutBar extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Сумма заказа', style: theme.textTheme.bodyMedium),
+              Text(total.format(), style: theme.textTheme.bodyMedium),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s4),
+          Row(
+            key: const ValueKey('delivery-fee-row'),
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Доставка', style: theme.textTheme.bodyMedium),
+              Text(
+                deliveryFee.isZero ? 'Бесплатно' : deliveryFee.format(),
+                style: theme.textTheme.bodyMedium,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s4),
           if (appliedBonusPoints > 0) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Сумма заказа', style: theme.textTheme.bodyMedium),
-                Text(total.format(), style: theme.textTheme.bodyMedium),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.s4),
             Row(
               key: const ValueKey('bonus-discount-row'),
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

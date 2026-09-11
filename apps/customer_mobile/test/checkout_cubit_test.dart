@@ -67,7 +67,11 @@ void main() {
         ),
       ),
       seed: () => const CheckoutEditing(
-        form: CheckoutForm(address: 'ул. Пушкина, 10', offerAccepted: true),
+        form: CheckoutForm(
+          street: 'ул. Пушкина',
+          house: '10',
+          offerAccepted: true,
+        ),
       ),
       act: (cubit) async {
         when(
@@ -97,7 +101,8 @@ void main() {
       ),
       seed: () => const CheckoutEditing(
         form: CheckoutForm(
-          address: 'ул. Пушкина, 10',
+          street: 'ул. Пушкина',
+          house: '10',
           comment: 'Без лука',
           offerAccepted: true,
         ),
@@ -114,7 +119,8 @@ void main() {
             verify(() => repository.createOrder(captureAny())).captured.single
                 as CreateOrderRequest;
         expect(captured.orderType, OrderType.delivery);
-        expect(captured.deliveryAddress, 'ул. Пушкина, 10');
+        expect(captured.deliveryAddress, 'ул. Пушкина, д. 10');
+        expect(captured.scheduledFor, isNull);
         expect(captured.brandId, 'brand-test');
         expect(captured.branchId, 'branch-test');
         expect(captured.comment, 'Без лука');
@@ -133,7 +139,11 @@ void main() {
         ),
       ),
       seed: () => const CheckoutEditing(
-        form: CheckoutForm(address: 'ул. Пушкина, 10', offerAccepted: true),
+        form: CheckoutForm(
+          street: 'ул. Пушкина',
+          house: '10',
+          offerAccepted: true,
+        ),
       ),
       act: (cubit) async {
         when(() => repository.createOrder(any())).thenThrow(
@@ -151,7 +161,11 @@ void main() {
               'errorMessage',
               'Нет соединения с сервером. Проверьте интернет и попробуйте ещё раз.',
             )
-            .having((s) => s.address, 'address', 'ул. Пушкина, 10')
+            .having(
+              (s) => s.composedAddress,
+              'composedAddress',
+              'ул. Пушкина, д. 10',
+            )
             .having((s) => s.offerAccepted, 'offerAccepted', isTrue),
       ],
     );
@@ -164,8 +178,9 @@ void main() {
           latency: Duration.zero,
         ),
       ),
-      seed: () =>
-          const CheckoutEditing(form: CheckoutForm(address: 'ул. Пушкина, 10')),
+      seed: () => const CheckoutEditing(
+        form: CheckoutForm(street: 'ул. Пушкина', house: '10'),
+      ),
       act: (cubit) =>
           cubit.submit(orderType: OrderType.delivery, lines: [_line]),
       expect: () => <CheckoutState>[],
@@ -238,6 +253,124 @@ void main() {
       },
       expect: () => [isA<CheckoutSubmitting>(), isA<CheckoutSuccess>()],
       verify: (_) => verify(() => repository.createOrder(any())).called(1),
+    );
+  });
+
+  group('CheckoutForm: структурированный адрес', () {
+    test('composedAddress собирает все заполненные поля по шаблону', () {
+      const form = CheckoutForm(
+        street: ' ул. Пушкина ',
+        house: '10',
+        apartment: '5',
+        entrance: '2',
+        floor: '3',
+        intercom: '45',
+      );
+      expect(
+        form.composedAddress,
+        'ул. Пушкина, д. 10, кв. 5, подъезд 2, этаж 3, домофон 45',
+      );
+    });
+
+    test('composedAddress пропускает пустые опциональные поля', () {
+      const form = CheckoutForm(street: 'ул. Пушкина', house: '10');
+      expect(form.composedAddress, 'ул. Пушкина, д. 10');
+    });
+
+    test('hasDeliveryAddress: улица без дома недостаточна', () {
+      expect(const CheckoutForm(street: 'ул. Пушкина').hasDeliveryAddress, isFalse);
+      expect(const CheckoutForm(house: '10').hasDeliveryAddress, isFalse);
+      expect(
+        const CheckoutForm(street: 'ул. Пушкина', house: '10')
+            .hasDeliveryAddress,
+        isTrue,
+      );
+    });
+
+    blocTest<CheckoutCubit, CheckoutState>(
+      'доставка: улица без дома блокирует submit',
+      build: () => CheckoutCubit(
+        repository: repository,
+        paymentsRepository: FakeCustomerPaymentsRepository(
+          latency: Duration.zero,
+        ),
+      ),
+      seed: () => const CheckoutEditing(
+        form: CheckoutForm(street: 'ул. Пушкина', offerAccepted: true),
+      ),
+      act: (cubit) =>
+          cubit.submit(orderType: OrderType.delivery, lines: [_line]),
+      expect: () => <CheckoutState>[],
+      verify: (_) => verifyNever(() => repository.createOrder(any())),
+    );
+  });
+
+  group('CheckoutForm: время получения (scheduledAt)', () {
+    final slot = DateTime(2026, 9, 11, 19, 30);
+
+    test('copyWith: scheduledAt: null сохраняет прежнее значение', () {
+      final form = CheckoutForm(scheduledAt: slot);
+      expect(form.copyWith(scheduledAt: null).scheduledAt, slot);
+    });
+
+    test('copyWith: clearScheduledAt сбрасывает время в null (ASAP)', () {
+      final form = CheckoutForm(scheduledAt: slot);
+      expect(form.copyWith(clearScheduledAt: true).scheduledAt, isNull);
+      expect(
+        form.copyWith(scheduledAt: slot, clearScheduledAt: true).scheduledAt,
+        isNull,
+      );
+    });
+
+    blocTest<CheckoutCubit, CheckoutState>(
+      'scheduledSelected фиксирует слот, asapSelected сбрасывает',
+      build: () => CheckoutCubit(
+        repository: repository,
+        paymentsRepository: FakeCustomerPaymentsRepository(
+          latency: Duration.zero,
+        ),
+      ),
+      act: (cubit) {
+        cubit.scheduledSelected(slot);
+        cubit.asapSelected();
+      },
+      expect: () => [
+        isA<CheckoutEditing>().having((s) => s.scheduledAt, 'scheduledAt', slot),
+        isA<CheckoutEditing>().having(
+          (s) => s.scheduledAt,
+          'scheduledAt',
+          isNull,
+        ),
+      ],
+    );
+
+    blocTest<CheckoutCubit, CheckoutState>(
+      'submit со слотом: scheduledFor уходит в запросе как ISO-8601 UTC',
+      build: () => CheckoutCubit(
+        repository: repository,
+        paymentsRepository: FakeCustomerPaymentsRepository(
+          latency: Duration.zero,
+        ),
+      ),
+      seed: () => CheckoutEditing(
+        form: CheckoutForm(offerAccepted: true, scheduledAt: slot),
+      ),
+      act: (cubit) async {
+        when(
+          () => repository.createOrder(any()),
+        ).thenAnswer((_) async => _successOrder);
+        await cubit.submit(orderType: OrderType.pickup, lines: [_line]);
+      },
+      verify: (_) {
+        final captured =
+            verify(() => repository.createOrder(captureAny())).captured.single
+                as CreateOrderRequest;
+        expect(captured.scheduledFor, slot);
+        expect(
+          captured.toJson()['scheduledFor'],
+          slot.toUtc().toIso8601String(),
+        );
+      },
     );
   });
 }
