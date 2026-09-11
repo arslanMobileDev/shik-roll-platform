@@ -1,7 +1,7 @@
 ---
 id: ADR-001
 title: BLoC Checkout Resilience — аудит архитектурных ошибок
-status: proposed
+status: accepted
 date: 2026-09-10
 source: ai-router / ask_gemini (Gemini Flash)
 tags: [flutter, bloc, checkout, network-resilience, adr]
