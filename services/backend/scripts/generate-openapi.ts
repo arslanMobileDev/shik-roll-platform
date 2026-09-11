@@ -22,6 +22,7 @@ async function generate(): Promise<void> {
     .addTag('menu-items')
     .addTag('orders')
     .addTag('auth')
+    .addTag('uploads')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
