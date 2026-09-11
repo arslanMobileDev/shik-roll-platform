@@ -69,6 +69,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(
       const CreateOrderRequest(
+        brandId: '',
         branchId: '',
         orderType: OrderType.delivery,
         items: [],
@@ -91,7 +92,8 @@ void main() {
     blocTest<CheckoutCubit, CheckoutState>(
       'ONLINE uses paymentUrl from POST /orders and does not call /payments/create',
       build: buildCubit,
-      seed: () => const CheckoutState(offerAccepted: true),
+      seed: () =>
+          const CheckoutEditing(form: CheckoutForm(offerAccepted: true)),
       act: (cubit) async {
         when(
           () => orders.createOrder(any()),
@@ -99,15 +101,18 @@ void main() {
         await cubit.submit(orderType: OrderType.pickup, lines: [_line]);
       },
       expect: () => [
-        predicate<CheckoutState>(
-          (state) => state.status == CheckoutStatus.submitting,
-        ),
-        predicate<CheckoutState>(
-          (state) =>
-              state.status == CheckoutStatus.success &&
-              state.payment?.paymentUrl == _onlineOrder.paymentUrl &&
-              state.payment?.status == PaymentStatus.pending,
-        ),
+        isA<CheckoutSubmitting>(),
+        isA<CheckoutSuccess>()
+            .having(
+              (s) => s.payment?.paymentUrl,
+              'payment.paymentUrl',
+              _onlineOrder.paymentUrl,
+            )
+            .having(
+              (s) => s.payment?.status,
+              'payment.status',
+              PaymentStatus.pending,
+            ),
       ],
       verify: (_) {
         verifyNever(() => legacyPayments.createPayment(any()));
@@ -122,9 +127,11 @@ void main() {
     blocTest<CheckoutCubit, CheckoutState>(
       'ON_DELIVERY completes without a payment redirect',
       build: buildCubit,
-      seed: () => const CheckoutState(
-        offerAccepted: true,
-        paymentMethod: PaymentMethod.onDelivery,
+      seed: () => const CheckoutEditing(
+        form: CheckoutForm(
+          offerAccepted: true,
+          paymentMethod: PaymentMethod.onDelivery,
+        ),
       ),
       act: (cubit) async {
         when(
@@ -133,13 +140,8 @@ void main() {
         await cubit.submit(orderType: OrderType.pickup, lines: [_line]);
       },
       expect: () => [
-        predicate<CheckoutState>(
-          (state) => state.status == CheckoutStatus.submitting,
-        ),
-        predicate<CheckoutState>(
-          (state) =>
-              state.status == CheckoutStatus.success && state.payment == null,
-        ),
+        isA<CheckoutSubmitting>(),
+        isA<CheckoutSuccess>().having((s) => s.payment, 'payment', isNull),
       ],
       verify: (_) {
         final request =
@@ -153,7 +155,8 @@ void main() {
     blocTest<CheckoutCubit, CheckoutState>(
       'ONLINE without paymentUrl reports a checkout error',
       build: buildCubit,
-      seed: () => const CheckoutState(offerAccepted: true),
+      seed: () =>
+          const CheckoutEditing(form: CheckoutForm(offerAccepted: true)),
       act: (cubit) async {
         when(() => orders.createOrder(any())).thenAnswer(
           (_) async => const GuestOrder(
@@ -166,13 +169,11 @@ void main() {
         await cubit.submit(orderType: OrderType.pickup, lines: [_line]);
       },
       expect: () => [
-        predicate<CheckoutState>(
-          (state) => state.status == CheckoutStatus.submitting,
-        ),
-        predicate<CheckoutState>(
-          (state) =>
-              state.status == CheckoutStatus.failure &&
-              state.errorMessage?.contains('не вернул ссылку') == true,
+        isA<CheckoutSubmitting>(),
+        isA<CheckoutFailure>().having(
+          (s) => s.errorMessage,
+          'errorMessage',
+          contains('не вернул ссылку'),
         ),
       ],
     );
@@ -236,10 +237,10 @@ void main() {
               child: Scaffold(
                 body: CartScreen(
                   onGoToMenu: () {},
-                orderTrackingRepository: FakeOrderTrackingRepository(
-                  latency: Duration.zero,
-                  script: const ['NEW'],
-                ),
+                  orderTrackingRepository: FakeOrderTrackingRepository(
+                    latency: Duration.zero,
+                    script: const ['NEW'],
+                  ),
                   paymentUrlLauncher: (uri) async {
                     launched.add(uri);
                     return true;

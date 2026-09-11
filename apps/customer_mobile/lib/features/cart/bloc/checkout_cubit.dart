@@ -11,22 +11,16 @@ import '../data/create_order_request.dart';
 import '../data/guest_order.dart';
 import '../data/orders_repository.dart';
 
-enum CheckoutStatus { editing, submitting, success, failure }
-
-/// Checkout form state: address, comment, offer consent, payment method and
-/// the submission lifecycle. Validation rules live here (see
-/// [CheckoutState.canSubmit]); widgets only render and forward edits.
-final class CheckoutState extends Equatable {
-  const CheckoutState({
+/// Редактируемые поля формы чекаута: адрес, комментарий, согласие с офертой,
+/// способ оплаты и переключатель списания бонусов. Форма переживает смену фаз
+/// [CheckoutState] (ADR-001): после сетевой ошибки введённые данные не теряются.
+final class CheckoutForm extends Equatable {
+  const CheckoutForm({
     this.address = '',
     this.comment = '',
     this.offerAccepted = false,
     this.paymentMethod = PaymentMethod.online,
     this.bonusSpendEnabled = false,
-    this.status = CheckoutStatus.editing,
-    this.errorMessage,
-    this.placedOrder,
-    this.payment,
   });
 
   final String address;
@@ -40,50 +34,19 @@ final class CheckoutState extends Equatable {
   /// `useBonusPoints`, рассчитанным по балансу и лимиту 30% от чека.
   final bool bonusSpendEnabled;
 
-  final CheckoutStatus status;
-  final String? errorMessage;
-
-  /// Set for exactly one emission after a successful checkout; the screen
-  /// consumes it (navigation) and calls [CheckoutCubit.reset].
-  final GuestOrder? placedOrder;
-
-  /// Платёж ЮKassa, созданный вслед за заказом при оплате онлайн; `null` для
-  /// наличной/терминальной оплаты. Одноразовый, как [placedOrder].
-  final Payment? payment;
-
-  /// The «Оформить заказ» button is enabled only when the cart has lines,
-  /// the offer is accepted and — for delivery — the address is filled.
-  bool canSubmit({required OrderType orderType, required bool cartIsEmpty}) {
-    if (status == CheckoutStatus.submitting || cartIsEmpty || !offerAccepted) {
-      return false;
-    }
-    if (orderType == OrderType.delivery && address.trim().isEmpty) {
-      return false;
-    }
-    return true;
-  }
-
-  CheckoutState copyWith({
+  CheckoutForm copyWith({
     String? address,
     String? comment,
     bool? offerAccepted,
     PaymentMethod? paymentMethod,
     bool? bonusSpendEnabled,
-    CheckoutStatus? status,
-    String? errorMessage,
-    GuestOrder? placedOrder,
-    Payment? payment,
   }) {
-    return CheckoutState(
+    return CheckoutForm(
       address: address ?? this.address,
       comment: comment ?? this.comment,
       offerAccepted: offerAccepted ?? this.offerAccepted,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       bonusSpendEnabled: bonusSpendEnabled ?? this.bonusSpendEnabled,
-      status: status ?? this.status,
-      errorMessage: errorMessage ?? this.errorMessage,
-      placedOrder: placedOrder ?? this.placedOrder,
-      payment: payment ?? this.payment,
     );
   }
 
@@ -94,11 +57,78 @@ final class CheckoutState extends Equatable {
     offerAccepted,
     paymentMethod,
     bonusSpendEnabled,
-    status,
-    errorMessage,
-    placedOrder,
-    payment,
   ];
+}
+
+/// Фазы жизненного цикла чекаута (ADR-001, sealed вместо flat state):
+/// редактирование → отправка → успех | ошибка. Невозможные комбинации
+/// («лоадер поверх ошибки», «протухшая ошибка при retry») исключены на
+/// уровне компилятора; навигация и SnackBar — одноразовые эффекты через
+/// `BlocListener` на терминальные состояния, не часть формы.
+sealed class CheckoutState extends Equatable {
+  const CheckoutState({this.form = const CheckoutForm()});
+
+  final CheckoutForm form;
+
+  // Прокси к полям формы: виджеты читают их, не зная о [CheckoutForm].
+  String get address => form.address;
+  String get comment => form.comment;
+  bool get offerAccepted => form.offerAccepted;
+  PaymentMethod get paymentMethod => form.paymentMethod;
+  bool get bonusSpendEnabled => form.bonusSpendEnabled;
+
+  /// The «Оформить заказ» button is enabled only when the cart has lines,
+  /// the offer is accepted and — for delivery — the address is filled.
+  /// Пока идёт отправка ([CheckoutSubmitting]) повторный submit невозможен —
+  /// это и есть droppable-семантика защиты от double-tap (ADR-001).
+  bool canSubmit({required OrderType orderType, required bool cartIsEmpty}) {
+    if (this is CheckoutSubmitting || cartIsEmpty || !offerAccepted) {
+      return false;
+    }
+    if (orderType == OrderType.delivery && address.trim().isEmpty) {
+      return false;
+    }
+    return true;
+  }
+
+  @override
+  List<Object?> get props => [form];
+}
+
+/// Форма открыта и редактируется (начальная фаза и фаза после `reset`).
+final class CheckoutEditing extends CheckoutState {
+  const CheckoutEditing({super.form});
+}
+
+/// Заказ отправляется на сервер; UI показывает лоадер, кнопка заблокирована.
+final class CheckoutSubmitting extends CheckoutState {
+  const CheckoutSubmitting({super.form});
+}
+
+/// Заказ принят. Терминальная одноразовая фаза: экран потребляет её
+/// (навигация через `BlocListener`) и вызывает [CheckoutCubit.reset].
+final class CheckoutSuccess extends CheckoutState {
+  const CheckoutSuccess({super.form, required this.placedOrder, this.payment});
+
+  final GuestOrder placedOrder;
+
+  /// Платёж ЮKassa, созданный вслед за заказом при оплате онлайн; `null` для
+  /// наличной/терминальной оплаты (ON_DELIVERY → заказ NEW без редиректа).
+  final Payment? payment;
+
+  @override
+  List<Object?> get props => [form, placedOrder, payment];
+}
+
+/// Ошибка оформления. Форма сохранена в [form], гость может повторить
+/// отправку; сообщение показывается одноразовым SnackBar'ом в `BlocListener`.
+final class CheckoutFailure extends CheckoutState {
+  const CheckoutFailure({super.form, required this.errorMessage});
+
+  final String errorMessage;
+
+  @override
+  List<Object?> get props => [form, errorMessage];
 }
 
 /// Sends the guest order through [CustomerOrdersRepository]. For ONLINE
@@ -108,27 +138,31 @@ class CheckoutCubit extends Cubit<CheckoutState> {
   CheckoutCubit({
     required this._repository,
     required CustomerPaymentsRepository paymentsRepository,
-  }) : super(const CheckoutState());
+    String? brandId,
+    String? branchId,
+  }) : _brandId = brandId ?? AppConfig.defaultBrandId,
+       _branchId = branchId ?? AppConfig.defaultBranchId,
+       super(const CheckoutEditing());
 
   final CustomerOrdersRepository _repository;
+  final String _brandId;
+  final String _branchId;
 
   void addressChanged(String value) =>
-      emit(state.copyWith(address: value, status: CheckoutStatus.editing));
+      emit(CheckoutEditing(form: state.form.copyWith(address: value)));
 
   void commentChanged(String value) =>
-      emit(state.copyWith(comment: value, status: CheckoutStatus.editing));
+      emit(CheckoutEditing(form: state.form.copyWith(comment: value)));
 
-  void offerToggled(bool accepted) => emit(
-    state.copyWith(offerAccepted: accepted, status: CheckoutStatus.editing),
-  );
+  void offerToggled(bool accepted) =>
+      emit(CheckoutEditing(form: state.form.copyWith(offerAccepted: accepted)));
 
-  void paymentMethodSelected(PaymentMethod method) => emit(
-    state.copyWith(paymentMethod: method, status: CheckoutStatus.editing),
-  );
+  void paymentMethodSelected(PaymentMethod method) =>
+      emit(CheckoutEditing(form: state.form.copyWith(paymentMethod: method)));
 
   /// «Списать бонусы» переключатель корзины (ADR-1614).
   void bonusSpendToggled(bool enabled) => emit(
-    state.copyWith(bonusSpendEnabled: enabled, status: CheckoutStatus.editing),
+    CheckoutEditing(form: state.form.copyWith(bonusSpendEnabled: enabled)),
   );
 
   Future<void> submit({
@@ -140,20 +174,16 @@ class CheckoutCubit extends Cubit<CheckoutState> {
     /// переключатель списания выключен. Сервер повторно проверяет лимит.
     int bonusPoints = 0,
   }) async {
+    // Guard от double-tap (ADR-001): в Cubit нет event transformers, поэтому
+    // droppable-семантика реализована синхронной проверкой — повторный вызов
+    // до завершения текущего (state is CheckoutSubmitting) отбрасывается до
+    // первого await, race condition в однопоточном event loop исключён.
     if (!state.canSubmit(orderType: orderType, cartIsEmpty: lines.isEmpty)) {
       return;
     }
-    // Fresh state: clears a previous error and the consumed placedOrder.
-    emit(
-      CheckoutState(
-        address: state.address,
-        comment: state.comment,
-        offerAccepted: state.offerAccepted,
-        paymentMethod: state.paymentMethod,
-        bonusSpendEnabled: state.bonusSpendEnabled,
-        status: CheckoutStatus.submitting,
-      ),
-    );
+    // Свежая фаза submitting: предыдущая ошибка и consumed-success
+    // уничтожаются сменой типа состояния, протухших полей не остаётся.
+    emit(CheckoutSubmitting(form: state.form));
     try {
       final order = await _repository.createOrder(
         _buildRequest(orderType, lines, bonusPoints),
@@ -162,21 +192,15 @@ class CheckoutCubit extends Cubit<CheckoutState> {
           ? _paymentFromOrder(order)
           : null;
       emit(
-        state.copyWith(
-          status: CheckoutStatus.success,
-          placedOrder: order,
-          payment: payment,
-        ),
+        CheckoutSuccess(form: state.form, placedOrder: order, payment: payment),
       );
     } on OrdersException catch (e) {
-      emit(
-        state.copyWith(status: CheckoutStatus.failure, errorMessage: e.message),
-      );
+      emit(CheckoutFailure(form: state.form, errorMessage: e.message));
     }
   }
 
   /// Back to a blank form after the success was consumed.
-  void reset() => emit(const CheckoutState());
+  void reset() => emit(const CheckoutEditing());
 
   CreateOrderRequest _buildRequest(
     OrderType orderType,
@@ -186,7 +210,8 @@ class CheckoutCubit extends Cubit<CheckoutState> {
     final address = state.address.trim();
     final comment = state.comment.trim();
     return CreateOrderRequest(
-      branchId: AppConfig.defaultBranchId,
+      brandId: _brandId,
+      branchId: _branchId,
       orderType: orderType,
       paymentMethod: state.paymentMethod,
       deliveryAddress: orderType == OrderType.delivery ? address : null,

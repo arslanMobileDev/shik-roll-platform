@@ -31,6 +31,7 @@ class MenuBloc extends Bloc<MenuEvent, MenuState> {
       state.copyWith(
         status: MenuStatus.loading,
         selectedCategoryId: event.categoryId,
+        clearCategory: event.categoryId == null,
       ),
     );
     await _load(emit, keepCategories: true);
@@ -49,8 +50,7 @@ class MenuBloc extends Bloc<MenuEvent, MenuState> {
     bool keepCategories = false,
   }) async {
     try {
-      final categories =
-          keepCategories && state.categories.isNotEmpty
+      final categories = keepCategories && state.categories.isNotEmpty
           ? state.categories
           : (await _repository.getCategories()).data
                 .where((c) => c.isActive)

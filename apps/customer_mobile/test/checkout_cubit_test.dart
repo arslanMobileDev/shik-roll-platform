@@ -43,6 +43,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(
       const CreateOrderRequest(
+        brandId: '',
         branchId: '',
         orderType: OrderType.delivery,
         items: [],
@@ -59,12 +60,15 @@ void main() {
       'успешный submit: submitting → success с реальным номером заказа',
       build: () => CheckoutCubit(
         repository: repository,
+        brandId: 'brand-test',
+        branchId: 'branch-test',
         paymentsRepository: FakeCustomerPaymentsRepository(
           latency: Duration.zero,
         ),
       ),
-      seed: () =>
-          const CheckoutState(address: 'ул. Пушкина, 10', offerAccepted: true),
+      seed: () => const CheckoutEditing(
+        form: CheckoutForm(address: 'ул. Пушкина, 10', offerAccepted: true),
+      ),
       act: (cubit) async {
         when(
           () => repository.createOrder(any()),
@@ -72,11 +76,11 @@ void main() {
         await cubit.submit(orderType: OrderType.delivery, lines: [_line]);
       },
       expect: () => [
-        predicate<CheckoutState>((s) => s.status == CheckoutStatus.submitting),
-        predicate<CheckoutState>(
-          (s) =>
-              s.status == CheckoutStatus.success &&
-              s.placedOrder?.orderNumber == '5551',
+        isA<CheckoutSubmitting>(),
+        isA<CheckoutSuccess>().having(
+          (s) => s.placedOrder.orderNumber,
+          'placedOrder.orderNumber',
+          '5551',
         ),
       ],
     );
@@ -85,14 +89,18 @@ void main() {
       'submit отправляет запрос по контракту: филиал, тип, адрес, позиции',
       build: () => CheckoutCubit(
         repository: repository,
+        brandId: 'brand-test',
+        branchId: 'branch-test',
         paymentsRepository: FakeCustomerPaymentsRepository(
           latency: Duration.zero,
         ),
       ),
-      seed: () => const CheckoutState(
-        address: 'ул. Пушкина, 10',
-        comment: 'Без лука',
-        offerAccepted: true,
+      seed: () => const CheckoutEditing(
+        form: CheckoutForm(
+          address: 'ул. Пушкина, 10',
+          comment: 'Без лука',
+          offerAccepted: true,
+        ),
       ),
       act: (cubit) async {
         when(
@@ -101,13 +109,14 @@ void main() {
         await cubit.submit(orderType: OrderType.delivery, lines: [_line]);
       },
       verify: (cubit) {
-        expect(cubit.state.status, CheckoutStatus.success);
+        expect(cubit.state, isA<CheckoutSuccess>());
         final captured =
             verify(() => repository.createOrder(captureAny())).captured.single
                 as CreateOrderRequest;
         expect(captured.orderType, OrderType.delivery);
         expect(captured.deliveryAddress, 'ул. Пушкина, 10');
-        expect(captured.branchId, isNotEmpty);
+        expect(captured.brandId, 'brand-test');
+        expect(captured.branchId, 'branch-test');
         expect(captured.comment, 'Без лука');
         expect(captured.items.single.menuItemId, 'item-lemonade');
         expect(captured.items.single.quantity, 1);
@@ -123,8 +132,9 @@ void main() {
           latency: Duration.zero,
         ),
       ),
-      seed: () =>
-          const CheckoutState(address: 'ул. Пушкина, 10', offerAccepted: true),
+      seed: () => const CheckoutEditing(
+        form: CheckoutForm(address: 'ул. Пушкина, 10', offerAccepted: true),
+      ),
       act: (cubit) async {
         when(() => repository.createOrder(any())).thenThrow(
           const OrdersException(
@@ -134,15 +144,15 @@ void main() {
         await cubit.submit(orderType: OrderType.delivery, lines: [_line]);
       },
       expect: () => [
-        predicate<CheckoutState>((s) => s.status == CheckoutStatus.submitting),
-        predicate<CheckoutState>(
-          (s) =>
-              s.status == CheckoutStatus.failure &&
-              s.errorMessage ==
-                  'Нет соединения с сервером. Проверьте интернет и попробуйте ещё раз.' &&
-              s.address == 'ул. Пушкина, 10' &&
-              s.offerAccepted,
-        ),
+        isA<CheckoutSubmitting>(),
+        isA<CheckoutFailure>()
+            .having(
+              (s) => s.errorMessage,
+              'errorMessage',
+              'Нет соединения с сервером. Проверьте интернет и попробуйте ещё раз.',
+            )
+            .having((s) => s.address, 'address', 'ул. Пушкина, 10')
+            .having((s) => s.offerAccepted, 'offerAccepted', isTrue),
       ],
     );
 
@@ -154,7 +164,8 @@ void main() {
           latency: Duration.zero,
         ),
       ),
-      seed: () => const CheckoutState(address: 'ул. Пушкина, 10'),
+      seed: () =>
+          const CheckoutEditing(form: CheckoutForm(address: 'ул. Пушкина, 10')),
       act: (cubit) =>
           cubit.submit(orderType: OrderType.delivery, lines: [_line]),
       expect: () => <CheckoutState>[],
@@ -169,7 +180,8 @@ void main() {
           latency: Duration.zero,
         ),
       ),
-      seed: () => const CheckoutState(offerAccepted: true),
+      seed: () =>
+          const CheckoutEditing(form: CheckoutForm(offerAccepted: true)),
       act: (cubit) =>
           cubit.submit(orderType: OrderType.delivery, lines: [_line]),
       expect: () => <CheckoutState>[],
@@ -184,7 +196,8 @@ void main() {
           latency: Duration.zero,
         ),
       ),
-      seed: () => const CheckoutState(offerAccepted: true),
+      seed: () =>
+          const CheckoutEditing(form: CheckoutForm(offerAccepted: true)),
       act: (cubit) async {
         when(
           () => repository.createOrder(any()),
@@ -192,13 +205,39 @@ void main() {
         await cubit.submit(orderType: OrderType.pickup, lines: [_line]);
       },
       verify: (cubit) {
-        expect(cubit.state.status, CheckoutStatus.success);
+        expect(cubit.state, isA<CheckoutSuccess>());
         final captured =
             verify(() => repository.createOrder(captureAny())).captured.single
                 as CreateOrderRequest;
         expect(captured.deliveryAddress, isNull);
         expect(captured.orderType, OrderType.pickup);
       },
+    );
+
+    blocTest<CheckoutCubit, CheckoutState>(
+      'double-tap: повторный submit во время отправки игнорируется, '
+      'заказ создаётся один раз (ADR-001)',
+      build: () => CheckoutCubit(
+        repository: repository,
+        paymentsRepository: FakeCustomerPaymentsRepository(
+          latency: Duration.zero,
+        ),
+      ),
+      seed: () =>
+          const CheckoutEditing(form: CheckoutForm(offerAccepted: true)),
+      act: (cubit) async {
+        when(() => repository.createOrder(any())).thenAnswer((_) async {
+          // Медленная сеть: второй тап прилетает, пока первый заказ в полёте.
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          return _successOrder;
+        });
+        await Future.wait([
+          cubit.submit(orderType: OrderType.pickup, lines: [_line]),
+          cubit.submit(orderType: OrderType.pickup, lines: [_line]),
+        ]);
+      },
+      expect: () => [isA<CheckoutSubmitting>(), isA<CheckoutSuccess>()],
+      verify: (_) => verify(() => repository.createOrder(any())).called(1),
     );
   });
 }

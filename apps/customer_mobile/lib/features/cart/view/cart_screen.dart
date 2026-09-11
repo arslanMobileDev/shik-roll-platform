@@ -21,7 +21,8 @@ import '../bloc/cart_event.dart';
 import '../bloc/cart_state.dart';
 import '../bloc/checkout_cubit.dart';
 import '../bloc/customer_cart_bloc.dart';
-import '../data/cart_line.dart';
+import 'widgets/cart_empty_view.dart';
+import 'widgets/cart_item_tile.dart';
 
 /// Guest cart tab: positions with modifiers, delivery/pickup switch,
 /// address & comment, offer consent and the checkout button.
@@ -40,13 +41,13 @@ class CartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Одноразовые эффекты (ADR-001): навигация и SnackBar реагируют только на
+    // смену фазы; редактирование формы внутри одной фазы listener не будит.
     return BlocListener<CheckoutCubit, CheckoutState>(
-      listenWhen: (previous, next) => previous.status != next.status,
+      listenWhen: (previous, next) => previous.runtimeType != next.runtimeType,
       listener: (context, state) {
-        switch (state.status) {
-          case CheckoutStatus.success:
-            final order = state.placedOrder!;
-            final payment = state.payment;
+        switch (state) {
+          case CheckoutSuccess(:final placedOrder, :final payment):
             final cart = context.read<CustomerCartBloc>().state;
             final loyaltyCubit = context.read<LoyaltyCubit>();
             final orderType = context.read<OrderTypeCubit>().state;
@@ -56,7 +57,7 @@ class CartScreen extends StatelessWidget {
               MaterialPageRoute<void>(
                 builder: (_) => payment != null
                     ? PaymentStatusScreen(
-                        order: order,
+                        order: placedOrder,
                         payment: payment,
                         trackingRepository: orderTrackingRepository,
                         loyaltyCubit: loyaltyCubit,
@@ -64,8 +65,8 @@ class CartScreen extends StatelessWidget {
                         urlLauncher: paymentUrlLauncher,
                       )
                     : OrderTrackingScreen(
-                        orderId: order.id,
-                        orderNumber: order.orderNumber,
+                        orderId: placedOrder.id,
+                        orderNumber: placedOrder.orderNumber,
                         trackingRepository: orderTrackingRepository,
                         deliveryAddress: orderType == OrderType.delivery
                             ? state.address.trim()
@@ -83,63 +84,19 @@ class CartScreen extends StatelessWidget {
                       ),
               ),
             );
-          case CheckoutStatus.failure:
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  state.errorMessage ?? 'Не удалось оформить заказ',
-                ),
-              ),
-            );
-          case CheckoutStatus.editing || CheckoutStatus.submitting:
+          case CheckoutFailure(:final errorMessage):
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(errorMessage)));
+          case CheckoutEditing() || CheckoutSubmitting():
             break;
         }
       },
       child: BlocBuilder<CustomerCartBloc, CartState>(
         builder: (context, cart) {
-          if (cart.isEmpty) return _EmptyCart(onGoToMenu: onGoToMenu);
+          if (cart.isEmpty) return CartEmptyView(onGoToMenu: onGoToMenu);
           return _CartContent(cart: cart);
         },
-      ),
-    );
-  }
-}
-
-class _EmptyCart extends StatelessWidget {
-  const _EmptyCart({required this.onGoToMenu});
-
-  final VoidCallback onGoToMenu;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return SafeArea(
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.shopping_cart_outlined,
-              size: 48,
-              color: AppColors.gray400,
-            ),
-            const SizedBox(height: AppSpacing.s12),
-            Text('Корзина пуста', style: theme.textTheme.titleMedium),
-            const SizedBox(height: AppSpacing.s4),
-            Text(
-              'Добавьте блюда из меню',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppColors.gray600,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.s16),
-            FilledButton.tonal(
-              key: const ValueKey('go-to-menu-button'),
-              onPressed: onGoToMenu,
-              child: const Text('Перейти к меню'),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -156,7 +113,7 @@ class _CartContent extends StatelessWidget {
     final orderType = context.watch<OrderTypeCubit>().state;
     final checkout = context.watch<CheckoutCubit>().state;
     final loyalty = context.watch<LoyaltyCubit>().state;
-    final submitting = checkout.status == CheckoutStatus.submitting;
+    final submitting = checkout is CheckoutSubmitting;
     final canSubmit = checkout.canSubmit(
       orderType: orderType,
       cartIsEmpty: cart.isEmpty,
@@ -177,7 +134,7 @@ class _CartContent extends StatelessWidget {
                 const SizedBox(height: AppSpacing.s8),
                 Text('Корзина', style: theme.textTheme.headlineSmall),
                 const SizedBox(height: AppSpacing.s12),
-                for (final line in cart.lines) _CartLineTile(line: line),
+                for (final line in cart.lines) CartItemTile(line: line),
                 const SizedBox(height: AppSpacing.s8),
                 Text('Способ получения', style: theme.textTheme.titleSmall),
                 const SizedBox(height: AppSpacing.s8),
@@ -220,92 +177,6 @@ class _CartContent extends StatelessWidget {
             submitting: submitting,
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CartLineTile extends StatelessWidget {
-  const _CartLineTile({required this.line});
-
-  final CartLine line;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cartBloc = context.read<CustomerCartBloc>();
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.s8),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.s12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(line.item.name, style: theme.textTheme.titleSmall),
-                      if (line.modifiers.isNotEmpty) ...[
-                        const SizedBox(height: AppSpacing.s4),
-                        Text(
-                          line.modifiersLabel,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppColors.gray600,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: AppSpacing.s4),
-                      Text(
-                        '${line.unitPrice.format()} / шт',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppColors.gray600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.s8),
-                Text(line.total.format(), style: theme.textTheme.titleSmall),
-              ],
-            ),
-            Row(
-              children: [
-                IconButton(
-                  key: ValueKey('qty-minus-${line.id}'),
-                  onPressed: () => cartBloc.add(
-                    CartLineQuantityChanged(lineId: line.id, delta: -1),
-                  ),
-                  icon: const Icon(Icons.remove_circle_outline),
-                  tooltip: 'Убавить',
-                ),
-                Text('${line.quantity}', style: theme.textTheme.titleSmall),
-                IconButton(
-                  key: ValueKey('qty-plus-${line.id}'),
-                  onPressed: () => cartBloc.add(
-                    CartLineQuantityChanged(lineId: line.id, delta: 1),
-                  ),
-                  icon: const Icon(Icons.add_circle_outline),
-                  tooltip: 'Прибавить',
-                ),
-                const Spacer(),
-                IconButton(
-                  key: ValueKey('remove-${line.id}'),
-                  onPressed: () =>
-                      cartBloc.add(CartLineRemoved(lineId: line.id)),
-                  icon: const Icon(
-                    Icons.delete_outline,
-                    color: AppColors.gray600,
-                  ),
-                  tooltip: 'Удалить',
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

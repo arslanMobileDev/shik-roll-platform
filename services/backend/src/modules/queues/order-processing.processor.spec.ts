@@ -73,16 +73,14 @@ describe('OrderProcessingProcessor — send-to-kitchen', () => {
     expect(prisma.orderStatusHistory.create).not.toHaveBeenCalled();
   });
 
-  it('supports the legacy paid-order transition only when explicitly enabled', async () => {
+  it('does not restore transitions when a legacy flag is set', async () => {
     process.env.ORDER_AUTO_STATUS_ADVANCE_ENABLED = 'true';
     prisma.order.findFirst.mockResolvedValue({ status: OrderStatus.CONFIRMED });
 
     await processor.process(job());
 
-    expect(prisma.order.update).toHaveBeenCalledWith({
-      where: { id: ORDER_ID },
-      data: { status: OrderStatus.COOKING, version: { increment: 1 } },
-    });
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.orderStatusHistory.create).not.toHaveBeenCalled();
   });
 
   it.each([

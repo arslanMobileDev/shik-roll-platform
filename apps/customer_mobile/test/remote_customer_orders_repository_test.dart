@@ -11,6 +11,7 @@ import 'package:mocktail/mocktail.dart';
 class _MockDio extends Mock implements Dio {}
 
 const _request = CreateOrderRequest(
+  brandId: 'brand-1',
   branchId: 'branch-1',
   orderType: OrderType.delivery,
   paymentMethod: PaymentMethod.online,

@@ -19,6 +19,7 @@ extension OrderTypeWire on OrderType {
 /// extended with [deliveryAddress].
 final class CreateOrderRequest extends Equatable {
   const CreateOrderRequest({
+    required this.brandId,
     required this.branchId,
     required this.orderType,
     required this.items,
@@ -28,6 +29,7 @@ final class CreateOrderRequest extends Equatable {
     this.useBonusPoints = 0,
   });
 
+  final String brandId;
   final String branchId;
   final OrderType orderType;
   final List<OrderItemRequest> items;
@@ -43,7 +45,7 @@ final class CreateOrderRequest extends Equatable {
 
   Map<String, dynamic> toJson() => {
     'branchId': branchId,
-    'brandId': '37b84f4c-0a70-4263-bfa0-cc04ba0d4b99',
+    'brandId': brandId,
     'type': orderType.wireName,
     'paymentMethod': paymentMethod.wireName,
     if (deliveryAddress != null && deliveryAddress!.isNotEmpty)
@@ -55,6 +57,7 @@ final class CreateOrderRequest extends Equatable {
 
   @override
   List<Object?> get props => [
+    brandId,
     branchId,
     orderType,
     items,

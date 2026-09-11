@@ -15,7 +15,7 @@ import '../features/shift/data/fake_cook_shift_repository.dart';
 
 final GetIt getIt = GetIt.instance;
 
-bool get _demoMode => KdsConfig.apiBaseUrl.isEmpty;
+bool get _demoMode => KdsConfig.allowMocks;
 
 /// Registers app-level dependencies (ADR-1618 graph).
 ///
@@ -25,6 +25,7 @@ bool get _demoMode => KdsConfig.apiBaseUrl.isEmpty;
 /// Demo (`API_BASE_URL` empty): fake auth (PIN `0000`), in-memory board,
 /// silent stream — no network at all.
 void setupInjection() {
+  KdsConfig.validate();
   if (!getIt.isRegistered<KitchenSessionStore>()) {
     getIt.registerLazySingleton<KitchenSessionStore>(KitchenSessionStore.new);
   }

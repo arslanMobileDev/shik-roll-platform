@@ -30,7 +30,8 @@ class CustomerCartBloc extends Bloc<CartEvent, CartState> {
     } else {
       lines.add(line);
     }
-    emit(CartState(lines: lines));
+    // Успешная мутация сохраняет deliveryFee и сбрасывает устаревшую ошибку.
+    emit(state.copyWith(lines: lines, clearError: true));
   }
 
   void _onQuantityChanged(
@@ -46,16 +47,17 @@ class CustomerCartBloc extends Bloc<CartEvent, CartState> {
     } else {
       lines[index] = lines[index].copyWith(quantity: next);
     }
-    emit(CartState(lines: lines));
+    emit(state.copyWith(lines: lines, clearError: true));
   }
 
   void _onLineRemoved(CartLineRemoved event, Emitter<CartState> emit) {
     emit(
-      CartState(
+      state.copyWith(
         lines: [
           for (final line in state.lines)
             if (line.id != event.lineId) line,
         ],
+        clearError: true,
       ),
     );
   }

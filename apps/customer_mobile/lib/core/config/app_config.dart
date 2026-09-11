@@ -1,17 +1,15 @@
+import 'package:flutter/foundation.dart';
+
 /// Runtime configuration for the guest app.
 abstract final class AppConfig {
-  /// Base URL of the Menu & Product API (API-706). Passed via
-  /// `--dart-define=API_BASE_URL=https://…`; when absent the app falls back
-  /// to the in-memory demo menu ([FakeCustomerMenuRepository]).
+  /// Base URL of the production API, supplied through `--dart-define`.
   static const String apiBaseUrl = String.fromEnvironment('API_BASE_URL');
-
-  static bool get useRemoteMenu => apiBaseUrl.isNotEmpty;
 
   /// Branch the guest order is routed to. Passed via
   /// `--dart-define=BRANCH_ID=…`; the demo value matches the seeded dev data.
   static const String defaultBranchId = String.fromEnvironment(
     'BRANCH_ID',
-    defaultValue: 'branch-demo',
+    defaultValue: '',
   );
 
   /// Brand whose promotion feed is loaded (ADR-1614, `GET /promotions/feed`).
@@ -19,6 +17,19 @@ abstract final class AppConfig {
   /// SHIK ROLL brand.
   static const String defaultBrandId = String.fromEnvironment(
     'BRAND_ID',
-    defaultValue: '37b84f4c-0a70-4263-bfa0-cc04ba0d4b99',
+    defaultValue: '',
   );
+
+  static void validate() {
+    final apiUri = Uri.tryParse(apiBaseUrl);
+    if (apiUri == null || !apiUri.hasScheme || apiUri.host.isEmpty) {
+      throw StateError('API_BASE_URL is required');
+    }
+    if (kReleaseMode && apiUri.scheme != 'https') {
+      throw StateError('Release API_BASE_URL must use HTTPS');
+    }
+    if (defaultBranchId.isEmpty || defaultBrandId.isEmpty) {
+      throw StateError('BRANCH_ID and BRAND_ID are required');
+    }
+  }
 }

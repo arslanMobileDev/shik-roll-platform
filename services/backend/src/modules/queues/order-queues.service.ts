@@ -13,7 +13,7 @@ export interface ProcessOrderJobData {
  * Background processing of orders (BE-902: background work goes to BullMQ,
  * never inline in the request path). The 'order-processing' queue handles:
  * server-side totals recalculation and stop-list verification. Legacy
- * automatic status timers are opt-in via ORDER_AUTO_STATUS_ADVANCE_ENABLED.
+ * status transitions are never performed by this queue.
  */
 @Injectable()
 export class OrderQueuesService {
@@ -40,8 +40,8 @@ export class OrderQueuesService {
   }
 
   /**
-   * Dispatch a paid order to the kitchen. In manual mode the worker records
-   * the dispatch without advancing the status; the cook starts work through
+   * Notify the worker that a paid order is available. The worker records the
+   * dispatch without advancing the status; the cook starts work through
    * PATCH /orders/:id/status. jobId keeps repeated webhooks idempotent.
    */
   async sendToKitchen(orderId: string): Promise<void> {
