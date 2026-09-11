@@ -24,13 +24,16 @@ final class MenuState extends Equatable {
     List<Category>? categories,
     List<MenuItem>? items,
     String? selectedCategoryId,
+    bool clearCategory = false,
     String? errorMessage,
   }) {
     return MenuState(
       status: status ?? this.status,
       categories: categories ?? this.categories,
       items: items ?? this.items,
-      selectedCategoryId: selectedCategoryId ?? this.selectedCategoryId,
+      selectedCategoryId: clearCategory
+          ? null
+          : (selectedCategoryId ?? this.selectedCategoryId),
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
