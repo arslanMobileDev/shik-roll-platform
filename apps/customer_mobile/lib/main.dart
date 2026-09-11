@@ -1,3 +1,5 @@
+import 'package:get_it/get_it.dart';
+import 'features/restaurant_contact/restaurant_contact_di.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -72,6 +74,13 @@ Future<void> main() async {
   // Локальные UI-настройки гостя (ADR-1616).
   final userSettingsRepository = SharedPreferencesUserSettingsRepository(
     await SharedPreferences.getInstance(),
+  );
+
+  registerRestaurantContacts(
+    locator: GetIt.instance,
+    client: ApiClient(baseUrl: AppConfig.apiBaseUrl),
+    tokens: tokenProvider,
+    preferences: await SharedPreferences.getInstance(),
   );
 
   runApp(

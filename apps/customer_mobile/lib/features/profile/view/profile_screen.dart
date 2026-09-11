@@ -1,3 +1,4 @@
+import '../../restaurant_contact/presentation/restaurant_contact_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -36,6 +37,16 @@ class ProfileScreen extends StatelessWidget {
               // Стиль доставки — UI-предпочтение, не привязано к аккаунту
               // и доступно также анонимному гостю (ADR-1616).
               const DeliveryStyleSection(),
+              const SizedBox(height: AppSpacing.s16),
+              Card(
+                child: ListTile(
+                  key: const ValueKey('restaurant-contact-profile'),
+                  leading: const Icon(Icons.headset_mic_outlined),
+                  title: const Text('Связаться с рестораном'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => showRestaurantContactSheet(context),
+                ),
+              ),
               const SizedBox(height: AppSpacing.s16),
               const _LegalSection(),
               if (state.isAuthenticated) ...[

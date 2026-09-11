@@ -1,3 +1,5 @@
+import '../../../restaurant_contact/domain/restaurant_contacts.dart';
+import '../../../restaurant_contact/presentation/restaurant_contact_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -123,7 +125,7 @@ class OrderTrackingScreen extends StatelessWidget {
                       ),
 
                     // 5. Кнопка связи с поддержкой
-                    const _SupportButton(),
+                    _SupportButton(orderId: orderId),
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -454,7 +456,8 @@ class _BonusEarnCard extends StatelessWidget {
 }
 
 class _SupportButton extends StatelessWidget {
-  const _SupportButton();
+  const _SupportButton({required this.orderId});
+  final String orderId;
 
   @override
   Widget build(BuildContext context) {
@@ -462,7 +465,9 @@ class _SupportButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(20),
       child: OutlinedButton.icon(
-        onPressed: () {},
+        onPressed: () => showRestaurantContactSheet(
+          context, target: ContactTarget.order(orderId),
+        ),
         icon: const Icon(Icons.headset_mic_rounded, color: brandOrange),
         label: const Text(
           'Связаться с рестораном',
