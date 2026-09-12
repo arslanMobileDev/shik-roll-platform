@@ -1,22 +1,33 @@
-import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { InjectQueue, OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { Injectable, Logger } from '@nestjs/common';
 import { OrderStatus, Prisma } from '@prisma/client';
-import { Job } from 'bullmq';
+import { Job, Queue } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
-import { LoyaltyService } from '../loyalty/loyalty.service';
 import { lineTotal, orderSubtotal, orderTotal } from '../orders/domain/order-pricing';
-import { KitchenEventsService } from '../kitchen/kitchen-events.service';
-import {
-  ORDER_PROCESSING_QUEUE,
-  ProcessOrderJobData,
-  SEND_TO_KITCHEN_JOB,
-} from './order-queues.service';
+import { canTransition } from '../orders/domain/order-status-machine';
+import { ORDER_PROCESSING_QUEUE, ProcessOrderJobData } from './order-queues.service';
+
+const STATUS_TIMER_JOB = 'status-timer';
+
+export interface StatusTimerJobData {
+  orderId: string;
+  to: OrderStatus;
+}
+
+/**
+ * Timer emulation for the order lifecycle (dev harness): after background
+ * processing confirms an order, COOKING and READY follow on delays.
+ * Overridable via env for tests/dev.
+ */
+const STATUS_TIMER_DELAYS_MS: ReadonlyArray<{ to: OrderStatus; delayMs: number }> = [
+  { to: OrderStatus.COOKING, delayMs: Number(process.env.ORDER_TIMER_COOKING_MS ?? 30_000) },
+  { to: OrderStatus.READY, delayMs: Number(process.env.ORDER_TIMER_READY_MS ?? 90_000) },
+];
 
 /**
  * 'order-processing' worker: server-side totals recalculation, stop-list
- * verification. It never advances kitchen or courier statuses. Retry
- * strategy comes from the queue defaults (3 attempts, exponential backoff
- * from 1s) — BullMQ re-runs
+ * verification and emulated status timers. Retry strategy comes from the
+ * queue defaults (3 attempts, exponential backoff from 1s) — BullMQ re-runs
  * the job on throw, and the failed handler logs terminal failures.
  */
 @Injectable()
@@ -26,24 +37,19 @@ export class OrderProcessingProcessor extends WorkerHost {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly loyalty: LoyaltyService,
-    @Optional() private readonly kitchenEvents?: KitchenEventsService,
+    @InjectQueue(ORDER_PROCESSING_QUEUE)
+    private readonly queue: Queue<ProcessOrderJobData | StatusTimerJobData>,
   ) {
     super();
   }
 
-  async process(job: Job<ProcessOrderJobData>): Promise<void> {
+  async process(job: Job<ProcessOrderJobData | StatusTimerJobData>): Promise<void> {
     switch (job.name) {
       case 'process-order':
         await this.processOrder(job as Job<ProcessOrderJobData>);
         return;
-      case SEND_TO_KITCHEN_JOB:
-        // Backward-compatible drain for jobs queued by older releases. The
-        // paid order is already published to KDS by PaymentsService; workers
-        // must never change its status.
-        this.logger.log(
-          `send-to-kitchen: order ${job.data.orderId} awaits a cook action`,
-        );
+      case STATUS_TIMER_JOB:
+        await this.advanceStatus(job as Job<StatusTimerJobData>);
         return;
       default:
         this.logger.warn(`Unknown job name: ${job.name}`);
@@ -104,9 +110,7 @@ export class OrderProcessingProcessor extends WorkerHost {
       })),
     }));
     const subtotal = orderSubtotal(pricedItems);
-    // The payable total keeps the checkout bonus discount (ADR-1614):
-    // recalculation must never give back the points already spent.
-    const total = orderTotal(subtotal.minus(order.bonusDiscountAmount));
+    const total = orderTotal(subtotal);
 
     await this.prisma.$transaction([
       ...order.items.map((item, index) =>
@@ -121,7 +125,40 @@ export class OrderProcessingProcessor extends WorkerHost {
       }),
     ]);
 
-    this.logger.log(`process-order: order ${orderId} validated; status unchanged`);
+    // 3. Confirm the order and schedule the emulated lifecycle timers.
+    if (order.status === OrderStatus.NEW) {
+      await this.transitionWithHistory(orderId, OrderStatus.NEW, OrderStatus.CONFIRMED, {
+        reason: 'AUTO_CONFIRM',
+      });
+      for (const step of STATUS_TIMER_DELAYS_MS) {
+        await this.queue.add(
+          STATUS_TIMER_JOB,
+          { orderId, to: step.to },
+          { delay: step.delayMs, jobId: `status-timer-${orderId}-${step.to}` },
+        );
+      }
+    }
+  }
+
+  private async advanceStatus(job: Job<StatusTimerJobData>): Promise<void> {
+    const { orderId, to } = job.data;
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, deletedAt: null },
+      select: { status: true },
+    });
+    if (!order) {
+      this.logger.warn(`status-timer: order ${orderId} not found, skipping`);
+      return;
+    }
+    // Timer emulation must never break the state machine: skip transitions
+    // that no longer apply (e.g. the operator already moved or cancelled).
+    if (!canTransition(order.status, to)) {
+      this.logger.log(
+        `status-timer: skipping ${order.status} -> ${to} for order ${orderId} (not allowed)`,
+      );
+      return;
+    }
+    await this.transitionWithHistory(orderId, order.status, to, { reason: 'AUTO_TIMER' });
   }
 
   private async transitionWithHistory(
@@ -151,15 +188,5 @@ export class OrderProcessingProcessor extends WorkerHost {
       }),
     ]);
     this.logger.log(`Order ${orderId}: ${from} -> ${to} (${options.reason ?? 'n/a'})`);
-    await this.kitchenEvents?.publishOrderChanged(orderId);
-
-    // Loyalty (ADR-1614): a worker-driven terminal transition follows the same
-    // rules as the operator path — COMPLETED accrues cashback, CANCELLED
-    // (e.g. stop-listed checkout) refunds the spent points. Idempotent.
-    if (to === OrderStatus.COMPLETED) {
-      await this.loyalty.earnCashback(orderId);
-    } else if (to === OrderStatus.CANCELLED) {
-      await this.loyalty.refundOnCancel(orderId);
-    }
   }
 }
