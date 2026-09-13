@@ -299,6 +299,68 @@ describe('KitchenService', () => {
       expect(result).not.toHaveProperty('deliveryAddress');
     });
 
+    it('stamps confirmedAt when COOKING starts from NEW (ADR-1618)', async () => {
+      // ON_DELIVERY orders skip the explicit CONFIRMED step on the kitchen
+      // board: the operator starts cooking straight from NEW. The data
+      // contract still requires confirmedAt to be written.
+      prisma.order.findFirst.mockResolvedValue(
+        boardOrder({ status: OrderStatus.NEW, confirmedAt: null }),
+      );
+      prisma.order.updateMany.mockResolvedValue({ count: 1 });
+      prisma.order.findUniqueOrThrow.mockResolvedValue(
+        boardOrder({
+          status: OrderStatus.COOKING,
+          version: 4,
+          cookingStartedAt: new Date('2026-09-08T10:05:00.000Z'),
+          confirmedAt: new Date('2026-09-08T10:05:00.000Z'),
+        }),
+      );
+
+      await service.updateOrderStatus(TERMINAL, ORDER_ID, {
+        status: 'COOKING',
+        expectedVersion: 3,
+      });
+
+      expect(prisma.order.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: ORDER_ID,
+          branchId: TERMINAL.branchId,
+          status: OrderStatus.NEW,
+          version: 3,
+        },
+        data: {
+          status: OrderStatus.COOKING,
+          version: { increment: 1 },
+          cookingStartedAt: expect.any(Date),
+          confirmedAt: expect.any(Date),
+        },
+      });
+    });
+
+    it('does not overwrite confirmedAt on CONFIRMED -> COOKING', async () => {
+      const originalConfirmedAt = new Date('2026-09-08T10:00:00.000Z');
+      prisma.order.findFirst.mockResolvedValue(
+        boardOrder({ status: OrderStatus.CONFIRMED, confirmedAt: originalConfirmedAt }),
+      );
+      prisma.order.updateMany.mockResolvedValue({ count: 1 });
+      prisma.order.findUniqueOrThrow.mockResolvedValue(
+        boardOrder({
+          status: OrderStatus.COOKING,
+          version: 4,
+          cookingStartedAt: new Date('2026-09-08T10:05:00.000Z'),
+          confirmedAt: originalConfirmedAt,
+        }),
+      );
+
+      await service.updateOrderStatus(TERMINAL, ORDER_ID, {
+        status: 'COOKING',
+        expectedVersion: 3,
+      });
+
+      const call = prisma.order.updateMany.mock.calls[0][0];
+      expect(call.data).not.toHaveProperty('confirmedAt');
+    });
+
     it('moves COOKING -> READY stamping readyAt', async () => {
       const cooking = boardOrder({
         status: OrderStatus.COOKING,

@@ -138,8 +138,14 @@ export class KitchenService {
         data: {
           status: target,
           version: { increment: 1 },
+          // ADR-1618: starting COOKING from NEW is an implicit confirmation —
+          // record confirmedAt so the data contract holds even when the
+          // kitchen board skips the explicit CONFIRMED step.
           ...(target === OrderStatus.COOKING
-            ? { cookingStartedAt: now }
+            ? {
+                cookingStartedAt: now,
+                ...(from === OrderStatus.NEW ? { confirmedAt: now } : {}),
+              }
             : { readyAt: now }),
         },
       });
