@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { OrderStatus, OrderType } from '@prisma/client';
+import { OrderStatus, OrderType, PaymentMethod } from '@prisma/client';
 import { CouriersService } from './couriers.service';
 import { COURIER_TOKEN_TTL_SECONDS } from './couriers.config';
 import { AuthenticatedCourier, CourierTokenPayload } from './couriers.types';
@@ -231,6 +231,26 @@ describe('CouriersService.getActiveOrders', () => {
       status: OrderStatus.READY,
       clientPhone: '+79171234567',
     });
+  });
+
+  it('maps ONLINE payment to the onlinePaid wire value', async () => {
+    prisma.order.findMany.mockResolvedValue([
+      makeOrder({ paymentMethod: PaymentMethod.ONLINE }),
+    ]);
+
+    const result = await service.getActiveOrders('branch-1', 'courier-1');
+
+    expect(result[0].paymentMethod).toBe('onlinePaid');
+  });
+
+  it('maps ON_DELIVERY payment to the onDelivery wire value', async () => {
+    prisma.order.findMany.mockResolvedValue([
+      makeOrder({ paymentMethod: PaymentMethod.ON_DELIVERY }),
+    ]);
+
+    const result = await service.getActiveOrders('branch-1', 'courier-1');
+
+    expect(result[0].paymentMethod).toBe('onDelivery');
   });
 });
 

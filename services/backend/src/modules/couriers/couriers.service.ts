@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Courier, Order, OrderStatus, OrderType } from '@prisma/client';
+import { Courier, Order, OrderStatus, OrderType, PaymentMethod } from '@prisma/client';
 import { CourierPinAuthDto } from './dto/courier-auth.dto';
 import { UpdateCourierOrderStatusDto } from './dto/update-courier-order-status.dto';
 import { ReportCourierLocationDto } from './dto/report-courier-location.dto';
@@ -372,7 +372,8 @@ export class CouriersService {
       status: order.status,
       type: order.type,
       totalRubles: Math.round(Number(order.totalAmount)),
-      paymentMethod: 'onlinePaid',
+      paymentMethod:
+        order.paymentMethod === PaymentMethod.ONLINE ? 'onlinePaid' : 'onDelivery',
       address: {
         street: order.deliveryAddress || 'Адрес не указан',
       },
