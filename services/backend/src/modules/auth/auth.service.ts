@@ -27,6 +27,7 @@ import {
   toCustomerEntity,
 } from './entities/auth.entities';
 import { OTP_STORE, OtpStore } from './otp-store.service';
+import { SMS_PROVIDER, SmsProvider } from './providers/sms/sms.provider';
 
 /**
  * Guest authentication by phone + one-time code (BE-906 surface).
@@ -44,11 +45,12 @@ export class AuthService {
 
   constructor(
     @Inject(OTP_STORE) private readonly otpStore: OtpStore,
+    @Inject(SMS_PROVIDER) private readonly sms: SmsProvider,
     private readonly jwt: JwtService,
     private readonly prisma: PrismaService,
   ) {}
 
-  async sendOtp(dto: SendOtpDto): Promise<SendOtpResponse> {
+  async sendOtp(dto: SendOtpDto, ip?: string): Promise<SendOtpResponse> {
     const slotAcquired = await this.otpStore.acquireSendSlot(
       dto.phone,
       OTP_SEND_COOLDOWN_SECONDS,
@@ -73,17 +75,11 @@ export class AuthService {
     if (devMode) {
       // Dev/test only: fixed code 1111, no SMS is dispatched.
       this.logger.log(`OTP for ${dto.phone}: ${code} (dev mode, SMS not sent)`);
-    } else if (process.env.SMS_PROVIDER) {
-      // SMS provider adapter is future work; the TTL-bounded code is stored
-      // and ready to be dispatched once the provider integration lands.
-      // The code itself is never logged in production.
-      this.logger.log(
-        `OTP dispatched for ${this.maskPhone(dto.phone)} (provider: ${process.env.SMS_PROVIDER})`,
-      );
     } else {
-      this.logger.error(
-        `SMS_PROVIDER is not configured; OTP for ${this.maskPhone(dto.phone)} was NOT delivered`,
-      );
+      // Production: hand the code to the configured gateway. The provider
+      // throws on transport failure so the client gets a 5xx and can retry;
+      // the code is already stored with its TTL and stays valid.
+      await this.sms.send(dto.phone, code, ip);
     }
 
     return {

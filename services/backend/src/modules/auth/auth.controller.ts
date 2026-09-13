@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Ip,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -42,8 +43,8 @@ export class AuthController {
   @ApiTooManyRequestsResponse({
     description: 'OTP_SEND_RATE_LIMITED — one code per phone per minute',
   })
-  sendOtp(@Body() dto: SendOtpDto): Promise<SendOtpResponse> {
-    return this.auth.sendOtp(dto);
+  sendOtp(@Body() dto: SendOtpDto, @Ip() ip: string): Promise<SendOtpResponse> {
+    return this.auth.sendOtp(dto, ip);
   }
 
   @Post('otp/verify')
