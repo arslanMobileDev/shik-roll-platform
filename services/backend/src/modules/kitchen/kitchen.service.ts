@@ -7,8 +7,10 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, OrderType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CouriersEventsService } from '../couriers/couriers-events.service';
+import { OrdersEventsService } from '../orders/orders-events.service';
 import { ORDER_INCLUDE } from '../orders/mappers/order.mapper';
 import { KITCHEN_TOKEN_TTL_SECONDS } from './kitchen.config';
 import { toKitchenOrder } from './kitchen.mapper';
@@ -27,6 +29,8 @@ export class KitchenService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly events: KitchenEventsService,
+    private readonly courierEvents: CouriersEventsService,
+    private readonly orderEvents: OrdersEventsService,
   ) {}
 
   /**
@@ -186,6 +190,36 @@ export class KitchenService {
       });
     });
 
+    // Publish the committed transition once to each existing channel.
+    const timestamp = new Date().toISOString();
+    this.courierEvents.emitOrderTrackingEvent({
+      orderId: updated.id,
+      status: updated.status,
+      courierId: updated.courierId,
+      version: updated.version,
+      estimatedReadyAt: updated.estimatedReadyAt?.toISOString() ?? null,
+      timestamp,
+    });
+    if (updated.type === OrderType.DELIVERY) {
+      this.courierEvents.emitOrderEvent({
+        orderId: updated.id,
+        orderNumber: updated.orderNumber,
+        status: updated.status,
+        branchId: updated.branchId,
+        courierId: updated.courierId,
+        deliveryAddress: updated.deliveryAddress,
+        totalRubles: Math.round(Number(updated.totalAmount)),
+        timestamp,
+      });
+    }
+    this.orderEvents.emitKdsEvent({
+      eventType: 'ORDER_STATUS_CHANGED',
+      orderId: updated.id,
+      orderNumber: updated.orderNumber,
+      branchId: updated.branchId,
+      status: updated.status,
+      timestamp,
+    });
     await this.events.publishOrderChanged(updated.id);
     return toKitchenOrder(updated);
   }

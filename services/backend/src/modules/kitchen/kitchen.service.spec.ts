@@ -1,6 +1,8 @@
 import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
 import { OrderStatus } from '@prisma/client';
+import { CouriersEventsService } from '../couriers/couriers-events.service';
+import { OrdersEventsService } from '../orders/orders-events.service';
 import { KitchenService } from './kitchen.service';
 import { KitchenEventsService } from './kitchen-events.service';
 import { AuthenticatedKitchenTerminal } from './kitchen.types';
@@ -32,6 +34,10 @@ function boardOrder(overrides: Record<string, unknown> = {}) {
     version: 3,
     status: OrderStatus.CONFIRMED,
     type: 'DELIVERY',
+    courierId: null,
+    estimatedReadyAt: null,
+    totalAmount: 500,
+    deliveryAddress: 'Delivery address',
     branchId: TERMINAL.branchId,
     tableNumber: null,
     comment: 'Без лука',
@@ -68,6 +74,8 @@ describe('KitchenService', () => {
   let jwt: JwtService;
   let events: { publishOrderChanged: jest.Mock };
   let service: KitchenService;
+  let courierEvents: CouriersEventsService;
+  let orderEvents: OrdersEventsService;
 
   beforeEach(() => {
     prisma = {
@@ -87,10 +95,14 @@ describe('KitchenService', () => {
     };
     jwt = new JwtService({ secret: SECRET });
     events = { publishOrderChanged: jest.fn().mockResolvedValue(undefined) };
+    courierEvents = new CouriersEventsService();
+    orderEvents = new OrdersEventsService();
     service = new KitchenService(
       prisma as never,
       jwt,
       events as unknown as KitchenEventsService,
+      courierEvents,
+      orderEvents,
     );
   });
 
@@ -167,6 +179,74 @@ describe('KitchenService', () => {
   });
 
   describe('updateOrderStatus', () => {
+    it.each(['COOKING', 'READY'] as const)(
+      '%s reaches tracking, courier and both kitchen channels once after commit', async (status) => {
+        const updated = boardOrder({ status, version: 4 });
+        prisma.order.findFirst.mockResolvedValue(boardOrder({
+          status: status === 'COOKING' ? OrderStatus.CONFIRMED : OrderStatus.COOKING,
+        }));
+        prisma.order.updateMany.mockResolvedValue({ count: 1 });
+        prisma.order.findUniqueOrThrow.mockResolvedValue(updated);
+        let committed = false;
+        prisma.$transaction.mockImplementation(async (cb) => {
+          const result = await cb(prisma);
+          committed = true;
+          return result;
+        });
+        const tracking: MessageEvent[] = [];
+        const courier: MessageEvent[] = [];
+        const legacy: MessageEvent[] = [];
+        const foreign: MessageEvent[] = [];
+        const subscriptions = [
+          courierEvents.getOrderTrackingStream(ORDER_ID).subscribe(e => {
+            expect(committed).toBe(true); tracking.push(e);
+          }),
+          courierEvents.getOrderStream(TERMINAL.branchId).subscribe(e => courier.push(e)),
+          orderEvents.getKdsStream(TERMINAL.branchId).subscribe(e => legacy.push(e)),
+          courierEvents.getOrderTrackingStream('other-order').subscribe(e => foreign.push(e)),
+          courierEvents.getOrderStream('other-branch').subscribe(e => foreign.push(e)),
+        ];
+        try {
+          await service.updateOrderStatus(TERMINAL, ORDER_ID, { status, expectedVersion: 3 });
+          expect(tracking).toHaveLength(1);
+          expect(tracking[0].data).toMatchObject({ orderId: ORDER_ID, status, version: 4 });
+          expect(courier).toHaveLength(1);
+          expect(courier[0].data).toMatchObject({ orderId: ORDER_ID, status, branchId: TERMINAL.branchId });
+          expect(legacy).toHaveLength(1);
+          expect(legacy[0].data).toMatchObject({ eventType: 'ORDER_STATUS_CHANGED', status });
+          expect(events.publishOrderChanged).toHaveBeenCalledTimes(1);
+          expect(foreign).toHaveLength(0);
+        } finally { subscriptions.forEach(s => s.unsubscribe()); }
+      },
+    );
+
+    it('does not send takeaway orders to the courier feed', async () => {
+      prisma.order.findFirst.mockResolvedValue(boardOrder({ status: OrderStatus.COOKING }));
+      prisma.order.updateMany.mockResolvedValue({ count: 1 });
+      prisma.order.findUniqueOrThrow.mockResolvedValue(boardOrder({ status: OrderStatus.READY, type: 'TAKEAWAY' }));
+      const publish = jest.spyOn(courierEvents, 'emitOrderEvent');
+      const tracking = jest.spyOn(courierEvents, 'emitOrderTrackingEvent');
+      await service.updateOrderStatus(TERMINAL, ORDER_ID, { status: 'READY', expectedVersion: 3 });
+      expect(publish).not.toHaveBeenCalled();
+      expect(tracking).toHaveBeenCalledTimes(1);
+      expect(events.publishOrderChanged).toHaveBeenCalledTimes(1);
+    });
+
+    it('publishes nothing if the transaction rolls back', async () => {
+      prisma.order.findFirst.mockResolvedValue(boardOrder());
+      prisma.$transaction.mockRejectedValue(new Error('rollback'));
+      const tracking = jest.spyOn(courierEvents, 'emitOrderTrackingEvent');
+      const courier = jest.spyOn(courierEvents, 'emitOrderEvent');
+      const legacy = jest.spyOn(orderEvents, 'emitKdsEvent');
+      await expect(service.updateOrderStatus(TERMINAL, ORDER_ID, {
+        status: 'COOKING', expectedVersion: 3,
+      })).rejects.toThrow('rollback');
+      expect(tracking).not.toHaveBeenCalled();
+      expect(courier).not.toHaveBeenCalled();
+      expect(legacy).not.toHaveBeenCalled();
+      expect(events.publishOrderChanged).not.toHaveBeenCalled();
+    });
+
     it('answers 404 ORDER_NOT_FOUND for an unknown order', async () => {
       prisma.order.findFirst.mockResolvedValue(null);
       await expect(
