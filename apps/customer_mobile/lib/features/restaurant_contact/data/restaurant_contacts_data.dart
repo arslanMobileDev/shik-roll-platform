@@ -28,6 +28,7 @@ abstract final class ContactsDto {
     final branch = text(json['branchId']);
     if (branch == null) throw const FormatException('Missing branch');
     final username = text(json['telegram'])?.replaceFirst(RegExp(r'^@'), '');
+    final insta = text(json['instagramUrl']) ?? text(json['instagram']);
     final contacts = RestaurantContacts(
       branchId: branch,
       phone: phone(json['phone']),
@@ -37,6 +38,7 @@ abstract final class ContactsDto {
               RegExp(r'^[A-Za-z][A-Za-z0-9_]{4,31}$').hasMatch(username)
           ? username
           : null,
+      instagram: insta,
       workingHours: text(json['workingHours']),
       address: text(json['address']),
     );
@@ -49,6 +51,7 @@ abstract final class ContactsDto {
     'phone': contacts.phone,
     'whatsapp': contacts.whatsapp,
     'telegram': contacts.telegram,
+    'instagram': contacts.instagram,
     'workingHours': contacts.workingHours,
     'address': contacts.address,
   };

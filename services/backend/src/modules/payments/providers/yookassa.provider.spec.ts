@@ -135,44 +135,75 @@ describe('YooKassaProvider', () => {
     });
   });
 
-  it('verifies a webhook against GET /v3/payments/{id}', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        id: 'ext-1',
-        status: 'succeeded',
-        metadata: { orderId: 'order-1' },
-      }),
-    });
+  const expected = makeInput();
+  const notification = {
+    type: 'notification', event: 'payment.succeeded',
+    object: { id: 'ext-1', status: 'succeeded' },
+  };
+  const authoritative = {
+    id: 'ext-1', status: 'succeeded', paid: true,
+    amount: { value: '500.00', currency: 'RUB' },
+    metadata: { orderId: expected.orderId, paymentId: expected.paymentId },
+  };
 
-    await expect(
-      provider.verifyWebhook({}, {
-        type: 'notification',
-        event: 'payment.succeeded',
-        object: {
-          id: 'ext-1',
-          status: 'succeeded',
-          metadata: { orderId: 'order-1' },
-        },
-      }),
-    ).resolves.toBe(true);
-    expect(fetchMock.mock.calls[0][0]).toBe(
-      'https://api.yookassa.ru/v3/payments/ext-1',
-    );
-    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'GET' });
+  it('verifies GET data against the database even without notification metadata', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => authoritative });
+    await expect(provider.verifyWebhook({}, notification, expected)).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith('https://api.yookassa.ru/v3/payments/ext-1',
+      expect.objectContaining({ method: 'GET', signal: expect.any(AbortSignal),
+        headers: { Authorization: expect.stringMatching(/^Basic /) } }));
   });
 
-  it('rejects a webhook when the authoritative status does not match', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({ id: 'ext-1', status: 'pending' }),
-    });
-    await expect(
-      provider.verifyWebhook({}, {
-        type: 'notification',
-        event: 'payment.succeeded',
-        object: { id: 'ext-1', status: 'succeeded' },
-      }),
-    ).resolves.toBe(false);
+  it.each([
+    { id: 'other' }, { status: 'pending' }, { paid: false },
+    { amount: { value: '1.00', currency: 'RUB' } },
+    { amount: { value: '500.00', currency: 'USD' } },
+    { metadata: { ...authoritative.metadata, orderId: 'another-order' } },
+    { metadata: { ...authoritative.metadata, paymentId: 'another-attempt' } },
+    { metadata: undefined },
+  ])('rejects an authoritative mismatch: %j', async (override) => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ...authoritative, ...override }) });
+    await expect(provider.verifyWebhook({}, notification, expected)).resolves.toBe(false);
   });
+
+  it('does not trust a forged amount or metadata from the notification', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({
+      ...authoritative, amount: { value: '1.00', currency: 'RUB' },
+    }) });
+    await expect(provider.verifyWebhook({}, {
+      ...notification, object: { ...notification.object,
+        amount: authoritative.amount, metadata: authoritative.metadata },
+    }, expected)).resolves.toBe(false);
+  });
+
+  it('verifies canceled payments without requiring paid=true', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({
+      ...authoritative, status: 'canceled', paid: false,
+    }) });
+    await expect(provider.verifyWebhook({}, {
+      ...notification, event: 'payment.canceled',
+      object: { id: 'ext-1', status: 'canceled' },
+    }, expected)).resolves.toBe(true);
+  });
+
+  it.each([401, 404, 429, 500])('propagates provider HTTP %s for retry', async (status) => {
+    fetchMock.mockResolvedValue({ ok: false, status });
+    await expect(provider.verifyWebhook({}, notification, expected)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'PAYMENT_VERIFICATION_UNAVAILABLE' }),
+    });
+  });
+
+  it.each(['network', 'timeout', 'invalid JSON', 'malformed object'])(
+    'propagates %s verification failures for retry', async (failure) => {
+      if (failure === 'network' || failure === 'timeout') {
+        fetchMock.mockRejectedValue(new Error(failure));
+      } else {
+        fetchMock.mockResolvedValue({ ok: true, json: async () => {
+          if (failure === 'invalid JSON') throw new SyntaxError('invalid JSON');
+          return null;
+        } });
+      }
+      await expect(provider.verifyWebhook({}, notification, expected)).rejects.toBeInstanceOf(BadGatewayException);
+    },
+  );
 });

@@ -35,10 +35,13 @@ describe('PaymentsController', () => {
     });
   });
 
-  it('acknowledges processing failures instead of returning a non-200 error', async () => {
-    service.handleWebhook.mockRejectedValue(new Error('database unavailable'));
-    await expect(controller.webhook({}, payload)).resolves.toEqual({
-      status: 'ignored',
-    });
-  });
+  it.each(['webhook', 'yooKassaWebhook'] as const)(
+    '%s returns a retryable error when processing fails', async (method) => {
+      service.handleWebhook.mockRejectedValue(new Error('database unavailable'));
+      await expect(controller[method]({}, payload)).rejects.toMatchObject({
+        response: { statusCode: 503, code: 'PAYMENT_WEBHOOK_RETRY',
+          message: 'Payment processing is temporarily unavailable' },
+      });
+    },
+  );
 });

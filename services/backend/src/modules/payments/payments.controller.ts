@@ -9,6 +9,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -40,7 +41,7 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'YooKassa webhook receiver (payment.succeeded confirms the order); always 200, unknown payments are acknowledged and ignored',
+      'YooKassa webhook receiver (payment.succeeded confirms the order); processing failures return 503; unknown payments are acknowledged and ignored',
   })
   @ApiOkResponse({ schema: { properties: { status: { type: 'string', enum: ['processed', 'ignored'] } } } })
   webhook(
@@ -77,10 +78,12 @@ export class PaymentsController {
     try {
       return await this.service.handleWebhook(headers, payload);
     } catch (error) {
-      // YooKassa requires HTTP 200. Operational errors are logged by the
-      // service and acknowledged so the public endpoint never leaks details.
       this.logger.error(`Webhook processing failed: ${String(error)}`);
-      return { status: 'ignored' };
+      throw new ServiceUnavailableException({
+        statusCode: 503,
+        code: 'PAYMENT_WEBHOOK_RETRY',
+        message: 'Payment processing is temporarily unavailable',
+      });
     }
   }
 }

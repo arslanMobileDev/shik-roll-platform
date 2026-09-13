@@ -47,29 +47,16 @@ export class CouriersService {
   ) {}
 
   async authenticateByPin(dto: CourierPinAuthDto) {
-    let courier = await this.prisma.courier.findUnique({
+    const courier = await this.prisma.courier.findUnique({
       where: { phone: dto.phone },
     });
 
-    if (!courier) {
-      const defaultBranch = await this.prisma.branch.findFirst();
-      const defaultBrand = await this.prisma.brand.findFirst();
-
-      if (!defaultBranch || !defaultBrand) {
-        throw new UnauthorizedException('Branch or Brand configuration is missing');
-      }
-
-      courier = await this.prisma.courier.create({
-        data: {
-          name: 'Курьер ' + dto.phone.slice(-4),
-          phone: dto.phone,
-          pinHash: await bcrypt.hash(dto.pin, PIN_BCRYPT_ROUNDS),
-          brandId: defaultBrand.id,
-          branchId: defaultBranch.id,
-        },
+    if (!courier || !(await this.verifyPin(courier, dto.pin))) {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        code: 'INVALID_CREDENTIALS',
+        message: 'Invalid phone or PIN',
       });
-    } else if (!(await this.verifyPin(courier, dto.pin))) {
-      throw new UnauthorizedException('Invalid PIN code');
     }
 
     const payload: CourierTokenPayload = {

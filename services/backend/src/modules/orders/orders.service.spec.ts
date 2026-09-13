@@ -186,7 +186,7 @@ describe('OrdersService', () => {
   describe('list', () => {
     it('returns a paginated page', async () => {
       repository.list.mockResolvedValue({ records: [makeOrderRecord()], total: 1 });
-      const page = await service.list({ page: 1, limit: 20 });
+      const page = await service.list({ page: 1, limit: 20 }, 'customer-1');
       expect(page.meta).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
       expect(page.data).toHaveLength(1);
       expect(page.data[0].orderNumber).toBe('AAAA-20260830-0001');
@@ -196,7 +196,7 @@ describe('OrdersService', () => {
         branchId: undefined,
         statuses: undefined,
         excludePendingPayment: true,
-        customerId: undefined,
+        customerId: 'customer-1',
         page: 1,
         limit: 20,
       });
@@ -210,12 +210,13 @@ describe('OrdersService', () => {
         status: [OrderStatus.READY],
         page: 2,
         limit: 10,
-      });
+      }, 'customer-1');
       expect(repository.list).toHaveBeenCalledWith({
         brandId: BRAND_ID,
         branchId: BRANCH_ID,
         statuses: [OrderStatus.READY],
         excludePendingPayment: false,
+        customerId: 'customer-1',
         page: 2,
         limit: 10,
       });
@@ -223,12 +224,28 @@ describe('OrdersService', () => {
   });
 
   describe('getById', () => {
-    it('throws ORDER_NOT_FOUND when missing', async () => {
-      repository.findById.mockResolvedValue(null);
-      await expect(service.getById(ORDER_ID)).rejects.toMatchObject({
+    it.each(['another-customer', null])('hides an order owned by %s', async (owner) => {
+      repository.findById.mockResolvedValue({ ...makeOrderRecord(), customerId: owner });
+      await expect(service.getById(ORDER_ID, 'customer-1')).rejects.toMatchObject({
         response: { code: 'ORDER_NOT_FOUND' },
       });
-      await expect(service.getById(ORDER_ID)).rejects.toBeInstanceOf(NotFoundException);
+    });
+    it('returns the owner order', async () => {
+      repository.findById.mockResolvedValue({ ...makeOrderRecord(), customerId: 'customer-1' });
+      expect((await service.getById(ORDER_ID, 'customer-1')).id).toBe(ORDER_ID);
+    });
+    it('rejects missing customer identity before database access', async () => {
+      await expect(service.getById(ORDER_ID, '')).rejects.toMatchObject({ status: 401 });
+      await expect(service.list({}, '')).rejects.toMatchObject({ status: 401 });
+      expect(repository.findById).not.toHaveBeenCalled();
+      expect(repository.list).not.toHaveBeenCalled();
+    });
+    it('throws ORDER_NOT_FOUND when missing', async () => {
+      repository.findById.mockResolvedValue(null);
+      await expect(service.getById(ORDER_ID, 'customer-1')).rejects.toMatchObject({
+        response: { code: 'ORDER_NOT_FOUND' },
+      });
+      await expect(service.getById(ORDER_ID, 'customer-1')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 

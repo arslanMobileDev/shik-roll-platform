@@ -18,6 +18,7 @@ final class RestaurantContacts extends Equatable {
     this.phone,
     this.whatsapp,
     this.telegram,
+    this.instagram,
     this.workingHours,
     this.address,
   });
@@ -25,12 +26,14 @@ final class RestaurantContacts extends Equatable {
   final String? phone;
   final String? whatsapp;
   final String? telegram;
+  final String? instagram;
   final String? workingHours;
   final String? address;
   bool get isEmpty => [
     phone,
     whatsapp,
     telegram,
+    instagram,
     workingHours,
     address,
   ].every((value) => value == null);
@@ -40,6 +43,7 @@ final class RestaurantContacts extends Equatable {
     phone,
     whatsapp,
     telegram,
+    instagram,
     workingHours,
     address,
   ];

@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   Optional,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   OrderStatus,
@@ -52,7 +53,8 @@ export class OrdersService {
    * result is restricted to that customer's orders — guests never see
    * other customers' orders regardless of the query filters.
    */
-  async list(query: OrderQueryDto, customerId?: string): Promise<OrderPage> {
+  async list(query: OrderQueryDto, customerId: string): Promise<OrderPage> {
+    if (!customerId) throw new UnauthorizedException('Customer identity required');
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const { records, total } = await this.repository.list({
@@ -80,6 +82,7 @@ export class OrdersService {
    * Always scoped to the token's customer, always sorted newest first.
    */
   async listMine(customerId: string, query: MyOrdersQueryDto): Promise<OrderPage> {
+    if (!customerId) throw new UnauthorizedException('Customer identity required');
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const { records, total } = await this.repository.list({
@@ -99,9 +102,10 @@ export class OrdersService {
     };
   }
 
-  async getById(id: string): Promise<OrderEntity> {
+  async getById(id: string, customerId: string): Promise<OrderEntity> {
+    if (!customerId) throw new UnauthorizedException('Customer identity required');
     const record = await this.repository.findById(id);
-    if (!record) {
+    if (!record || record.customerId !== customerId) {
       throw new NotFoundException({
         statusCode: 404,
         code: 'ORDER_NOT_FOUND',
