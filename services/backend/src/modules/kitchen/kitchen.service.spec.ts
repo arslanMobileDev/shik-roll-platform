@@ -360,7 +360,6 @@ describe('KitchenService', () => {
           orderId: ORDER_ID,
           previousStatus: OrderStatus.CONFIRMED,
           newStatus: OrderStatus.COOKING,
-          changedBy: 'kitchen:KDS-01',
           kitchenTerminalId: TERMINAL.id,
           cookId: 'cook-7',
           shiftId: 'shift-9',

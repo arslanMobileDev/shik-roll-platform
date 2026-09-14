@@ -170,15 +170,16 @@ export class KitchenService {
           message: `Order ${orderId} changed on the board — refresh and retry`,
         });
       }
-      // Audit (ADR-1618): terminal + cook/shift metadata + both statuses;
-      // cookId/shiftId are stored as provided — the backend Shift bounded
-      // context that could verify them does not exist yet.
+      // Audit (ADR-1618): kitchenTerminalId already captures the terminal
+      // UUID; changedBy is reserved for a staff/worker actor UUID and stays
+      // null for kitchen transitions. cookId/shiftId are stored as provided
+      // — the backend Shift bounded context that could verify them does not
+      // exist yet.
       await tx.orderStatusHistory.create({
         data: {
           orderId,
           previousStatus: from,
           newStatus: target,
-          changedBy: `kitchen:${terminal.code}`,
           kitchenTerminalId: terminal.id,
           cookId: dto.cookId ?? null,
           shiftId: dto.shiftId ?? null,
