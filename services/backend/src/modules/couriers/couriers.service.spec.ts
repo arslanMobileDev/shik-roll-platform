@@ -15,7 +15,7 @@ import { AuthenticatedCourier, CourierTokenPayload } from './couriers.types';
 const SECRET = 'courier-service-test-secret';
 
 function prismaMock() {
-  return {
+  const mock: any = {
     courier: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
     branch: { findFirst: jest.fn() },
     brand: { findFirst: jest.fn() },
@@ -26,7 +26,13 @@ function prismaMock() {
       count: jest.fn(),
       updateMany: jest.fn(),
     },
+    orderStatusHistory: { create: jest.fn() },
   };
+  // Interactive transaction: the callback runs against the same mock, so
+  // assertions on tx.order.updateMany / tx.orderStatusHistory.create see
+  // the same jest.fn() instances as the outer prisma.
+  mock.$transaction = jest.fn(async (cb: (tx: any) => unknown) => cb(mock));
+  return mock;
 }
 
 function eventsMock() {
@@ -445,6 +451,71 @@ describe('CouriersService.updateCourierOrderStatus', () => {
       response: expect.objectContaining({ code: 'ORDER_NOT_FOUND' }),
     });
   });
+
+  it('writes an audit row when the courier claims a READY order', async () => {
+    const order = makeOrder();
+    prisma.order.findUnique.mockResolvedValue(order);
+    prisma.order.count.mockResolvedValue(0);
+    prisma.order.updateMany.mockResolvedValue({ count: 1 });
+    prisma.order.findUniqueOrThrow.mockResolvedValue(
+      makeOrder({ courierId: 'courier-1', version: 4 }),
+    );
+
+    await service.updateCourierOrderStatus(jwtCourier, 'order-1', { status: 'READY' });
+
+    expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+      data: {
+        orderId: 'order-1',
+        previousStatus: OrderStatus.READY,
+        newStatus: OrderStatus.READY,
+        changedBy: 'courier-1',
+        reason: 'COURIER_CLAIM',
+      },
+    });
+  });
+
+  it('writes an audit row when the courier starts the delivery (ON_WAY)', async () => {
+    prisma.order.findUnique.mockResolvedValue(
+      makeOrder({ courierId: 'courier-1', status: OrderStatus.READY }),
+    );
+    prisma.order.updateMany.mockResolvedValue({ count: 1 });
+    prisma.order.findUniqueOrThrow.mockResolvedValue(
+      makeOrder({ courierId: 'courier-1', status: OrderStatus.ON_WAY, version: 5 }),
+    );
+
+    await service.updateCourierOrderStatus(jwtCourier, 'order-1', { status: 'ON_WAY' });
+
+    expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+      data: {
+        orderId: 'order-1',
+        previousStatus: OrderStatus.READY,
+        newStatus: OrderStatus.ON_WAY,
+        changedBy: 'courier-1',
+      },
+    });
+  });
+
+  it('writes an audit row when the courier completes the delivery', async () => {
+    prisma.order.findUnique.mockResolvedValue(
+      makeOrder({ courierId: 'courier-1', status: OrderStatus.ON_WAY }),
+    );
+    prisma.order.updateMany.mockResolvedValue({ count: 1 });
+    prisma.order.findUniqueOrThrow.mockResolvedValue(
+      makeOrder({ courierId: 'courier-1', status: OrderStatus.COMPLETED, version: 6 }),
+    );
+
+    await service.updateCourierOrderStatus(jwtCourier, 'order-1', { status: 'COMPLETED' });
+
+    expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({
+      data: {
+        orderId: 'order-1',
+        previousStatus: OrderStatus.ON_WAY,
+        newStatus: OrderStatus.COMPLETED,
+        changedBy: 'courier-1',
+      },
+    });
+  });
+
 });
 
 describe('CouriersService.reportCourierLocation', () => {

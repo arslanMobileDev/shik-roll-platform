@@ -204,9 +204,25 @@ export class CouriersService {
     }
 
     // Atomic claim: only one concurrent claimant flips courierId null -> own.
-    const { count } = await this.prisma.order.updateMany({
-      where: { id: order.id, status: OrderStatus.READY, courierId: null },
-      data: { courierId: courier.id, version: { increment: 1 } },
+    // The audit row lands in the same transaction so status and history can
+    // never drift apart (ADR-608: every change is recorded).
+    const { count } = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.order.updateMany({
+        where: { id: order.id, status: OrderStatus.READY, courierId: null },
+        data: { courierId: courier.id, version: { increment: 1 } },
+      });
+      if (result.count > 0) {
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: order.id,
+            previousStatus: OrderStatus.READY,
+            newStatus: OrderStatus.READY,
+            changedBy: courier.id,
+            reason: 'COURIER_CLAIM',
+          },
+        });
+      }
+      return result;
     });
     if (count === 0) {
       throw new ConflictException({
@@ -240,13 +256,28 @@ export class CouriersService {
       throw this.invalidTransition(order.status, target);
     }
 
-    const { count } = await this.prisma.order.updateMany({
-      where: { id: order.id, status: expected, courierId: courier.id },
-      data: {
-        status: target,
-        version: { increment: 1 },
-        ...(target === OrderStatus.COMPLETED ? { completedAt: new Date() } : {}),
-      },
+    // Transition + audit row atomically (ADR-608). changedBy carries the
+    // courier UUID; kitchen transitions use kitchenTerminalId instead.
+    const { count } = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.order.updateMany({
+        where: { id: order.id, status: expected, courierId: courier.id },
+        data: {
+          status: target,
+          version: { increment: 1 },
+          ...(target === OrderStatus.COMPLETED ? { completedAt: new Date() } : {}),
+        },
+      });
+      if (result.count > 0) {
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: order.id,
+            previousStatus: expected,
+            newStatus: target,
+            changedBy: courier.id,
+          },
+        });
+      }
+      return result;
     });
     if (count === 0) {
       throw this.invalidTransition(order.status, target);
