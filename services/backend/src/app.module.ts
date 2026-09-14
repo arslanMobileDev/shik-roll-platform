@@ -9,6 +9,7 @@ import { CouriersModule } from './modules/couriers/couriers.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { StaffModule } from './modules/staff/staff.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -23,6 +24,7 @@ import { HealthController } from './health.controller';
     KitchenModule,
     LoyaltyModule,
     UploadsModule,
+    StaffModule,
   ],
   controllers: [HealthController],
 })

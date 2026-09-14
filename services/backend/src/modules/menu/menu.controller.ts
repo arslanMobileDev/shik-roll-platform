@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CategoryQueryDto } from './dto/category-query.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -16,6 +16,7 @@ import { UpdateStopListDto } from './dto/update-stop-list.dto';
 import { CategoryEntity, CategoryPage } from './entities/category.entity';
 import { MenuPage } from './entities/menu.entity';
 import { MenuItemEntity, MenuItemPage } from './entities/menu-item.entity';
+import { StaffJwtAuthGuard } from '../staff/guards/staff-jwt-auth.guard';
 import { MenuService } from './menu.service';
 
 @Controller()
@@ -39,6 +40,7 @@ export class MenuController {
   }
 
   @Post('categories')
+  @UseGuards(StaffJwtAuthGuard)
   @ApiTags('categories')
   @ApiOperation({ summary: 'Create a category' })
   @ApiOkResponse({ type: CategoryEntity })
@@ -47,6 +49,7 @@ export class MenuController {
   }
 
   @Patch('categories/order')
+  @UseGuards(StaffJwtAuthGuard)
   @ApiTags('categories')
   @ApiOperation({ summary: 'Reorder categories inside a menu (index becomes sort_order)' })
   @ApiQuery({ name: 'menuId', required: true, type: String })
@@ -59,6 +62,7 @@ export class MenuController {
   }
 
   @Patch('categories/:id')
+  @UseGuards(StaffJwtAuthGuard)
   @ApiTags('categories')
   @ApiOperation({ summary: 'Update a category' })
   @ApiOkResponse({ type: CategoryEntity })
@@ -70,6 +74,7 @@ export class MenuController {
   }
 
   @Patch('categories/:id/products/order')
+  @UseGuards(StaffJwtAuthGuard)
   @ApiTags('categories')
   @ApiOperation({ summary: 'Reorder products inside a category (index becomes sort_order)' })
   @ApiOkResponse({ schema: { properties: { updated: { type: 'number' } } } })
@@ -105,6 +110,7 @@ export class MenuController {
   }
 
   @Post('menu-items')
+  @UseGuards(StaffJwtAuthGuard)
   @ApiTags('menu-items')
   @ApiOperation({ summary: 'Create a menu item (composition, modifier groups, certifications)' })
   @ApiOkResponse({ type: MenuItemEntity })
@@ -113,6 +119,7 @@ export class MenuController {
   }
 
   @Patch('menu-items/:id')
+  @UseGuards(StaffJwtAuthGuard)
   @ApiTags('menu-items')
   @ApiOperation({ summary: 'Update scalar fields of a menu item' })
   @ApiOkResponse({ type: MenuItemEntity })
@@ -124,6 +131,7 @@ export class MenuController {
   }
 
   @Patch('menu-items/:id/status')
+  @UseGuards(StaffJwtAuthGuard)
   @ApiTags('menu-items')
   @ApiOperation({ summary: 'Change the product lifecycle status (DRAFT/PUBLISHED/HIDDEN)' })
   @ApiOkResponse({ type: MenuItemEntity })
@@ -135,6 +143,7 @@ export class MenuController {
   }
 
   @Patch('menu-items/:id/merchandising')
+  @UseGuards(StaffJwtAuthGuard)
   @ApiTags('menu-items')
   @ApiOperation({ summary: 'Update manual merchandising flags (popular / new / featured)' })
   @ApiOkResponse({ type: MenuItemEntity })
@@ -146,6 +155,7 @@ export class MenuController {
   }
 
   @Delete('menu-items/:id')
+  @UseGuards(StaffJwtAuthGuard)
   @ApiTags('menu-items')
   @HttpCode(200)
   @ApiOperation({ summary: 'Archive a product (lifecycle → ARCHIVED)' })
@@ -155,6 +165,7 @@ export class MenuController {
   }
 
   @Patch('menu-items/:id/price')
+  @UseGuards(StaffJwtAuthGuard)
   @ApiTags('menu-items')
   @ApiOperation({ summary: 'Set or replace the branch price override' })
   @ApiOkResponse({ type: MenuItemEntity })
@@ -166,6 +177,7 @@ export class MenuController {
   }
 
   @Patch('menu-items/:id/availability')
+  @UseGuards(StaffJwtAuthGuard)
   @ApiTags('menu-items')
   @ApiOperation({ summary: 'Enable or disable the item at a branch' })
   @ApiOkResponse({ type: MenuItemEntity })
@@ -184,6 +196,7 @@ export class MenuController {
   }
 
   @Patch('menu-items/:id/stop-list')
+  @UseGuards(StaffJwtAuthGuard)
   @ApiTags('menu-items')
   @ApiOperation({ summary: 'Add the item to or remove it from the branch stop list' })
   @ApiOkResponse({ type: MenuItemEntity })

@@ -69,6 +69,7 @@ model Brand {
   modifierGroups  ModifierGroup[]
   orders          Order[]
   promotionCampaigns PromotionCampaign[]
+  staff           Staff[]
 
   @@unique([code], map: "uq_brands_code")
   @@index([status], map: "idx_brands_status")
@@ -800,4 +801,31 @@ model PromotionCampaign {
 
   @@index([brandId, status, startsAt, endsAt], map: "idx_promotion_campaigns_feed")
   @@map("promotion_campaigns")
+}
+
+// Back-office staff (ADR-style: STAFF bounded context). Owners, developers
+// and managers log in with a phone + 4-digit PIN and receive a scoped JWT
+// (role STAFF). Mutating menu/category endpoints require this token;
+// customer and KDS tokens are rejected.
+model Staff {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String
+  phone     String    @unique
+  pinHash   String    @map("pin_hash")
+  role      StaffRole @default(MANAGER)
+  brandId   String    @map("brand_id") @db.Uuid
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_staff_brands")
+
+  @@index([brandId, isActive], map: "idx_staff_brand_active")
+  @@map("staff")
+}
+
+enum StaffRole {
+  OWNER
+  DEVELOPER
+  MANAGER
 }
