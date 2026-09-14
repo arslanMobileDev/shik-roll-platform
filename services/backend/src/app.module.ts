@@ -11,6 +11,7 @@ import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { HealthController } from './health.controller';
+import { RestaurantsController } from './restaurants.controller';
 
 @Module({
   imports: [
@@ -26,6 +27,6 @@ import { HealthController } from './health.controller';
     UploadsModule,
     StaffModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, RestaurantsController],
 })
 export class AppModule {}
