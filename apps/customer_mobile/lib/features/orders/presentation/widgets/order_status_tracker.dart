@@ -146,26 +146,34 @@ class _OrderStatusTrackerState extends State<OrderStatusTracker> {
     final chipLabel = _isCancelled ? 'Отменён' : widget.status!.label;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'ВАШ ЗАКАЗ',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF8A8A8E),
-                letterSpacing: 0.5,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'ВАШ ЗАКАЗ',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF8A8A8E),
+                  letterSpacing: 0.5,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '#${widget.orderNumber}',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-            ),
-          ],
+              const SizedBox(height: 4),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '#${widget.orderNumber}',
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
         ),
+        const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(

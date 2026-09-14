@@ -169,18 +169,44 @@ describe('OrderProcessingProcessor — process-order (loyalty hooks, ADR-1614)',
 
   const job = () => ({ name: 'process-order', data: { orderId: ORDER_ID } }) as never;
 
-  it('keeps the checkout bonus discount when recalculating totals', async () => {
-    prisma.order.findFirst.mockResolvedValue(makeOrder({ bonusDiscountAmount: D('100.00') }));
+  it.each([
+    ['0.00', '800'], ['100.00', '700'], ['100.25', '699.75'], ['800.00', '0'],
+  ])('keeps checkout discount %s when recalculating totals', async (discount, expected) => {
+    prisma.order.findFirst.mockResolvedValue(makeOrder({ bonusDiscountAmount: D(discount) }));
 
     await processor.process(job());
 
-    const orderUpdate = prisma.order.update.mock.calls.find(
-      (call) => call[0].data?.subtotalAmount !== undefined,
-    );
-    expect(orderUpdate).toBeDefined();
-    expect(orderUpdate[0].data.subtotalAmount.toString()).toBe('800');
-    // payable = 800 - 100 (the discount is never given back by the worker)
-    expect(orderUpdate[0].data.totalAmount.toString()).toBe('700');
+    const update = prisma.order.update.mock.calls[0][0].data;
+    expect(update.subtotalAmount.toString()).toBe('800');
+    expect(update.totalAmount.toString()).toBe(expected);
+    expect(update.bonusDiscountAmount).toBeUndefined();
+    expect(loyalty.refundOnCancel).not.toHaveBeenCalled();
+  });
+
+  it('preserves the discount and modifier totals across retries', async () => {
+    const order = makeOrder({ bonusDiscountAmount: D('100.25') });
+    const item = { ...order.items[0], unitPrice: D('400.10'),
+      modifiers: [{ priceDelta: D('10.15'), quantity: 2 }] };
+    prisma.order.findFirst.mockResolvedValue({ ...order, items: [item] });
+    prisma.order.update.mockImplementation(async ({ data }) => {
+      prisma.order.findFirst.mockResolvedValue({ ...order, ...data, items: [item] });
+      return { ...order, ...data };
+    });
+
+    await processor.process(job());
+    await processor.process(job());
+
+    expect(prisma.order.update).toHaveBeenCalledTimes(2);
+    for (const [args] of prisma.order.update.mock.calls) {
+      expect(args.data.subtotalAmount.toString()).toBe('840.8');
+      expect(args.data.totalAmount.toString()).toBe('740.55');
+      expect(args.data.bonusDiscountAmount).toBeUndefined();
+    }
+    for (const [args] of prisma.orderItem.update.mock.calls) {
+      expect(args.data.totalAmount.toString()).toBe('840.8');
+    }
+    expect(loyalty.refundOnCancel).not.toHaveBeenCalled();
+    expect(loyalty.earnCashback).not.toHaveBeenCalled();
   });
 
   it('refunds the spent points when a stop-listed order is cancelled', async () => {
@@ -191,6 +217,44 @@ describe('OrderProcessingProcessor — process-order (loyalty hooks, ADR-1614)',
 
     expect(loyalty.refundOnCancel).toHaveBeenCalledWith(ORDER_ID);
     expect(loyalty.earnCashback).not.toHaveBeenCalled();
+  });
+
+  it('retries a failed refund without repeating cancellation after the stop-list changes', async () => {
+    prisma.order.findFirst.mockResolvedValue(makeOrder({ status: OrderStatus.NEW }));
+    prisma.stopListEntry.findMany.mockResolvedValue([{ menuItemId: MENU_ITEM_ID }]);
+    loyalty.refundOnCancel.mockRejectedValueOnce(new Error('loyalty unavailable'));
+    await expect(processor.process(job())).rejects.toThrow('loyalty unavailable');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+
+    prisma.order.findFirst.mockResolvedValue(makeOrder({
+      status: OrderStatus.CANCELLED, cancelReason: 'STOP_LISTED',
+    }));
+    prisma.stopListEntry.findMany.mockResolvedValue([]);
+    await processor.process(job());
+    await processor.process(job());
+
+    expect(loyalty.refundOnCancel).toHaveBeenCalledTimes(3);
+    expect(prisma.orderStatusHistory.create).toHaveBeenCalledTimes(1);
+    expect(prisma.stopListEntry.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.orderItem.update).not.toHaveBeenCalled();
+  });
+
+  it('does not refund when cancellation fails to commit', async () => {
+    prisma.order.findFirst.mockResolvedValue(makeOrder({ status: OrderStatus.NEW }));
+    prisma.stopListEntry.findMany.mockResolvedValue([{ menuItemId: MENU_ITEM_ID }]);
+    prisma.$transaction.mockRejectedValue(new Error('database unavailable'));
+    await expect(processor.process(job())).rejects.toThrow('database unavailable');
+    expect(loyalty.refundOnCancel).not.toHaveBeenCalled();
+  });
+
+  it('leaves cancellation for another reason to its owning flow', async () => {
+    prisma.order.findFirst.mockResolvedValue(makeOrder({
+      status: OrderStatus.CANCELLED, cancelReason: 'CUSTOMER_REQUEST',
+    }));
+    await processor.process(job());
+    expect(loyalty.refundOnCancel).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('does not touch loyalty while the order stays on the happy path', async () => {
@@ -210,4 +274,30 @@ describe('OrderProcessingProcessor — process-order (loyalty hooks, ADR-1614)',
     expect(queue.add).not.toHaveBeenCalled();
     expect(prisma.orderStatusHistory.create).not.toHaveBeenCalled();
   });
+});
+
+
+describe('OrderProcessingProcessor — retired status timers', () => {
+  it.each([OrderStatus.CONFIRMED, OrderStatus.COOKING, OrderStatus.READY,
+    OrderStatus.ON_WAY, OrderStatus.COMPLETED])(
+    'ignores a persisted timer targeting %s even with legacy emulation enabled',
+    async (to) => {
+      const previous = process.env.ORDER_AUTO_STATUS_ADVANCE_ENABLED;
+      process.env.ORDER_AUTO_STATUS_ADVANCE_ENABLED = 'true';
+      try {
+        const prisma = { order: { findFirst: jest.fn(), update: jest.fn() },
+          $transaction: jest.fn() };
+        const processor = new OrderProcessingProcessor(prisma as unknown as PrismaService,
+          { refundOnCancel: jest.fn() } as unknown as LoyaltyService);
+        await processor.process({ id: 'legacy-job', name: 'status-timer',
+          data: { orderId: ORDER_ID, to } } as never);
+        expect(prisma.order.findFirst).not.toHaveBeenCalled();
+        expect(prisma.order.update).not.toHaveBeenCalled();
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+      } finally {
+        if (previous === undefined) delete process.env.ORDER_AUTO_STATUS_ADVANCE_ENABLED;
+        else process.env.ORDER_AUTO_STATUS_ADVANCE_ENABLED = previous;
+      }
+    },
+  );
 });

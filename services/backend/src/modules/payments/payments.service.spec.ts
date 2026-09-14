@@ -483,12 +483,32 @@ describe('PaymentsService', () => {
       ).toEqual({ status: 'ignored' });
     });
 
+    it('passes database payment fields to verification before writes', async () => {
+      prisma.payment.findFirst.mockResolvedValue(makePaymentRecord());
+      adapter.verifyWebhook.mockResolvedValue(false);
+      await service.handleWebhook({}, succeededPayload);
+      expect(adapter.verifyWebhook).toHaveBeenCalledWith({}, succeededPayload, {
+        paymentId: PAYMENT_ID, orderId: ORDER_ID, amount: D('500.00'), currency: 'RUB',
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('propagates verification failure without touching payment or order', async () => {
+      prisma.payment.findFirst.mockResolvedValue(makePaymentRecord());
+      const failure = new Error('provider unavailable');
+      adapter.verifyWebhook.mockRejectedValue(failure);
+      await expect(service.handleWebhook({}, succeededPayload)).rejects.toBe(failure);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(queues.sendToKitchen).not.toHaveBeenCalled();
+    });
+
     it('ignores an event that cannot be verified', async () => {
+      prisma.payment.findFirst.mockResolvedValue(makePaymentRecord());
       adapter.verifyWebhook.mockResolvedValue(false);
       expect(await service.handleWebhook({}, succeededPayload)).toEqual({
         status: 'ignored',
       });
-      expect(prisma.payment.findFirst).not.toHaveBeenCalled();
+      expect(prisma.payment.update).not.toHaveBeenCalled();
     });
   });
 

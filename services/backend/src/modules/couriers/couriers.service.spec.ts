@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { OrderStatus, OrderType } from '@prisma/client';
+import { OrderStatus, OrderType, PaymentMethod } from '@prisma/client';
 import { CouriersService } from './couriers.service';
 import { COURIER_TOKEN_TTL_SECONDS } from './couriers.config';
 import { AuthenticatedCourier, CourierTokenPayload } from './couriers.types';
@@ -92,26 +92,18 @@ describe('CouriersService.authenticateByPin', () => {
     service = new CouriersService(prisma as any, jwt, eventsMock() as any, loyaltyMock() as any);
   });
 
-  it('registers a new courier with a bcrypt-hashed PIN and returns a signed JWT', async () => {
-    prisma.courier.findUnique.mockResolvedValue(null);
-    prisma.branch.findFirst.mockResolvedValue({ id: 'branch-1' });
-    prisma.brand.findFirst.mockResolvedValue({ id: 'brand-1' });
-    prisma.courier.create.mockImplementation(async ({ data }) => ({
-      ...existingCourier,
-      ...data,
-    }));
+  it('returns a signed JWT only for an existing courier with a verified PIN', async () => {
+    const pinHash = await bcrypt.hash('1234', 4);
+    prisma.courier.findUnique.mockResolvedValue({ ...existingCourier, pinHash });
 
     const result = await service.authenticateByPin({
       phone: existingCourier.phone,
       pin: '1234',
     });
 
-    // PIN is stored only as a bcrypt hash, never in plaintext.
-    const { pinHash } = prisma.courier.create.mock.calls[0][0].data;
-    expect(pinHash).toMatch(/^\$2[aby]\$/);
-    expect(pinHash).not.toBe('1234');
-    await expect(bcrypt.compare('1234', pinHash)).resolves.toBe(true);
-    await expect(bcrypt.compare('9999', pinHash)).resolves.toBe(false);
+    expect(prisma.courier.create).not.toHaveBeenCalled();
+    expect(prisma.branch.findFirst).not.toHaveBeenCalled();
+    expect(prisma.brand.findFirst).not.toHaveBeenCalled();
 
     // The token is a real signed JWT carrying courierId, branch and role.
     expect(result.token).not.toContain('courier-session-');
@@ -178,16 +170,31 @@ describe('CouriersService.authenticateByPin', () => {
     expect(prisma.courier.update).not.toHaveBeenCalled();
   });
 
-  it('fails registration when branch/brand configuration is missing', async () => {
-    prisma.courier.findUnique.mockResolvedValue(null);
-    prisma.branch.findFirst.mockResolvedValue(null);
-    prisma.brand.findFirst.mockResolvedValue({ id: 'brand-1' });
+  it.each(['unknown phone', 'wrong PIN'])(
+    'rejects %s without creating an account or issuing a token', async (scenario) => {
+      prisma.courier.findUnique.mockResolvedValue(
+        scenario === 'unknown phone'
+          ? null
+          : { ...existingCourier, pinHash: await bcrypt.hash('9999', 4) },
+      );
+      const sign = jest.spyOn(jwt, 'signAsync');
 
-    await expect(
-      service.authenticateByPin({ phone: '+79990000000', pin: '1234' }),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
-    expect(prisma.courier.create).not.toHaveBeenCalled();
-  });
+      await expect(
+        service.authenticateByPin({ phone: existingCourier.phone, pin: '1234' }),
+      ).rejects.toMatchObject({
+        response: {
+          statusCode: 401,
+          code: 'INVALID_CREDENTIALS',
+          message: 'Invalid phone or PIN',
+        },
+      });
+      expect(prisma.courier.create).not.toHaveBeenCalled();
+      expect(prisma.courier.update).not.toHaveBeenCalled();
+      expect(prisma.branch.findFirst).not.toHaveBeenCalled();
+      expect(prisma.brand.findFirst).not.toHaveBeenCalled();
+      expect(sign).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('CouriersService.getActiveOrders', () => {
@@ -224,6 +231,26 @@ describe('CouriersService.getActiveOrders', () => {
       status: OrderStatus.READY,
       clientPhone: '+79171234567',
     });
+  });
+
+  it('maps ONLINE payment to the onlinePaid wire value', async () => {
+    prisma.order.findMany.mockResolvedValue([
+      makeOrder({ paymentMethod: PaymentMethod.ONLINE }),
+    ]);
+
+    const result = await service.getActiveOrders('branch-1', 'courier-1');
+
+    expect(result[0].paymentMethod).toBe('onlinePaid');
+  });
+
+  it('maps ON_DELIVERY payment to the onDelivery wire value', async () => {
+    prisma.order.findMany.mockResolvedValue([
+      makeOrder({ paymentMethod: PaymentMethod.ON_DELIVERY }),
+    ]);
+
+    const result = await service.getActiveOrders('branch-1', 'courier-1');
+
+    expect(result[0].paymentMethod).toBe('onDelivery');
   });
 });
 

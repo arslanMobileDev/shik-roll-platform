@@ -1,3 +1,4 @@
 # Production deploy secrets & generated files
 deploy/.env.production
 deploy/nginx/.rendered/
+.vscode/

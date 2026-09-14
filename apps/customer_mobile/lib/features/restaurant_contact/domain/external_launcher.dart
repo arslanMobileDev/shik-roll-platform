@@ -1,4 +1,4 @@
-enum ContactAction { call, whatsapp, telegram, maps }
+enum ContactAction { call, whatsapp, telegram, instagram, maps }
 
 enum LaunchResult { opened, unavailable, failed, invalid }
 

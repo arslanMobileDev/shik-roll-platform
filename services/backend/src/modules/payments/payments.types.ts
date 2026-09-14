@@ -56,6 +56,10 @@ export interface ParsedPaymentWebhookEvent {
  * storage layer): the service speaks only to this interface; concrete
  * providers (YooKassa HTTP API, dev Mock) are swapped by PaymentsModule.
  */
+export type WebhookPaymentExpectation = Pick<
+  CreatePaymentSessionInput, 'paymentId' | 'orderId' | 'amount' | 'currency'
+>;
+
 export interface PaymentProviderAdapter {
   readonly provider: PaymentProvider;
   createPayment(input: CreatePaymentSessionInput): Promise<PaymentSessionResult>;
@@ -67,6 +71,7 @@ export interface PaymentProviderAdapter {
   verifyWebhook(
     headers: Record<string, string | string[] | undefined>,
     body: YooKassaWebhookPayload,
+    expected: WebhookPaymentExpectation,
   ): Promise<boolean>;
 
   parseWebhookEvent(

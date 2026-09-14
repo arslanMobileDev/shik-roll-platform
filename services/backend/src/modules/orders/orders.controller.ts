@@ -2,8 +2,7 @@ import {
   Body,
   Controller,
   Get,
-  HttpCode,
-  HttpStatus,
+  GoneException,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -15,6 +14,7 @@ import {
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiGoneResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -27,7 +27,9 @@ import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/guards/jwt-auth.guar
 import { CreateOrderDto } from './dto/create-order.dto';
 import { MyOrdersQueryDto } from './dto/my-orders-query.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
-import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { KitchenJwtAuthGuard } from '../kitchen/guards/kitchen-jwt-auth.guard';
+import { CurrentKitchenTerminal } from '../kitchen/decorators/current-kitchen-terminal.decorator';
+import { AuthenticatedKitchenTerminal } from '../kitchen/kitchen.types';
 import { OrderEntity, OrderPage } from './entities/order.entity';
 import { OrdersService } from './orders.service';
 
@@ -51,17 +53,19 @@ export class OrdersController {
   }
 
   @Get()
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiUnauthorizedResponse({ description: 'Customer access token required' })
   @ApiOperation({
     summary:
-      'List orders (brand / branch / status filters, pagination); a guest Bearer token restricts the list to that customer',
+      'List the authenticated customer own orders with filters and pagination',
   })
   @ApiOkResponse({ type: OrderPage })
   list(
     @Query() query: OrderQueryDto,
-    @CurrentCustomer() customer?: AuthenticatedCustomer,
+    @CurrentCustomer() customer: AuthenticatedCustomer,
   ): Promise<OrderPage> {
-    return this.service.list(query, customer?.id);
+    return this.service.list(query, customer.id);
   }
 
   // Declared before @Get(':id') so the literal "my" is not captured by the
@@ -86,18 +90,27 @@ export class OrdersController {
    * KDS live stream (ADR-1620): SSE stream for kitchen orders filtered by branch.
    */
   @Sse('kds/stream')
+  @UseGuards(KitchenJwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiUnauthorizedResponse({ description: 'Valid active kitchen terminal required' })
   @ApiOperation({ summary: 'SSE stream of order events for KDS by branch' })
   streamKdsOrders(
-    @Query('branchId') branchId: string,
+    @CurrentKitchenTerminal() terminal: AuthenticatedKitchenTerminal,
   ): Observable<MessageEvent> {
-    return this.service.getKdsStream(branchId);
+    return this.service.getKdsStream(terminal.branchId);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get an order by id' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiUnauthorizedResponse({ description: 'Customer access token required' })
+  @ApiOperation({ summary: 'Get an authenticated customer own order by id' })
   @ApiOkResponse({ type: OrderEntity })
-  getById(@Param('id', ParseUUIDPipe) id: string): Promise<OrderEntity> {
-    return this.service.getById(id);
+  getById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentCustomer() customer: AuthenticatedCustomer,
+  ): Promise<OrderEntity> {
+    return this.service.getById(id, customer.id);
   }
 
   /**
@@ -120,15 +133,17 @@ export class OrdersController {
   }
 
   @Patch(':id/status')
-  @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Change order status (operator / POS / kitchen); validated against the state machine',
+    summary: 'Retired: use authenticated kitchen or courier status endpoints',
+    deprecated: true,
   })
-  @ApiOkResponse({ type: OrderEntity })
-  updateStatus(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateOrderStatusDto,
-  ): Promise<OrderEntity> {
-    return this.service.updateStatus(id, dto);
+  @ApiGoneResponse({ description: 'LEGACY_STATUS_ENDPOINT_DISABLED' })
+  updateStatus(): never {
+    // No staff authorization contract exists for this unrestricted legacy route.
+    throw new GoneException({
+      statusCode: 410,
+      code: 'LEGACY_STATUS_ENDPOINT_DISABLED',
+      message: 'Use the authenticated kitchen or courier status endpoint',
+    });
   }
 }

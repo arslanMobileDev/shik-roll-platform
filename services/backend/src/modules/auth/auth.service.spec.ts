@@ -11,6 +11,7 @@ import {
 } from './auth.config';
 import { AuthService } from './auth.service';
 import { InMemoryOtpStore } from './otp-store.service';
+import { SmsProvider } from './providers/sms/sms.provider';
 
 const PHONE = '+79991234567';
 const CUSTOMER_ID = '11111111-1111-1111-1111-111111111111';
@@ -31,6 +32,7 @@ describe('AuthService', () => {
   let service: AuthService;
   let otpStore: InMemoryOtpStore;
   let jwt: JwtService;
+  let sms: { send: jest.Mock };
   let prisma: {
     customer: { upsert: jest.Mock; findUnique: jest.Mock };
   };
@@ -39,13 +41,14 @@ describe('AuthService', () => {
   beforeEach(() => {
     otpStore = new InMemoryOtpStore();
     jwt = new JwtService({ secret: 'unit-test-secret' });
+    sms = { send: jest.fn().mockResolvedValue(undefined) };
     prisma = {
       customer: {
         upsert: jest.fn().mockResolvedValue(makeCustomer()),
         findUnique: jest.fn().mockResolvedValue(makeCustomer()),
       },
     };
-    service = new AuthService(otpStore, jwt, prisma as never);
+    service = new AuthService(otpStore, sms as unknown as SmsProvider, jwt, prisma as never);
     originalNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'test';
     delete process.env.SMS_PROVIDER;
@@ -88,13 +91,35 @@ describe('AuthService', () => {
 
     it('generates a random 4-digit code in production and never returns it', async () => {
       process.env.NODE_ENV = 'production';
-      process.env.SMS_PROVIDER = 'stub';
       const result = await service.sendOtp({ phone: PHONE });
 
       expect(result.expiresInSeconds).toBe(OTP_TTL_SECONDS);
       expect(result.devCode).toBeUndefined();
       const entry = await otpStore.get(PHONE);
       expect(entry?.code).toMatch(/^\d{4}$/);
+    });
+
+    it('dispatches the OTP through the SMS provider in production', async () => {
+      process.env.NODE_ENV = 'production';
+      await service.sendOtp({ phone: PHONE });
+
+      expect(sms.send).toHaveBeenCalledTimes(1);
+      const [calledPhone, calledCode] = sms.send.mock.calls[0];
+      expect(calledPhone).toBe(PHONE);
+      expect(calledCode).toMatch(/^\d{4}$/);
+    });
+
+    it('does not call the SMS provider in dev mode', async () => {
+      // NODE_ENV is 'test' in beforeEach — dev mode is active.
+      await service.sendOtp({ phone: PHONE });
+      expect(sms.send).not.toHaveBeenCalled();
+    });
+
+    it('propagates SMS provider failures so the client can retry', async () => {
+      process.env.NODE_ENV = 'production';
+      sms.send.mockRejectedValueOnce(new Error('gateway down'));
+
+      await expect(service.sendOtp({ phone: PHONE })).rejects.toThrow('gateway down');
     });
 
     it('rate limits resend: second send within the cooldown window is rejected (429)', async () => {

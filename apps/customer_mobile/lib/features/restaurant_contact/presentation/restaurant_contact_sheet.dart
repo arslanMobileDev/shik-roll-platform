@@ -169,6 +169,13 @@ class _RestaurantContactSheetState extends State<RestaurantContactSheet> {
           ContactAction.telegram,
           contacts.telegram!,
         ),
+      if (contacts.instagram != null)
+        _button(
+          'Перейти в Instagram',
+          Icons.camera_alt_outlined,
+          ContactAction.instagram,
+          contacts.instagram!,
+        ),
       if (contacts.address != null)
         _button(
           'Открыть в картах',
@@ -178,8 +185,9 @@ class _RestaurantContactSheetState extends State<RestaurantContactSheet> {
         ),
       if (contacts.phone == null &&
           contacts.whatsapp == null &&
-          contacts.telegram == null)
-        const Text('Телефон и мессенджеры пока не указаны.'),
+          contacts.telegram == null &&
+          contacts.instagram == null)
+        const Text('Контакты пока не указаны.'),
     ];
   }
 

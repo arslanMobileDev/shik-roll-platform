@@ -41,7 +41,9 @@ export class JwtAuthGuard implements CanActivate {
   protected async verify(token: string): Promise<AuthenticatedCustomer> {
     try {
       const payload = await this.jwt.verifyAsync<CustomerTokenPayload>(token);
-      if (payload.type !== 'access') {
+      if (payload.type !== 'access' ||
+          typeof payload.sub !== 'string' || !payload.sub.trim() ||
+          (payload.role !== undefined && payload.role !== 'CUSTOMER')) {
         throw new Error(`Unexpected token type: ${payload.type}`);
       }
       // Tokens minted before the role column existed fall back to CUSTOMER.

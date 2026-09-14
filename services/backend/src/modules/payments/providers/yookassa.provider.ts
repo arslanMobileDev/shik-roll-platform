@@ -18,6 +18,7 @@ import {
   PaymentProviderAdapter,
   PaymentSessionResult,
   YooKassaWebhookPayload,
+  WebhookPaymentExpectation,
   parseYooKassaWebhookEvent,
 } from '../payments.types';
 
@@ -32,6 +33,8 @@ const STATUS_MAP: Record<string, PaymentStatus> = {
 interface YooKassaPaymentResponse {
   id?: string;
   status?: string;
+  paid?: boolean;
+  amount?: { value?: string; currency?: string };
   confirmation?: { confirmation_url?: string };
   metadata?: Record<string, string>;
 }
@@ -145,6 +148,7 @@ export class YooKassaProvider implements PaymentProviderAdapter {
   async verifyWebhook(
     _headers: Record<string, string | string[] | undefined>,
     body: YooKassaWebhookPayload,
+    expected: WebhookPaymentExpectation,
   ): Promise<boolean> {
     const event = this.parseWebhookEvent(body);
     if (!event) return false;
@@ -154,6 +158,7 @@ export class YooKassaProvider implements PaymentProviderAdapter {
         `${YOOKASSA_API_URL}/payments/${encodeURIComponent(event.paymentId)}`,
         {
           method: 'GET',
+          signal: AbortSignal.timeout(10_000),
           headers: { Authorization: this.authorizationHeader() },
         },
       );
@@ -161,22 +166,34 @@ export class YooKassaProvider implements PaymentProviderAdapter {
         this.logger.warn(
           `Webhook verification failed for payment ${event.paymentId}: HTTP ${response.status}`,
         );
-        return false;
+        throw new Error('Payment verification HTTP failure');
       }
 
       const payment = (await response.json()) as YooKassaPaymentResponse;
+      if (!payment || typeof payment.id !== 'string' || typeof payment.status !== 'string' ||
+          typeof payment.amount?.value !== 'string' || typeof payment.amount.currency !== 'string') {
+        throw new Error('Malformed payment verification response');
+      }
       const expectedStatus =
         event.event === 'payment.succeeded' ? 'succeeded' : 'canceled';
       return (
         payment.id === event.paymentId &&
         payment.status === expectedStatus &&
-        (!event.orderId || payment.metadata?.orderId === event.orderId)
+        payment.amount.value === expected.amount.toFixed(2) &&
+        payment.amount.currency === expected.currency &&
+        payment.metadata?.orderId === expected.orderId &&
+        payment.metadata?.paymentId === expected.paymentId &&
+        (event.event !== 'payment.succeeded' || payment.paid === true)
       );
     } catch (error) {
       this.logger.warn(
         `Webhook verification unavailable for payment ${event.paymentId}: ${String(error)}`,
       );
-      return false;
+      throw new BadGatewayException({
+        statusCode: 502,
+        code: 'PAYMENT_VERIFICATION_UNAVAILABLE',
+        message: 'Payment verification is temporarily unavailable',
+      });
     }
   }
 

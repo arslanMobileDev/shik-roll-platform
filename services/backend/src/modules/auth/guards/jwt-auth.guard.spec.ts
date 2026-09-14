@@ -96,3 +96,20 @@ describe('OptionalJwtAuthGuard', () => {
     expect(request.customer).toEqual({ id: 'c2', phone: '+79991111111', role: 'CUSTOMER' });
   });
 });
+
+
+describe.each([JwtAuthGuard, OptionalJwtAuthGuard])('%s role boundaries', (Guard) => {
+  it.each([
+    { sub: 'c1', role: 'COURIER' }, { sub: 'c1', role: 'KITCHEN' },
+    { sub: 'c1', role: 'ADMIN' }, { sub: 'c1', role: null },
+    { role: 'CUSTOMER' }, { sub: '', role: 'CUSTOMER' },
+  ])('rejects unsafe claims %j', async (claims) => {
+    const jwt = new JwtService({ secret: SECRET });
+    const guard = new Guard(jwt);
+    const token = jwt.sign({ ...claims, type: 'access' });
+    const { context } = contextFor({ authorization: `Bearer ${token}` });
+    await expect(guard.canActivate(context)).rejects.toMatchObject({
+      response: { code: 'TOKEN_INVALID' },
+    });
+  });
+});

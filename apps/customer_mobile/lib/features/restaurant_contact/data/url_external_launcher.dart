@@ -54,6 +54,12 @@ final class UrlExternalLauncher implements ExternalLauncher {
           return null;
         }
         return Uri.https('t.me', '/$value');
+      case ContactAction.instagram:
+        if (value.startsWith('http://') || value.startsWith('https://')) {
+          return Uri.tryParse(value);
+        }
+        final handle = value.replaceFirst(RegExp(r'^@'), '');
+        return Uri.https('instagram.com', '/$handle');
       case ContactAction.maps:
         if (value.isEmpty || value.length > 1000) return null;
         return Uri.https('yandex.ru', '/maps/', {'text': value});

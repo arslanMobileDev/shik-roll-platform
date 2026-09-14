@@ -148,7 +148,7 @@ export class PaymentsService {
 
   /**
    * YooKassa webhook (https://yookassa.ru/developers/using-api/webhooks).
-   * Must always answer 200 fast — unknown payments and unsupported events
+   * Processing errors propagate for provider retry; unknown payments and unsupported events
    * are acknowledged as 'ignored' so the provider stops retrying. Repeated
    * delivery of payment.succeeded is a no-op (idempotent).
    */
@@ -158,11 +158,6 @@ export class PaymentsService {
   ): Promise<{ status: 'processed' | 'ignored' }> {
     const event = this.provider.parseWebhookEvent(payload);
     if (!event) {
-      return { status: 'ignored' };
-    }
-
-    if (!(await this.provider.verifyWebhook(headers, payload))) {
-      this.logger.warn(`Unverified webhook for payment ${event.paymentId}`);
       return { status: 'ignored' };
     }
 
@@ -176,8 +171,13 @@ export class PaymentsService {
       );
       return { status: 'ignored' };
     }
-    if (event.orderId && event.orderId !== payment.orderId) {
-      this.logger.warn(`Webhook order mismatch for payment ${event.paymentId}`);
+    if (!(await this.provider.verifyWebhook(headers, payload, {
+      paymentId: payment.id,
+      orderId: payment.orderId,
+      amount: payment.amount,
+      currency: payment.currency,
+    }))) {
+      this.logger.warn(`Unverified webhook for payment ${event.paymentId}`);
       return { status: 'ignored' };
     }
 
@@ -190,12 +190,6 @@ export class PaymentsService {
           `Succeeded webhook for canceled payment ${payment.id} — manual reconciliation required`,
         );
         return { status: 'ignored' };
-      }
-      const reported = payload.object?.amount?.value;
-      if (reported && reported !== payment.amount.toFixed(2)) {
-        this.logger.warn(
-          `Amount mismatch on payment ${payment.id}: expected ${payment.amount.toFixed(2)}, got ${reported}`,
-        );
       }
       await this.applyPaymentSuccess(payment.id);
       return { status: 'processed' };

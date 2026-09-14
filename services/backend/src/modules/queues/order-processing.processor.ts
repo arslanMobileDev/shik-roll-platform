@@ -1,10 +1,10 @@
-import { InjectQueue, OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { OrderStatus, Prisma } from '@prisma/client';
-import { Job, Queue } from 'bullmq';
+import { Job } from 'bullmq';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { lineTotal, orderSubtotal, orderTotal } from '../orders/domain/order-pricing';
-import { canTransition } from '../orders/domain/order-status-machine';
 import { ORDER_PROCESSING_QUEUE, ProcessOrderJobData } from './order-queues.service';
 
 const STATUS_TIMER_JOB = 'status-timer';
@@ -15,18 +15,8 @@ export interface StatusTimerJobData {
 }
 
 /**
- * Timer emulation for the order lifecycle (dev harness): after background
- * processing confirms an order, COOKING and READY follow on delays.
- * Overridable via env for tests/dev.
- */
-const STATUS_TIMER_DELAYS_MS: ReadonlyArray<{ to: OrderStatus; delayMs: number }> = [
-  { to: OrderStatus.COOKING, delayMs: Number(process.env.ORDER_TIMER_COOKING_MS ?? 30_000) },
-  { to: OrderStatus.READY, delayMs: Number(process.env.ORDER_TIMER_READY_MS ?? 90_000) },
-];
-
-/**
  * 'order-processing' worker: server-side totals recalculation, stop-list
- * verification and emulated status timers. Retry strategy comes from the
+ * verification. Kitchen and delivery progress is exclusively operator-driven. Retry strategy comes from the
  * queue defaults (3 attempts, exponential backoff from 1s) — BullMQ re-runs
  * the job on throw, and the failed handler logs terminal failures.
  */
@@ -37,8 +27,7 @@ export class OrderProcessingProcessor extends WorkerHost {
 
   constructor(
     private readonly prisma: PrismaService,
-    @InjectQueue(ORDER_PROCESSING_QUEUE)
-    private readonly queue: Queue<ProcessOrderJobData | StatusTimerJobData>,
+    private readonly loyalty: LoyaltyService,
   ) {
     super();
   }
@@ -49,7 +38,8 @@ export class OrderProcessingProcessor extends WorkerHost {
         await this.processOrder(job as Job<ProcessOrderJobData>);
         return;
       case STATUS_TIMER_JOB:
-        await this.advanceStatus(job as Job<StatusTimerJobData>);
+        // Drain legacy delayed jobs without touching orders or creating new jobs.
+        this.logger.warn(`Ignoring retired status-timer job ${job.id}`);
         return;
       default:
         this.logger.warn(`Unknown job name: ${job.name}`);
@@ -78,6 +68,14 @@ export class OrderProcessingProcessor extends WorkerHost {
       return;
     }
 
+    // A refund failure retries after cancellation has already committed.
+    if (order.status === OrderStatus.CANCELLED) {
+      if (order.cancelReason === 'STOP_LISTED') {
+        await this.loyalty.refundOnCancel(orderId);
+      }
+      return;
+    }
+
     // 1. Stop-list check: cancel the order if any line is stop-listed at the branch.
     const stopListed = await this.prisma.stopListEntry.findMany({
       where: {
@@ -97,6 +95,7 @@ export class OrderProcessingProcessor extends WorkerHost {
       await this.transitionWithHistory(orderId, order.status, OrderStatus.CANCELLED, {
         reason: 'STOP_LISTED',
       });
+      await this.loyalty.refundOnCancel(orderId);
       return;
     }
 
@@ -110,7 +109,8 @@ export class OrderProcessingProcessor extends WorkerHost {
       })),
     }));
     const subtotal = orderSubtotal(pricedItems);
-    const total = orderTotal(subtotal);
+    // Preserve the server-approved checkout discount, including on retries.
+    const total = orderTotal(subtotal.minus(order.bonusDiscountAmount));
 
     await this.prisma.$transaction([
       ...order.items.map((item, index) =>
@@ -125,40 +125,7 @@ export class OrderProcessingProcessor extends WorkerHost {
       }),
     ]);
 
-    // 3. Confirm the order and schedule the emulated lifecycle timers.
-    if (order.status === OrderStatus.NEW) {
-      await this.transitionWithHistory(orderId, OrderStatus.NEW, OrderStatus.CONFIRMED, {
-        reason: 'AUTO_CONFIRM',
-      });
-      for (const step of STATUS_TIMER_DELAYS_MS) {
-        await this.queue.add(
-          STATUS_TIMER_JOB,
-          { orderId, to: step.to },
-          { delay: step.delayMs, jobId: `status-timer-${orderId}-${step.to}` },
-        );
-      }
-    }
-  }
-
-  private async advanceStatus(job: Job<StatusTimerJobData>): Promise<void> {
-    const { orderId, to } = job.data;
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, deletedAt: null },
-      select: { status: true },
-    });
-    if (!order) {
-      this.logger.warn(`status-timer: order ${orderId} not found, skipping`);
-      return;
-    }
-    // Timer emulation must never break the state machine: skip transitions
-    // that no longer apply (e.g. the operator already moved or cancelled).
-    if (!canTransition(order.status, to)) {
-      this.logger.log(
-        `status-timer: skipping ${order.status} -> ${to} for order ${orderId} (not allowed)`,
-      );
-      return;
-    }
-    await this.transitionWithHistory(orderId, order.status, to, { reason: 'AUTO_TIMER' });
+    // No automatic confirmation or kitchen progression.
   }
 
   private async transitionWithHistory(
