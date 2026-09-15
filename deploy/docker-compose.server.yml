@@ -120,10 +120,6 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-      customer-web:
-        condition: service_healthy
-      kds-web:
-        condition: service_healthy
       back-office-web:
         condition: service_healthy
     networks: [shik_network]
