@@ -9,7 +9,7 @@ COPY pubspec.yaml pubspec.lock ./
 RUN flutter pub get
 COPY . .
 RUN test -n "$API_BASE_URL" && test -n "$BRAND_ID" && test -n "$BRANCH_ID"
-RUN flutter build web --release \
+RUN flutter build web --release --pwa-strategy=none \
     --dart-define=API_BASE_URL="$API_BASE_URL" \
     --dart-define=BRAND_ID="$BRAND_ID" \
     --dart-define=BRANCH_ID="$BRANCH_ID"
