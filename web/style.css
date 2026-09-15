@@ -1,0 +1,250 @@
+/* SHIK ROLL — статические страницы (юридические документы).
+   Палитра и типографика согласованы с мобильным приложением. */
+
+:root {
+  --header-bg: #2b2b2b;
+  --brand-red: #e63946;
+  --brand-green: #5cbf60;
+  --page-bg: #f5f5f7;
+  --card-bg: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #8a8a8e;
+  --border: #e5e5ea;
+  --radius: 14px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+/* Фон страницы: светло-серый + два мягких цветных пятна по углам,
+   нарисованы как radial-gradient — работают надёжнее псевдоэлементов. */
+html {
+  background:
+    radial-gradient(circle 500px at 0% 0%, rgba(230, 57, 70, 0.10), transparent 70%),
+    radial-gradient(circle 540px at 100% 100%, rgba(92, 191, 96, 0.12), transparent 70%),
+    #f5f5f7;
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+body {
+  background: transparent;
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Верхняя тёмная шапка с логотипом */
+.topbar {
+  background: var(--header-bg);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.topbar .logo {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+}
+
+.topbar .logo span {
+  color: var(--brand-red);
+}
+
+.badge-halal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--brand-green);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.badge-halal::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  display: inline-block;
+}
+
+/* Контейнер для контента */
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+/* Белая карточка как в приложении */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28px 24px;
+  margin-bottom: 16px;
+}
+
+/* Типографика заголовков */
+h1 {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  letter-spacing: -0.3px;
+}
+
+h2 {
+  font-size: 19px;
+  font-weight: 700;
+  margin: 32px 0 10px;
+  letter-spacing: -0.2px;
+}
+
+h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 20px 0 8px;
+}
+
+p {
+  margin: 0 0 12px;
+}
+
+.muted {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+ul, ol {
+  padding-left: 22px;
+  margin: 8px 0 16px;
+}
+
+li {
+  margin-bottom: 6px;
+}
+
+strong {
+  font-weight: 600;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 28px 0;
+}
+
+/* Ссылки */
+a {
+  color: var(--brand-red);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Навигация (главная + перекрёстные ссылки) */
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0 8px;
+}
+
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  background: var(--card-bg);
+  border-radius: 999px;
+  padding: 10px 18px;
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 15px;
+  box-shadow: var(--shadow);
+}
+
+.nav a:hover {
+  color: var(--brand-red);
+  text-decoration: none;
+}
+
+/* Кнопка действия (как «В корзину» в приложении) */
+.btn {
+  display: inline-block;
+  background: var(--brand-red);
+  color: #ffffff;
+  font-weight: 600;
+  padding: 12px 22px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.btn:hover {
+  text-decoration: none;
+  filter: brightness(0.95);
+}
+
+/* Реквизиты / метаданные */
+.meta {
+  background: #fafafa;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.meta strong {
+  color: var(--text-primary);
+}
+
+/* Подвал */
+footer {
+  text-align: center;
+  padding: 24px 16px 40px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+footer a {
+  color: var(--text-secondary);
+  margin: 0 8px;
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 22px 18px;
+  }
+  h1 {
+    font-size: 22px;
+  }
+  h2 {
+    font-size: 17px;
+  }
+  body {
+    font-size: 15px;
+  }
+}
+
