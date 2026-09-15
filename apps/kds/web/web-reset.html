@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ru"><meta charset="utf-8"><title>SHIK: обновление</title>
+<body><p id="status">Обновление файлов приложения…</p><script>
+async function retireFlutterCache() {
+  if ('serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const registration of registrations) {
+      const workers = [registration.active, registration.waiting, registration.installing];
+      if (workers.some(worker => worker &&
+          new URL(worker.scriptURL).pathname.endsWith('/flutter_service_worker.js'))) {
+        await registration.unregister();
+      }
+    }
+  }
+  if ('caches' in window) {
+    const names = ['flutter-app-cache', 'flutter-temp-cache', 'flutter-app-manifest'];
+    await Promise.all(names.map(name => caches.delete(name)));
+  }
+}
+
+retireFlutterCache().then(() => {
+  // Cache-busting navigation also escapes an old cached index response.
+  location.replace('/?web_reset=' + Date.now());
+}).catch(() => {
+  document.getElementById('status').textContent =
+    'Закройте остальные вкладки этого сайта и повторите обновление.';
+});
+</script></body></html>

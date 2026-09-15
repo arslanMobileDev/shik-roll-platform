@@ -1,8 +1,7 @@
 .dart_tool
-.idea
-.vscode
 build
 coverage
-test
-*.log
 .git
+.idea
+.vscode
+*.log
