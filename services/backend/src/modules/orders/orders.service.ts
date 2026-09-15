@@ -78,6 +78,33 @@ export class OrdersService {
   }
 
   /**
+   * Staff view of the orders journal (back office): all orders of a brand /
+   * branch without the customer scope. Caller (StaffOrdersController)
+   * applies role-based restrictions — a MANAGER only sees their own branch.
+   */
+  async listAll(query: OrderQueryDto): Promise<OrderPage> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const { records, total } = await this.repository.list({
+      brandId: query.brandId,
+      branchId: query.branchId,
+      statuses: query.status,
+      excludePendingPayment: !query.status?.length,
+      page,
+      limit,
+    });
+    return {
+      data: records.map((record) => toOrderEntity(record)),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
    * Order history of the authenticated guest (mobile app "My orders").
    * Always scoped to the token's customer, always sorted newest first.
    */
