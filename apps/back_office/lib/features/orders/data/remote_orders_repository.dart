@@ -22,7 +22,7 @@ final class RemoteOrdersRepository implements OrdersRepository {
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
-        '/orders',
+        '/staff/orders',
         queryParameters: {
           'branchId': branchId,
           if (status != null) 'status': status.wireName,
