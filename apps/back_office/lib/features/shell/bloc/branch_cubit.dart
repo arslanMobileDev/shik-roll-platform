@@ -18,7 +18,7 @@ final class BranchCubit extends Cubit<Branch> {
 
   static const List<Branch> branches = [
     Branch(
-      id: '47ad77ce-acf4-4778-a185-974d3a4a2413',
+      id: '904331fe-5efe-4ca8-9c17-ceccc6dd3839',
       name: 'SHIK ROLL · Центр',
     ),
   ];
