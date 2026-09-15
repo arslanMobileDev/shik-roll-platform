@@ -20,7 +20,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _phoneController = TextEditingController(text: '+7 ');
+  final _phoneController = TextEditingController();
   final _pinController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
@@ -190,16 +190,17 @@ class _LoginCard extends StatelessWidget {
               controller: phoneController,
               keyboardType: TextInputType.phone,
               enabled: !_isSubmitting(context),
+              inputFormatters: [_PhoneInputFormatter()],
               style: const TextStyle(fontSize: 16, color: AppColors.ink),
               decoration: const InputDecoration(
                 labelText: 'Телефон',
-                hintText: '+7 928 123-45-67',
+                hintText: '+7 (999) 123-45-67',
                 prefixIcon: Icon(Icons.phone_outlined, size: 20),
               ),
               validator: (value) {
                 final v = (value ?? '').replaceAll(RegExp(r'\D'), '');
                 if (v.length < 11) {
-                  return 'Введите телефон в формате +7 XXX XXX-XX-XX';
+                  return 'Введите телефон полностью';
                 }
                 return null;
               },
@@ -315,6 +316,60 @@ class _SubmitButton extends StatelessWidget {
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
       ),
+    );
+  }
+}
+
+/// Маска телефона +7 (XXX) XXX-XX-XX.
+///
+/// Принимает любые цифры (в том числе с ведущей 8 — заменяет на 7),
+/// автоматически вставляет скобки, пробелы и дефисы по мере ввода.
+/// Курсор всегда переносится в конец — этого достаточно для логина.
+class _PhoneInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+
+    // Ведущая 8 → 7 (старая привычка с городских номеров)
+    if (digits.startsWith('8')) {
+      digits = '7${digits.substring(1)}';
+    } else if (digits.isNotEmpty && !digits.startsWith('7')) {
+      digits = '7$digits';
+    }
+
+    if (digits.length > 11) {
+      digits = digits.substring(0, 11);
+    }
+
+    if (digits.isEmpty) {
+      return const TextEditingValue(text: '');
+    }
+
+    final buf = StringBuffer('+7');
+    if (digits.length > 1) {
+      buf.write(' (');
+      buf.write(digits.substring(1, digits.length < 4 ? digits.length : 4));
+    }
+    if (digits.length >= 5) {
+      buf.write(') ');
+      buf.write(digits.substring(4, digits.length < 7 ? digits.length : 7));
+    }
+    if (digits.length >= 8) {
+      buf.write('-');
+      buf.write(digits.substring(7, digits.length < 9 ? digits.length : 9));
+    }
+    if (digits.length >= 10) {
+      buf.write('-');
+      buf.write(digits.substring(9, digits.length < 11 ? digits.length : 11));
+    }
+
+    final formatted = buf.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

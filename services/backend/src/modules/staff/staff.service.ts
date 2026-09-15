@@ -35,8 +35,12 @@ export class StaffService {
   ) {}
 
   async authenticateByPin(dto: StaffPinAuthDto): Promise<StaffAuthResponse> {
+    // Normalise: strip spaces, dashes, parentheses; keep leading +.
+    // Accepts +7 928 313-51-91, +7(928)3135191, 89283135191 — all map
+    // to the canonical +79283135191 stored in the DB.
+    const phone = dto.phone.replace(/[\s\-()]/g, '');
     const staff = await this.prisma.staff.findUnique({
-      where: { phone: dto.phone },
+      where: { phone },
     });
     if (!staff || !staff.isActive || !(await bcrypt.compare(dto.pin, staff.pinHash))) {
       throw new UnauthorizedException({
