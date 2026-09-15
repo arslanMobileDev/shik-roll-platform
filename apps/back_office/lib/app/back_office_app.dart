@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../core/theme/app_theme.dart';
+import '../features/auth/data/auth_repository.dart';
 import '../features/branch_settings/bloc/branch_settings_cubit.dart';
 import '../features/branch_settings/view/branch_settings_screen.dart';
 import '../features/cook_shifts/bloc/cook_shifts_cubit.dart';
@@ -18,11 +19,49 @@ import '../features/orders/data/orders_repository.dart';
 import '../features/orders/view/orders_journal_screen.dart';
 import '../features/shell/bloc/branch_cubit.dart';
 import '../features/shell/view/back_office_shell.dart';
+import 'auth_gate.dart';
 
 /// SHIK ROLL Back Office root widget (Flutter Web, ADR-1600 / UI-805).
+///
+/// Wraps the shell with [AuthGate]: unauthenticated visitors see the login
+/// form, once a staff token is stored the shell renders. A 401 from any
+/// request drops the session and returns the login screen automatically.
 class BackOfficeApp extends StatelessWidget {
   const BackOfficeApp({
     super.key,
+    required this.authRepository,
+    required this.repository,
+    required this.cookShiftsRepository,
+    required this.ordersRepository,
+  });
+
+  final AuthRepository authRepository;
+  final BackOfficeRepository repository;
+  final CookShiftsRepository cookShiftsRepository;
+  final OrdersRepository ordersRepository;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'SHIK ROLL · Back Office',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light(),
+      home: AuthGate(
+        authRepository: authRepository,
+        authenticatedBuilder: (_) => _AuthenticatedShell(
+          repository: repository,
+          cookShiftsRepository: cookShiftsRepository,
+          ordersRepository: ordersRepository,
+        ),
+      ),
+    );
+  }
+}
+
+/// The authenticated tree: repository provider, blocs and the shell.
+/// Only built after AuthGate confirms a valid session.
+class _AuthenticatedShell extends StatelessWidget {
+  const _AuthenticatedShell({
     required this.repository,
     required this.cookShiftsRepository,
     required this.ordersRepository,
@@ -62,19 +101,14 @@ class BackOfficeApp extends StatelessWidget {
                 ),
           ),
         ],
-        child: MaterialApp(
-          title: 'SHIK ROLL · Back Office',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.light(),
-          home: BackOfficeShell(
-            sectionBuilder: (section) => switch (section) {
-              BackOfficeSection.menu => const MenuListScreen(),
-              BackOfficeSection.stopLists => const StopListScreen(),
-              BackOfficeSection.orders => const OrdersJournalScreen(),
-              BackOfficeSection.cookShifts => const CookShiftsScreen(),
-              BackOfficeSection.branchSettings => const BranchSettingsScreen(),
-            },
-          ),
+        child: BackOfficeShell(
+          sectionBuilder: (section) => switch (section) {
+            BackOfficeSection.menu => const MenuListScreen(),
+            BackOfficeSection.stopLists => const StopListScreen(),
+            BackOfficeSection.orders => const OrdersJournalScreen(),
+            BackOfficeSection.cookShifts => const CookShiftsScreen(),
+            BackOfficeSection.branchSettings => const BranchSettingsScreen(),
+          },
         ),
       ),
     );

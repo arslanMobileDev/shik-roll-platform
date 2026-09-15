@@ -85,6 +85,23 @@ services:
     restart: unless-stopped
     networks: [shik_network]
 
+  back-office-web:
+    build:
+      context: ../apps/back_office
+      dockerfile: Dockerfile.web
+      args:
+        API_BASE_URL: ${API_BASE_URL:?API_BASE_URL is required}
+    image: shik-back-office-web:production
+    container_name: shik_back_office_web
+    restart: unless-stopped
+    networks: [shik_network]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
   nginx:
     image: nginx:1.27-alpine
     container_name: shik_nginx
@@ -106,6 +123,8 @@ services:
       customer-web:
         condition: service_healthy
       kds-web:
+        condition: service_healthy
+      back-office-web:
         condition: service_healthy
     networks: [shik_network]
 
