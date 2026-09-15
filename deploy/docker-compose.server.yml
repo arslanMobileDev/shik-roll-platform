@@ -98,6 +98,8 @@ services:
       - certbot_www:/var/www/certbot
       # Статика /uploads/menu/ — read-only, публикует только backend (ADR-008).
       - uploads_data:/srv/uploads:ro
+      # Статический сайт: лендинг + юридические документы (web/ в репе)
+      - ../web:/var/www/shik-roll:ro
     depends_on:
       backend:
         condition: service_healthy
