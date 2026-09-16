@@ -1,3 +1,4 @@
+import { StaffCouriersController, CourierStaffAuthGuard } from './staff-couriers.controller';
 import { Module } from '@nestjs/common';
 import { CouriersController } from './couriers.controller';
 import { CouriersService } from './couriers.service';
@@ -8,8 +9,8 @@ import { LoyaltyModule } from '../loyalty/loyalty.module';
 
 @Module({
   imports: [PrismaModule, KitchenModule, LoyaltyModule, CouriersEventsModule],
-  controllers: [CouriersController],
-  providers: [CouriersService],
+  controllers: [CouriersController, StaffCouriersController],
+  providers: [CouriersService, CourierStaffAuthGuard],
   exports: [CouriersService, CouriersEventsModule],
 })
 export class CouriersModule {}

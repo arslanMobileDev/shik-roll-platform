@@ -1,3 +1,8 @@
+import '../features/couriers/bloc/couriers_cubit.dart';
+import '../features/couriers/data/couriers_repository.dart';
+import '../features/couriers/data/remote_couriers_repository.dart';
+import '../features/couriers/data/fake_couriers_repository.dart';
+import '../features/couriers/view/couriers_screen.dart';
 import '../core/config/api_config.dart';
 import '../features/dashboard/data/cooks_analytics_repository.dart';
 import '../features/cooks/data/cooks_repository.dart';
@@ -38,6 +43,7 @@ class BackOfficeApp extends StatelessWidget {
   const BackOfficeApp({
     super.key,
     required this.authRepository,
+    this.couriersRepository,
     required this.repository,
     required this.cookShiftsRepository,
     required this.ordersRepository,
@@ -45,6 +51,7 @@ class BackOfficeApp extends StatelessWidget {
   });
 
   final AuthRepository authRepository;
+  final CouriersRepository? couriersRepository;
   final BackOfficeRepository repository;
   final CookShiftsRepository cookShiftsRepository;
   final OrdersRepository ordersRepository;
@@ -59,6 +66,11 @@ class BackOfficeApp extends StatelessWidget {
       home: AuthGate(
         authRepository: authRepository,
         authenticatedBuilder: (_) => _AuthenticatedShell(
+          couriersRepository:
+              couriersRepository ??
+              (ApiConfig.useFakeRepository
+                  ? FakeCouriersRepository()
+                  : RemoteCouriersRepository()),
           repository: repository,
           cookShiftsRepository: cookShiftsRepository,
           ordersRepository: ordersRepository,
@@ -73,12 +85,14 @@ class BackOfficeApp extends StatelessWidget {
 /// Only built after AuthGate confirms a valid session.
 class _AuthenticatedShell extends StatelessWidget {
   const _AuthenticatedShell({
+    required this.couriersRepository,
     required this.repository,
     required this.cookShiftsRepository,
     required this.ordersRepository,
     required this.dashboardRepository,
   });
 
+  final CouriersRepository couriersRepository;
   final BackOfficeRepository repository;
   final CookShiftsRepository cookShiftsRepository;
   final OrdersRepository ordersRepository;
@@ -91,6 +105,11 @@ class _AuthenticatedShell extends StatelessWidget {
       child: MultiBlocProvider(
         providers: [
           BlocProvider(create: (_) => BranchCubit()),
+          BlocProvider(
+            create: (context) =>
+                CouriersCubit(couriersRepository)
+                  ..load(context.read<BranchCubit>().state.id),
+          ),
           BlocProvider(
             create: (context) =>
                 CooksCubit(CooksRepository())
@@ -131,6 +150,7 @@ class _AuthenticatedShell extends StatelessWidget {
           listener: (context, branch) {
             context.read<DashboardCubit>().load(branch.id);
             context.read<CooksCubit>().load(branch.id);
+            context.read<CouriersCubit>().load(branch.id);
             context.read<CookShiftsCubit>().load(branch.id);
           },
           child: BackOfficeShell(
@@ -140,6 +160,7 @@ class _AuthenticatedShell extends StatelessWidget {
               BackOfficeSection.stopLists => const StopListScreen(),
               BackOfficeSection.orders => const OrdersJournalScreen(),
               BackOfficeSection.cooks => const CooksScreen(),
+              BackOfficeSection.couriers => const CouriersScreen(),
               BackOfficeSection.cookShifts => const CookShiftsScreen(),
               BackOfficeSection.branchSettings => const BranchSettingsScreen(),
             },
