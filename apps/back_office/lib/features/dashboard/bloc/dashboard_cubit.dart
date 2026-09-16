@@ -1,10 +1,16 @@
+import '../data/cooks_analytics_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../data/dashboard_repository.dart';
 import '../data/models/revenue_summary.dart';
 import 'dashboard_state.dart';
 
 final class DashboardCubit extends Cubit<DashboardState> {
-  DashboardCubit({required this.repository}) : super(const DashboardState());
+  DashboardCubit({
+    required this.repository,
+    CooksAnalyticsRepository? cooksRepository,
+  }) : cooksRepository = cooksRepository ?? EmptyCooksAnalyticsRepository(),
+       super(const DashboardState());
+  final CooksAnalyticsRepository cooksRepository;
   final DashboardRepository repository;
   int _request = 0;
   static const cardPeriods = [

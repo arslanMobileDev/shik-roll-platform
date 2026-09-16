@@ -1,3 +1,8 @@
+import '../core/config/api_config.dart';
+import '../features/dashboard/data/cooks_analytics_repository.dart';
+import '../features/cooks/data/cooks_repository.dart';
+import '../features/cooks/bloc/cooks_cubit.dart';
+import '../features/cooks/view/cooks_screen.dart';
 import '../features/dashboard/data/dashboard_repository.dart';
 import '../features/dashboard/bloc/dashboard_cubit.dart';
 import '../features/dashboard/view/dashboard_screen.dart';
@@ -88,8 +93,16 @@ class _AuthenticatedShell extends StatelessWidget {
           BlocProvider(create: (_) => BranchCubit()),
           BlocProvider(
             create: (context) =>
-                DashboardCubit(repository: dashboardRepository)
+                CooksCubit(CooksRepository())
                   ..load(context.read<BranchCubit>().state.id),
+          ),
+          BlocProvider(
+            create: (context) => DashboardCubit(
+              repository: dashboardRepository,
+              cooksRepository: ApiConfig.useFakeRepository
+                  ? EmptyCooksAnalyticsRepository()
+                  : RemoteCooksAnalyticsRepository(),
+            )..load(context.read<BranchCubit>().state.id),
           ),
           BlocProvider(
             create: (_) => MenuCatalogBloc(repository: repository)
@@ -115,14 +128,18 @@ class _AuthenticatedShell extends StatelessWidget {
           ),
         ],
         child: BlocListener<BranchCubit, Branch>(
-          listener: (context, branch) =>
-              context.read<DashboardCubit>().load(branch.id),
+          listener: (context, branch) {
+            context.read<DashboardCubit>().load(branch.id);
+            context.read<CooksCubit>().load(branch.id);
+            context.read<CookShiftsCubit>().load(branch.id);
+          },
           child: BackOfficeShell(
             sectionBuilder: (section) => switch (section) {
               BackOfficeSection.dashboard => const DashboardScreen(),
               BackOfficeSection.menu => const MenuListScreen(),
               BackOfficeSection.stopLists => const StopListScreen(),
               BackOfficeSection.orders => const OrdersJournalScreen(),
+              BackOfficeSection.cooks => const CooksScreen(),
               BackOfficeSection.cookShifts => const CookShiftsScreen(),
               BackOfficeSection.branchSettings => const BranchSettingsScreen(),
             },

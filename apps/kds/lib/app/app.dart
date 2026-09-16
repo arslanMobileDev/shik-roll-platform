@@ -1,3 +1,5 @@
+import '../features/auth/bloc/cook_auth_cubit.dart';
+import '../features/auth/view/cook_gate.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -107,12 +109,19 @@ class _AuthenticatedBoard extends StatelessWidget {
           )..add(const KdsOrdersStarted()),
         ),
         BlocProvider(
-          create: (_) =>
-              CookShiftCubit(repository: cookShiftRepository)
-                ..load(session.branchId),
+          create: (_) {
+            final cubit = CookShiftCubit(repository: cookShiftRepository);
+            if (KdsConfig.allowMocks) cubit.load(session.branchId);
+            return cubit;
+          },
         ),
       ],
-      child: KdsScreen(alertService: alertService),
+      child: getIt.isRegistered<CookAuthCubit>() && !KdsConfig.allowMocks
+          ? CookGate(
+              cubit: getIt<CookAuthCubit>(),
+              child: KdsScreen(alertService: alertService),
+            )
+          : KdsScreen(alertService: alertService),
     );
   }
 }

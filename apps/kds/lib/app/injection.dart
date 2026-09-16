@@ -1,3 +1,5 @@
+import '../features/auth/bloc/cook_auth_cubit.dart';
+import '../features/auth/data/cook_auth_repository.dart';
 import 'package:get_it/get_it.dart';
 
 import '../core/audio/kitchen_alert_service.dart';
@@ -26,6 +28,16 @@ bool get _demoMode => KdsConfig.allowMocks;
 /// silent stream — no network at all.
 void setupInjection() {
   KdsConfig.validate();
+  if (!getIt.isRegistered<CookAuthCubit>()) {
+    getIt.registerLazySingleton<CookAuthCubit>(
+      () => CookAuthCubit(
+        HttpCookAuthRepository(
+          baseUrl: KdsConfig.apiBaseUrl,
+          terminalToken: () => getIt<KitchenSessionStore>().session?.token,
+        ),
+      ),
+    );
+  }
   if (!getIt.isRegistered<KitchenSessionStore>()) {
     getIt.registerLazySingleton<KitchenSessionStore>(KitchenSessionStore.new);
   }
@@ -60,8 +72,10 @@ void setupInjection() {
         storage: getIt<KitchenTokenStorage>(),
         sessionStore: getIt<KitchenSessionStore>(),
       );
-      getIt<KitchenSessionStore>().onSessionInvalid =
-          cubit.handleSessionExpired;
+      getIt<KitchenSessionStore>().onSessionInvalid = () {
+        getIt<CookAuthCubit>().expire();
+        cubit.handleSessionExpired();
+      };
       return cubit;
     });
   }
@@ -70,7 +84,16 @@ void setupInjection() {
     getIt.registerLazySingleton<KdsOrdersRepository>(
       () => _demoMode
           ? FakeKdsOrdersRepository()
-          : HttpKdsOrdersRepository(getIt<ApiClient>()),
+          : HttpKdsOrdersRepository(
+              getIt<ApiClient>(),
+              mutationDio: ApiClient(
+                baseUrl: KdsConfig.apiBaseUrl,
+                tokenProvider: () =>
+                    getIt<KitchenSessionStore>().session?.token,
+              ).dio,
+              cookToken: () => getIt<CookAuthCubit>().state.session?.token,
+              onCookExpired: () => getIt<CookAuthCubit>().expire(),
+            ),
     );
   }
 

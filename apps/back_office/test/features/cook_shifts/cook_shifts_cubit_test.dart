@@ -7,6 +7,15 @@ import 'test_cook_shifts_repository.dart';
 void main() {
   const branchId = 'branch-center';
 
+  test('period is part of state identity during concurrent loading', () {
+    expect(
+      const CookShiftsState(status: CookShiftsStatus.loading, period: 'today'),
+      isNot(
+        const CookShiftsState(status: CookShiftsStatus.loading, period: 'week'),
+      ),
+    );
+  });
+
   group('CookShiftsCubit — загрузка', () {
     blocTest<CookShiftsCubit, CookShiftsState>(
       'load: loading → ready, активные смены первыми, затем свежие',
@@ -71,11 +80,7 @@ void main() {
         repository: TestCookShiftsRepository(
           shifts: [
             buildShift(id: 'a', completedOrders: 10),
-            buildShift(
-              id: 'b',
-              completedOrders: 5,
-              clockOutAt: kShiftNow,
-            ),
+            buildShift(id: 'b', completedOrders: 5, clockOutAt: kShiftNow),
             buildShift(
               id: 'other-branch',
               branchId: 'branch-north',

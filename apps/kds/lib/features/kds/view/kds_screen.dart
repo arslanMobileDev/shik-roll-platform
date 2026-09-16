@@ -1,3 +1,8 @@
+import '../../../app/injection.dart';
+import '../../../core/config/kds_config.dart';
+import '../../auth/bloc/cook_auth_cubit.dart';
+import '../../auth/view/cook_gate.dart';
+import '../../auth/view/cook_stats_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -98,7 +103,17 @@ class KdsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Кухня — SHIK ROLL'),
         actions: [
-          const CookShiftHeader(),
+          if (getIt.isRegistered<CookAuthCubit>() && !KdsConfig.allowMocks)
+            CookHeader(
+              onStats: (repository, session) => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      CookStatsScreen(repository: repository, session: session),
+                ),
+              ),
+            )
+          else
+            const CookShiftHeader(),
           const SizedBox(width: AppSpacing.s12),
           if (alertService case final alerts?) ...[
             _SoundUnlockButton(alertService: alerts),
@@ -134,7 +149,15 @@ class KdsScreen extends StatelessWidget {
             key: const Key('kds-logout-button'),
             tooltip: 'Выйти из терминала',
             icon: const Icon(Icons.logout),
-            onPressed: () => context.read<KitchenAuthCubit>().logout(),
+            onPressed: () async {
+              if (getIt.isRegistered<CookAuthCubit>() &&
+                  !await getIt<CookAuthCubit>().logout()) {
+                return;
+              }
+              if (context.mounted) {
+                await context.read<KitchenAuthCubit>().logout();
+              }
+            },
           ),
           const SizedBox(width: AppSpacing.s8),
         ],

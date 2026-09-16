@@ -69,12 +69,13 @@ describe('KitchenController auth wiring', () => {
     const controller = new KitchenController(kitchenService as never, {} as never);
     const dto = { status: 'COOKING' as const, expectedVersion: 3 };
 
-    await controller.updateOrderStatus(TERMINAL, 'order-1', dto);
+    await controller.updateOrderStatus(TERMINAL, 'order-1', dto, {} as never);
 
     expect(kitchenService.updateOrderStatus).toHaveBeenCalledWith(
       TERMINAL,
       'order-1',
       dto,
+      undefined,
     );
   });
 });

@@ -1,3 +1,4 @@
+import 'top_cooks_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -170,6 +171,10 @@ class DashboardScreen extends StatelessWidget {
                   [item.name, '${item.quantity}', _money(item.revenue)],
               ],
               numericFrom: 1,
+            ),
+            TopCooksCard(
+              state: state,
+              repository: context.read<DashboardCubit>().cooksRepository,
             ),
             const Padding(
               padding: EdgeInsets.only(top: 8),

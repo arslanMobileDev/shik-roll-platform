@@ -11,12 +11,17 @@ final class CookShiftsState extends Equatable {
   const CookShiftsState({
     this.status = CookShiftsStatus.initial,
     this.branchId = '',
+    this.period = 'today',
+    this.dateFrom,
+    this.dateTo,
     this.shifts = const [],
     this.errorMessage,
   });
 
   final CookShiftsStatus status;
   final String branchId;
+  final String period;
+  final DateTime? dateFrom, dateTo;
   final List<CookShiftRecord> shifts;
   final String? errorMessage;
 
@@ -30,27 +35,42 @@ final class CookShiftsState extends Equatable {
 
   /// Open shifts first, then the most recently clocked-in.
   List<CookShiftRecord> get displayShifts {
-    final sorted = [...shifts]..sort((a, b) {
-      if (a.isActive != b.isActive) return a.isActive ? -1 : 1;
-      return b.clockInAt.compareTo(a.clockInAt);
-    });
+    final sorted = [...shifts]
+      ..sort((a, b) {
+        if (a.isActive != b.isActive) return a.isActive ? -1 : 1;
+        return b.clockInAt.compareTo(a.clockInAt);
+      });
     return List.unmodifiable(sorted);
   }
 
   CookShiftsState copyWith({
     CookShiftsStatus? status,
     String? branchId,
+    String? period,
+    DateTime? dateFrom,
+    DateTime? dateTo,
     List<CookShiftRecord>? shifts,
     String? Function()? errorMessage,
   }) => CookShiftsState(
     status: status ?? this.status,
     branchId: branchId ?? this.branchId,
+    period: period ?? this.period,
+    dateFrom: dateFrom ?? this.dateFrom,
+    dateTo: dateTo ?? this.dateTo,
     shifts: shifts ?? this.shifts,
     errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
   );
 
   @override
-  List<Object?> get props => [status, branchId, shifts, errorMessage];
+  List<Object?> get props => [
+    status,
+    branchId,
+    shifts,
+    errorMessage,
+    period,
+    dateFrom,
+    dateTo,
+  ];
 }
 
 /// Loads kitchen shift history for the active branch.
@@ -59,18 +79,35 @@ final class CookShiftsCubit extends Cubit<CookShiftsState> {
 
   final CookShiftsRepository repository;
 
-  Future<void> load(String branchId) async {
+  int _request = 0;
+  Future<void> load(
+    String branchId, {
+    String? period,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+  }) async {
+    final request = ++_request;
     emit(
       state.copyWith(
         status: CookShiftsStatus.loading,
         branchId: branchId,
+        period: period,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
         errorMessage: () => null,
       ),
     );
     try {
-      final shifts = await repository.fetchShifts(branchId: branchId);
+      final shifts = await repository.fetchShifts(
+        branchId: branchId,
+        period: state.period,
+        dateFrom: state.period == 'custom' ? state.dateFrom : null,
+        dateTo: state.period == 'custom' ? state.dateTo : null,
+      );
+      if (isClosed || request != _request) return;
       emit(state.copyWith(status: CookShiftsStatus.ready, shifts: shifts));
     } on Object catch (e) {
+      if (isClosed || request != _request) return;
       emit(
         state.copyWith(
           status: CookShiftsStatus.failure,

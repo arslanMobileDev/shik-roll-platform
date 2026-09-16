@@ -30,8 +30,12 @@ final class CookShiftRecord extends Equatable {
     this.clockOutAt,
     this.completedOrders = 0,
     this.avgPrepSeconds,
+    this.terminalCode = '',
+    this.durationMinutes = 0,
   });
 
+  final String terminalCode;
+  final int durationMinutes;
   final String id;
   final String cookId;
   final String cookName;
@@ -48,24 +52,23 @@ final class CookShiftRecord extends Equatable {
 
   bool get isActive => clockOutAt == null;
 
-  factory CookShiftRecord.fromJson(Map<String, dynamic> json) =>
-      CookShiftRecord(
-        id: json['id'] as String? ?? '',
-        cookId: json['cookId'] as String? ?? '',
-        cookName: json['cookName'] as String? ?? '',
-        role: CookRole.fromWire(json['role'] as String? ?? ''),
-        branchId: json['branchId'] as String? ?? '',
-        clockInAt:
-            DateTime.tryParse(
-              json['clockInAt'] as String? ?? '',
-            )?.toLocal() ??
-            DateTime.fromMillisecondsSinceEpoch(0),
-        clockOutAt: DateTime.tryParse(
-          json['clockOutAt'] as String? ?? '',
-        )?.toLocal(),
-        completedOrders: (json['completedOrders'] as num?)?.toInt() ?? 0,
-        avgPrepSeconds: (json['avgPrepSeconds'] as num?)?.toInt(),
-      );
+  factory CookShiftRecord.fromJson(
+    Map<String, dynamic> json,
+  ) => CookShiftRecord(
+    id: json['id'] as String? ?? '',
+    cookId: json['cookId'] as String? ?? '',
+    cookName: json['cookName'] as String? ?? '',
+    role: CookRole.fromWire(json['role'] as String? ?? ''),
+    branchId: json['branchId'] as String? ?? '',
+    clockInAt:
+        DateTime.tryParse(json['startedAt'] as String? ?? '')?.toLocal() ??
+        DateTime.fromMillisecondsSinceEpoch(0),
+    clockOutAt: DateTime.tryParse(json['endedAt'] as String? ?? '')?.toLocal(),
+    completedOrders: (json['ordersCooked'] as num?)?.toInt() ?? 0,
+    avgPrepSeconds: ((json['averageCookingMinutes'] as num? ?? 0) * 60).round(),
+    terminalCode: json['terminalCode'] as String? ?? '',
+    durationMinutes: (json['durationMinutes'] as num? ?? 0).toInt(),
+  );
 
   @override
   List<Object?> get props => [
@@ -78,5 +81,7 @@ final class CookShiftRecord extends Equatable {
     clockOutAt,
     completedOrders,
     avgPrepSeconds,
+    terminalCode,
+    durationMinutes,
   ];
 }

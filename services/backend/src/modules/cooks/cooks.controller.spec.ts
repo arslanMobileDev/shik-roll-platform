@@ -1,0 +1,22 @@
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { JwtModule, JwtService } from '@nestjs/jwt';
+import request from 'supertest';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CooksController, StaffCooksController } from './cooks.controller';
+import { CooksService } from './cooks.service';
+import { CookSessionService } from './cook-session.service';
+import { CookStatisticsService } from './cook-statistics.service';
+const branch = '904331fe-5efe-4ca8-9c17-ceccc6dd3839';
+describe('Cooks HTTP contract', () => {
+    let app: INestApplication, jwt: JwtService;
+    const db = { staff: { findUnique: jest.fn().mockResolvedValue({ id: 'staff', phone: '', brandId: 'brand', role: 'OWNER', isActive: true }) }, kitchenTerminal: { findUnique: jest.fn().mockResolvedValue({ id: 'terminal', branchId: branch, isActive: true }) }, cookShift: { findUnique: jest.fn().mockResolvedValue({ id: 'shift', cookId: 'cook', terminalId: 'terminal', branchId: branch, startedAt: new Date(), endedAt: null, cook: { isActive: true, branchId: branch }, terminal: { isActive: true, branchId: branch } }) } };
+    beforeAll(async () => { const m = await Test.createTestingModule({ imports: [JwtModule.register({ secret: 'http-test' })], controllers: [CooksController, StaffCooksController], providers: [CookSessionService, { provide: PrismaService, useValue: db }, { provide: CooksService, useValue: { login: jest.fn().mockResolvedValue({ token: 'ok' }), me: jest.fn().mockResolvedValue({}), logout: jest.fn().mockResolvedValue({ success: true }), list: jest.fn().mockResolvedValue([]), create: jest.fn().mockResolvedValue({ id: 'cook' }), update: jest.fn().mockResolvedValue({ id: 'cook' }) } }, { provide: CookStatisticsService, useValue: { shifts: jest.fn().mockResolvedValue({ shifts: [] }), top: jest.fn().mockResolvedValue({ cooks: [] }), personal: jest.fn().mockResolvedValue({}) } }] }).compile(); app = m.createNestApplication(); app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true })); jwt = m.get(JwtService); await app.init(); });
+    afterAll(() => app.close());
+    it.each([['post', '/cooks/auth/pin'], ['post', '/cooks/auth/logout'], ['get', '/cooks/me'], ['get', '/cooks/me/stats'], ['get', '/staff/cooks'], ['post', '/staff/cooks'], ['patch', '/staff/cooks/' + branch], ['delete', '/staff/cooks/' + branch], ['get', '/staff/shifts'], ['get', '/staff/analytics/cooks']])('%s %s requires authentication', async (method, path) => { await (request(app.getHttpServer()) as any)[method](path).expect(401); });
+    const bearer = (jwt: JwtService, role: string) => 'Bearer ' + jwt.sign({ sub: role === 'COOK' ? 'cook' : 'terminal', role, type: 'access', shiftId: 'shift', terminalId: 'terminal', branchId: branch });
+    it('validates PIN body after terminal authentication', async () => { await request(app.getHttpServer()).post('/cooks/auth/pin').set('Authorization', bearer(jwt, 'KITCHEN')).send({ phone: 'bad', pin: 'x' }).expect(400); await request(app.getHttpServer()).post('/cooks/auth/pin').set('Authorization', bearer(jwt, 'KITCHEN')).send({ phone: '89280000000', pin: '1234' }).expect(201); });
+    it('rejects terminal token on personal routes with 403', async () => { await request(app.getHttpServer()).get('/cooks/me').set('Authorization', bearer(jwt, 'KITCHEN')).expect(403); });
+    it.each([['post', '/cooks/auth/pin', 'OWNER'], ['get', '/staff/cooks', 'KITCHEN'], ['get', '/staff/shifts', 'COOK'], ['get', '/staff/analytics/cooks', 'CUSTOMER'], ['post', '/cooks/auth/logout', 'KITCHEN']])('wrong-role %s %s is 403', async (method, path, role) => { await (request(app.getHttpServer()) as any)[method](path).set('Authorization', bearer(jwt, role)).expect(403); });
+    it('validates creation and query', async () => { await request(app.getHttpServer()).post('/staff/cooks').set('Authorization', bearer(jwt, 'OWNER')).send({ name: '', pin: 'a' }).expect(400); await request(app.getHttpServer()).get('/staff/shifts?period=bad').set('Authorization', bearer(jwt, 'OWNER')).expect(400); });
+});

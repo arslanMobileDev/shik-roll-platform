@@ -58,7 +58,16 @@ abstract interface class KdsOrdersRepository {
 
 /// Remote implementation against the live Kitchen API.
 final class HttpKdsOrdersRepository implements KdsOrdersRepository {
-  HttpKdsOrdersRepository(ApiClient client) : _client = client;
+  HttpKdsOrdersRepository(
+    ApiClient client, {
+    this.cookToken,
+    this.onCookExpired,
+    Dio? mutationDio,
+  }) : _client = client,
+       _mutationDio = mutationDio ?? client.dio;
+  final Dio _mutationDio;
+  final String? Function()? cookToken;
+  final void Function()? onCookExpired;
 
   final ApiClient _client;
 
@@ -88,8 +97,12 @@ final class HttpKdsOrdersRepository implements KdsOrdersRepository {
     String? shiftId,
   }) async {
     try {
-      final response = await _client.dio.patch<Map<String, dynamic>>(
+      final token = cookToken?.call();
+      final response = await _mutationDio.patch<Map<String, dynamic>>(
         '/kitchen/orders/$orderId/status',
+        options: Options(
+          headers: {if (token != null) 'X-Cook-Authorization': 'Bearer $token'},
+        ),
         data: {
           'status': status.wireName,
           'expectedVersion': expectedVersion,
@@ -106,6 +119,9 @@ final class HttpKdsOrdersRepository implements KdsOrdersRepository {
       }
       return KdsOrder.fromJson(body);
     } on DioException catch (e) {
+      if (e.response?.statusCode == 401 && cookToken?.call() != null) {
+        onCookExpired?.call();
+      }
       final data = e.response?.data;
       final code = data is Map<String, dynamic>
           ? data['code'] as String?

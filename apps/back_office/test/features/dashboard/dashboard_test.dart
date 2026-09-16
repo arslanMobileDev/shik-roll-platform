@@ -104,7 +104,7 @@ void main() {
         expect(find.text('Топ-5 блюд'), findsOneWidget);
         expect(tester.takeException(), isNull);
         final cards = tester.widgetList<Card>(find.byType(Card)).toList();
-        expect(cards.length, 6);
+        expect(cards.length, 7);
       },
     );
   }

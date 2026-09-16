@@ -7,7 +7,12 @@ import 'cook_shifts_repository.dart';
 /// production metrics so the «Смены кухни» table is populated out of the box.
 final class FakeCookShiftsRepository implements CookShiftsRepository {
   @override
-  Future<List<CookShiftRecord>> fetchShifts({required String branchId}) async {
+  Future<List<CookShiftRecord>> fetchShifts({
+    required String branchId,
+    String period = 'today',
+    DateTime? dateFrom,
+    DateTime? dateTo,
+  }) async {
     final now = DateTime.now();
     final todayOpen = DateTime(now.year, now.month, now.day, 8);
     final yesterday = todayOpen.subtract(const Duration(days: 1));

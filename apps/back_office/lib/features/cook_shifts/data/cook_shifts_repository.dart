@@ -9,5 +9,10 @@ abstract interface class CookShiftsRepository {
   /// branch with per-cook production metrics. Extends the minimal cooks
   /// contract (`/cooks/active-shift`, clock-in/out) with the history view
   /// required by the Back Office.
-  Future<List<CookShiftRecord>> fetchShifts({required String branchId});
+  Future<List<CookShiftRecord>> fetchShifts({
+    required String branchId,
+    String period = 'today',
+    DateTime? dateFrom,
+    DateTime? dateTo,
+  });
 }

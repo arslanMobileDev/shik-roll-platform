@@ -1,3 +1,5 @@
+import { CookActor } from '../cooks/cooks.dto';
+import { COOK_TTL_MS } from '../cooks/cook-session.service';
 import * as bcrypt from 'bcryptjs';
 import {
   ConflictException,
@@ -98,6 +100,7 @@ export class KitchenService {
     terminal: AuthenticatedKitchenTerminal,
     orderId: string,
     dto: UpdateKitchenOrderStatusDto,
+    cook?: CookActor,
   ): Promise<KitchenOrderDto> {
     const target =
       dto.status === 'COOKING' ? OrderStatus.COOKING : OrderStatus.READY;
@@ -132,6 +135,10 @@ export class KitchenService {
     const from = order.status;
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      if (cook) {
+        const shifts = await tx.$queryRaw<Array<{id:string}>>`SELECT id FROM cook_shifts WHERE id = ${cook.shiftId}::uuid AND cook_id = ${cook.id}::uuid AND terminal_id = ${terminal.id}::uuid AND branch_id = ${terminal.branchId}::uuid AND ended_at IS NULL AND started_at > ${new Date(Date.now()-COOK_TTL_MS)} FOR UPDATE`;
+        if (!shifts.length) throw new UnauthorizedException('Cook shift is closed');
+      }
       const { count } = await tx.order.updateMany({
         where: {
           id: orderId,
@@ -170,19 +177,15 @@ export class KitchenService {
           message: `Order ${orderId} changed on the board — refresh and retry`,
         });
       }
-      // Audit (ADR-1618): kitchenTerminalId already captures the terminal
-      // UUID; changedBy is reserved for a staff/worker actor UUID and stays
-      // null for kitchen transitions. cookId/shiftId are stored as provided
-      // — the backend Shift bounded context that could verify them does not
-      // exist yet.
+      // Attribution comes only from the verified cook session, never from the DTO.
       await tx.orderStatusHistory.create({
         data: {
           orderId,
           previousStatus: from,
           newStatus: target,
           kitchenTerminalId: terminal.id,
-          cookId: dto.cookId ?? null,
-          shiftId: dto.shiftId ?? null,
+          cookId: cook?.id ?? null,
+          shiftId: cook?.shiftId ?? null,
         },
       });
       return tx.order.findUniqueOrThrow({

@@ -1,3 +1,4 @@
+import { CooksModule } from './modules/cooks/cooks.module';
 import { AnalyticsModule } from './modules/staff-analytics/analytics.module';
 import { Module } from '@nestjs/common';
 import { PrismaModule } from './prisma/prisma.module';
@@ -16,6 +17,7 @@ import { RestaurantsController } from './restaurants.controller';
 
 @Module({
   imports: [
+    CooksModule,
     PrismaModule,
     QueuesModule.register(),
     AuthModule,

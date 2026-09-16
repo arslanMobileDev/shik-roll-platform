@@ -1,3 +1,6 @@
+import { CookRequest } from '../cooks/cooks.dto';
+import { Req } from '@nestjs/common';
+import { OptionalCookGuard } from '../cooks/optional-cook.guard';
 import {
   Body,
   Controller,
@@ -10,6 +13,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiHeader,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -61,7 +65,8 @@ export class KitchenController {
    * from the JWT, never from body or query.
    */
   @Patch('orders/:orderId/status')
-  @UseGuards(KitchenJwtAuthGuard)
+  @ApiHeader({name:'X-Cook-Authorization',required:false,description:'Bearer COOK token; Authorization must still carry KITCHEN token'})
+  @UseGuards(KitchenJwtAuthGuard, OptionalCookGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Kitchen-driven order status transition' })
   @ApiUnauthorizedResponse({
@@ -71,8 +76,9 @@ export class KitchenController {
     @CurrentKitchenTerminal() terminal: AuthenticatedKitchenTerminal,
     @Param('orderId') orderId: string,
     @Body() dto: UpdateKitchenOrderStatusDto,
+    @Req() req: CookRequest,
   ) {
-    return this.kitchenService.updateOrderStatus(terminal, orderId, dto);
+    return this.kitchenService.updateOrderStatus(terminal, orderId, dto, req.cook);
   }
 
   /**

@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
@@ -12,17 +13,28 @@ final class RemoteCookShiftsRepository implements CookShiftsRepository {
   final Dio _dio;
 
   @override
-  Future<List<CookShiftRecord>> fetchShifts({required String branchId}) async {
+  Future<List<CookShiftRecord>> fetchShifts({
+    required String branchId,
+    String period = 'today',
+    DateTime? dateFrom,
+    DateTime? dateTo,
+  }) async {
     try {
       final response = await _dio.get<dynamic>(
-        '/cooks/shifts',
-        queryParameters: {'branchId': branchId},
+        '/staff/shifts',
+        queryParameters: {
+          'branchId': branchId,
+          'period': period,
+          if (dateFrom != null)
+            'dateFrom': DateFormat('yyyy-MM-dd').format(dateFrom),
+          if (dateTo != null) 'dateTo': DateFormat('yyyy-MM-dd').format(dateTo),
+        },
       );
       final payload = response.data;
       final data = switch (payload) {
-        {'data': final List list} => list,
+        {'shifts': final List list} => list,
         final List list => list,
-        _ => const <dynamic>[],
+        _ => throw const FormatException('Invalid shifts response'),
       };
       return data
           .whereType<Map<String, dynamic>>()

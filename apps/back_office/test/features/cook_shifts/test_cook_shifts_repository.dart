@@ -37,7 +37,12 @@ final class TestCookShiftsRepository implements CookShiftsRepository {
   final List<String> fetchCalls = [];
 
   @override
-  Future<List<CookShiftRecord>> fetchShifts({required String branchId}) async {
+  Future<List<CookShiftRecord>> fetchShifts({
+    required String branchId,
+    String period = 'today',
+    DateTime? dateFrom,
+    DateTime? dateTo,
+  }) async {
     fetchCalls.add(branchId);
     if (fetchError != null) throw fetchError!;
     return List.unmodifiable(shifts.where((s) => s.branchId == branchId));

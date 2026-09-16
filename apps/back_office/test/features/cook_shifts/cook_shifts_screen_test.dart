@@ -64,22 +64,16 @@ void main() {
     );
     expect(find.text('Ахмед'), findsOneWidget);
     expect(find.text('Иван'), findsOneWidget);
-    expect(find.text('Сушист'), findsOneWidget);
-    expect(find.text('Горячий цех'), findsOneWidget);
+    expect(find.text('Терминал'), findsOneWidget);
+
     expect(find.text('14 шт.'), findsOneWidget);
-    expect(find.text('11 мин'), findsOneWidget);
+    expect(find.text('11.0 мин'), findsOneWidget);
     // Открытая смена: время закрытия и среднее время ещё неизвестны.
     expect(find.text('—'), findsNWidgets(2));
     expect(find.text('На смене'), findsOneWidget);
     expect(find.text('Смена закрыта'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('shiftActiveBadge')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('shiftClosedBadge')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('shiftActiveBadge')), findsOneWidget);
+    expect(find.byKey(const ValueKey('shiftClosedBadge')), findsOneWidget);
   });
 
   testWidgets('пустая история: заглушка', (tester) async {

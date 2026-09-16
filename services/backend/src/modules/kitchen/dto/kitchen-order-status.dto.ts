@@ -22,14 +22,14 @@ export class UpdateKitchenOrderStatusDto {
   expectedVersion!: number;
 
   @ApiPropertyOptional({
-    description: 'Audit metadata: cook who took the order (not an authorization input)',
+    description: 'Audit metadata: deprecated; ignored, use X-Cook-Authorization',
   })
   @IsOptional()
   @IsString()
   cookId?: string;
 
   @ApiPropertyOptional({
-    description: 'Audit metadata: active shift id (not an authorization input)',
+    description: 'Audit metadata: deprecated; ignored, use X-Cook-Authorization',
   })
   @IsOptional()
   @IsString()

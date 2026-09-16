@@ -14,6 +14,7 @@ enum BackOfficeSection {
   stopLists('Стоп-листы', Icons.block_rounded),
   orders('Заказы', Icons.receipt_long_rounded),
   cookShifts('Смены кухни', Icons.soup_kitchen_rounded),
+  cooks('Повара', Icons.people_alt_rounded),
   branchSettings('Настройки точки', Icons.store_mall_directory_outlined);
 
   const BackOfficeSection(this.label, this.icon);

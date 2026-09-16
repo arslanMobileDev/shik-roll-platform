@@ -1,0 +1,84 @@
+import { Test } from '@nestjs/testing';
+import { ValidationPipe } from '@nestjs/common';
+import request from 'supertest';
+import { KitchenController } from '../kitchen/kitchen.controller';
+import { KitchenEventsService } from '../kitchen/kitchen-events.service';
+import { randomUUID } from 'crypto';
+import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CooksService } from './cooks.service';
+import { CookSessionService } from './cook-session.service';
+import { CookStatisticsService } from './cook-statistics.service';
+import { KitchenService } from '../kitchen/kitchen.service';
+import { CouriersEventsService } from '../couriers/couriers-events.service';
+import { OrdersEventsService } from '../orders/orders-events.service';
+import { RevenuePeriod } from '../staff-analytics/dto/analytics-query.dto';
+const url = process.env.TEST_COOK_DATABASE_URL;
+(url ? describe : describe.skip)('Cook shifts PostgreSQL integration (disposable task17 database only)', () => {
+    let db: PrismaService;
+    beforeAll(async () => { const parsed = new URL(url!); if (parsed.hostname !== '127.0.0.1' || parsed.port !== '15577' || parsed.pathname !== '/task17')
+        throw new Error('Refusing non-test database'); db = new PrismaService({ datasources: { db: { url } } }); await db.$connect(); });
+    afterAll(async () => { await db?.$disconnect(); });
+    it('serializes concurrent logins, persists attribution, computes metrics and revokes logout', async () => {
+        const suffix = randomUUID();
+        const brand = await db.brand.create({ data: { code: suffix, name: 'Test brand' } });
+        const branch = await db.branch.create({ data: { code: suffix, name: 'Test branch' } });
+        await db.brandBranch.create({ data: { brandId: brand.id, branchId: branch.id } });
+        const station = await db.kitchenTerminal.create({ data: { code: suffix, name: 'Test KDS', pinHash: 'unused', branchId: branch.id } });
+        const terminal = { ...station, role: 'KITCHEN' as const };
+        const staff = { id: randomUUID(), phone: '+70000000000', role: 'OWNER' as const, brandId: brand.id };
+        const jwt = new JwtService({ secret: 'integration-only' });
+        const cooks = new CooksService(db, jwt);
+        const sessions = new CookSessionService(db, jwt);
+        const stats = new CookStatisticsService(db, cooks);
+        const phone = '+7' + String(Date.now()).slice(-10);
+        const cook = await cooks.create(staff, { name: 'Иван', phone, pin: '1234', branchId: branch.id });
+        const [first, second] = await Promise.all([cooks.login(terminal, { phone, pin: '1234' }), cooks.login(terminal, { phone, pin: '1234' })]);
+        expect(first.shiftId).toBe(second.shiftId);
+        expect(await db.cookShift.count({ where: { cookId: cook.id, endedAt: null } })).toBe(1);
+        const actor = await sessions.verify('Bearer ' + first.token);
+        const courierEvents = new CouriersEventsService();
+        const orderEvents = new OrdersEventsService();
+        const board = { publishOrderChanged: jest.fn().mockResolvedValue(undefined) };
+        const kitchen = new KitchenService(db, jwt, board as never, courierEvents, orderEvents);
+        const module = await Test.createTestingModule({ controllers: [KitchenController], providers: [{ provide: PrismaService, useValue: db }, { provide: JwtService, useValue: jwt }, { provide: KitchenService, useValue: kitchen }, { provide: KitchenEventsService, useValue: board }, { provide: CookSessionService, useValue: sessions }] }).compile();
+        const app = module.createNestApplication();
+        app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
+        await app.init();
+        const terminalToken = jwt.sign({ sub: terminal.id, role: 'KITCHEN', type: 'access', branchId: branch.id });
+        const order = await db.order.create({ data: { orderNumber: suffix, brandId: brand.id, branchId: branch.id, type: 'DELIVERY' } });
+        const tracking: string[] = [];
+        const feed: string[] = [];
+        const kitchenFeed: string[] = [];
+        const subscriptions = [courierEvents.getOrderTrackingStream(order.id).subscribe(e => tracking.push(e.data.status)), courierEvents.getOrderStream(branch.id).subscribe(e => feed.push(e.data.status)), orderEvents.getKdsStream(branch.id).subscribe(e => kitchenFeed.push(e.data.status))];
+        try {
+            await request(app.getHttpServer()).patch('/kitchen/orders/' + order.id + '/status').set('Authorization', 'Bearer ' + terminalToken).set('X-Cook-Authorization', 'Bearer ' + first.token).send({ status: 'COOKING', expectedVersion: 1 }).expect(200);
+            await request(app.getHttpServer()).patch('/kitchen/orders/' + order.id + '/status').set('Authorization', 'Bearer ' + terminalToken).set('X-Cook-Authorization', 'Bearer ' + first.token).send({ status: 'READY', expectedVersion: 2 }).expect(200);
+            const history = await db.orderStatusHistory.findMany({ where: { orderId: order.id } });
+            expect(history).toHaveLength(2);
+            expect(history.every(h => h.cookId === cook.id && h.shiftId === first.shiftId)).toBe(true);
+            expect(tracking).toEqual(['COOKING', 'READY']);
+            expect(feed).toEqual(['COOKING', 'READY']);
+            expect(kitchenFeed).toEqual(['COOKING', 'READY']);
+            expect(board.publishOrderChanged).toHaveBeenCalledTimes(2);
+            const list = await stats.shifts(staff, { branchId: branch.id });
+            expect(list.shifts[0]).toMatchObject({ cookId: cook.id, ordersCooked: 1, isActive: true });
+            const personal = await stats.personal(actor, RevenuePeriod.TODAY);
+            expect(personal.ordersCooked).toBe(1);
+            expect(personal.last7Days).toHaveLength(7);
+            expect((await stats.top(staff, { branchId: branch.id })).cooks[0].ordersCooked).toBe(1);
+            await cooks.logout(actor);
+            await expect(sessions.verify('Bearer ' + first.token)).rejects.toThrow();
+            expect((await db.cookShift.findUniqueOrThrow({ where: { id: first.shiftId } })).endedReason).toBe('logout');
+            const legacy = await db.order.create({ data: { orderNumber: randomUUID(), brandId: brand.id, branchId: branch.id, type: 'TAKEAWAY' } });
+            await kitchen.updateOrderStatus(terminal, legacy.id, { status: 'COOKING', expectedVersion: 1, cookId: 'forged', shiftId: 'forged' });
+            const row = await db.orderStatusHistory.findFirstOrThrow({ where: { orderId: legacy.id } });
+            expect(row.cookId).toBeNull();
+            expect(row.shiftId).toBeNull();
+        }
+        finally {
+            subscriptions.forEach(s => s.unsubscribe());
+            await app.close();
+        }
+    }, 20000);
+});

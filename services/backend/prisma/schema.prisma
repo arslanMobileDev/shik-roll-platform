@@ -100,6 +100,8 @@ model Branch {
   stopList      StopListEntry[]
   orders        Order[]
   kitchenTerminals KitchenTerminal[]
+  cooks Cook[]
+  cookShifts CookShift[]
 
   @@unique([code], map: "uq_branches_code")
   @@index([status], map: "idx_branches_status")
@@ -677,12 +679,14 @@ model OrderStatusHistory {
   // cook/shift attribution sent with it. Nullable — non-kitchen transitions
   // (operator, courier, worker) leave these empty.
   kitchenTerminalId String? @map("kitchen_terminal_id") @db.Uuid
-  cookId            String? @map("cook_id")
-  shiftId           String? @map("shift_id")
+  cookId            String? @map("cook_id") @db.Uuid
+  shiftId           String? @map("shift_id") @db.Uuid
   reason         String?
   changedAt      DateTime    @default(now()) @map("changed_at") @db.Timestamptz(6)
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade, map: "fk_order_status_history_orders")
+  cook Cook? @relation(fields: [cookId], references: [id], onDelete: SetNull)
+  shift CookShift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
 
   @@index([orderId], map: "idx_order_status_history_order_id")
   @@map("order_status_history")
@@ -724,6 +728,8 @@ model KitchenTerminal {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_kitchen_terminals_branches")
+
+  cookShifts CookShift[]
 
   @@index([branchId, isActive], map: "idx_kitchen_terminals_branch_id_is_active")
   @@map("kitchen_terminals")
@@ -828,4 +834,36 @@ enum StaffRole {
   OWNER
   DEVELOPER
   MANAGER
+}
+
+model Cook {
+  id String @id @default(uuid()) @db.Uuid
+  name String
+  phone String @unique
+  pinHash String @map("pin_hash")
+  branchId String @map("branch_id") @db.Uuid
+  isActive Boolean @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  shifts CookShift[]
+  history OrderStatusHistory[]
+  @@index([branchId, isActive])
+  @@map("cooks")
+}
+model CookShift {
+  id String @id @default(uuid()) @db.Uuid
+  cookId String @map("cook_id") @db.Uuid
+  terminalId String @map("terminal_id") @db.Uuid
+  branchId String @map("branch_id") @db.Uuid
+  startedAt DateTime @default(now()) @map("started_at") @db.Timestamptz(6)
+  endedAt DateTime? @map("ended_at") @db.Timestamptz(6)
+  endedReason String? @map("ended_reason")
+  cook Cook @relation(fields: [cookId], references: [id], onDelete: Restrict)
+  terminal KitchenTerminal @relation(fields: [terminalId], references: [id], onDelete: Restrict)
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  history OrderStatusHistory[]
+  @@index([cookId, startedAt])
+  @@index([branchId, endedAt])
+  @@map("cook_shifts")
 }

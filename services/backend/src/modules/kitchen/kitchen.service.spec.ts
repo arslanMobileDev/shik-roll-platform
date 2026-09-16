@@ -325,6 +325,20 @@ describe('KitchenService', () => {
       });
     });
 
+    it('records verified attribution and rejects a closed shift before mutation', async () => {
+      prisma.order.findFirst.mockResolvedValue(boardOrder());
+      prisma.order.updateMany.mockResolvedValue({count:1});
+      prisma.order.findUniqueOrThrow.mockResolvedValue(boardOrder({status:OrderStatus.COOKING}));
+      const query=jest.fn().mockResolvedValue([{id:'shift'}]);
+      (prisma as any).$queryRaw=query;
+      const actor={id:'cook',shiftId:'shift',terminalId:TERMINAL.id,branchId:TERMINAL.branchId};
+      await service.updateOrderStatus(TERMINAL,ORDER_ID,{status:'COOKING',expectedVersion:3,cookId:'forged'},actor);
+      expect(prisma.orderStatusHistory.create).toHaveBeenCalledWith({data:expect.objectContaining({cookId:'cook',shiftId:'shift'})});
+      prisma.order.updateMany.mockClear();query.mockResolvedValue([]);
+      await expect(service.updateOrderStatus(TERMINAL,ORDER_ID,{status:'COOKING',expectedVersion:3},actor)).rejects.toThrow();
+      expect(prisma.order.updateMany).not.toHaveBeenCalled();
+    });
+
     it('moves CONFIRMED -> COOKING atomically with server timestamp, audit and board publish', async () => {
       const updated = boardOrder({
         status: OrderStatus.COOKING,
@@ -361,8 +375,8 @@ describe('KitchenService', () => {
           previousStatus: OrderStatus.CONFIRMED,
           newStatus: OrderStatus.COOKING,
           kitchenTerminalId: TERMINAL.id,
-          cookId: 'cook-7',
-          shiftId: 'shift-9',
+          cookId: null,
+          shiftId: null,
         },
       });
       expect(events.publishOrderChanged).toHaveBeenCalledWith(ORDER_ID);
