@@ -1,3 +1,4 @@
+import { AnalyticsModule } from './modules/staff-analytics/analytics.module';
 import { Module } from '@nestjs/common';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -26,6 +27,7 @@ import { RestaurantsController } from './restaurants.controller';
     LoyaltyModule,
     UploadsModule,
     StaffModule,
+    AnalyticsModule,
   ],
   controllers: [HealthController, RestaurantsController],
 })

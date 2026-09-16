@@ -1,3 +1,6 @@
+import 'package:intl/date_symbol_data_local.dart';
+import 'features/dashboard/data/fake_dashboard_repository.dart';
+import 'features/dashboard/data/remote_dashboard_repository.dart';
 import 'package:flutter/material.dart';
 
 import 'app/back_office_app.dart';
@@ -13,7 +16,9 @@ import 'features/orders/data/fake_orders_repository.dart';
 import 'features/orders/data/orders_repository.dart';
 import 'features/orders/data/remote_orders_repository.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('ru');
   // Auth always hits the real backend — the fake variant would defeat the
   // purpose of securing the admin panel with staff tokens.
   final authRepository = AuthRepository();
@@ -23,8 +28,7 @@ void main() {
   final BackOfficeRepository repository = ApiConfig.useFakeRepository
       ? FakeBackOfficeRepository()
       : RemoteBackOfficeRepository();
-  final CookShiftsRepository cookShiftsRepository =
-      ApiConfig.useFakeRepository
+  final CookShiftsRepository cookShiftsRepository = ApiConfig.useFakeRepository
       ? FakeCookShiftsRepository()
       : RemoteCookShiftsRepository();
   final OrdersRepository ordersRepository = ApiConfig.useFakeRepository
@@ -34,6 +38,9 @@ void main() {
   runApp(
     BackOfficeApp(
       authRepository: authRepository,
+      dashboardRepository: ApiConfig.useFakeRepository
+          ? FakeDashboardRepository()
+          : RemoteDashboardRepository(),
       repository: repository,
       cookShiftsRepository: cookShiftsRepository,
       ordersRepository: ordersRepository,

@@ -9,6 +9,7 @@ import 'branch_selector.dart';
 
 /// Sidebar destinations of the Back Office.
 enum BackOfficeSection {
+  dashboard('Дашборд', Icons.dashboard_rounded),
   menu('Меню и блюда', Icons.restaurant_menu_rounded),
   stopLists('Стоп-листы', Icons.block_rounded),
   orders('Заказы', Icons.receipt_long_rounded),
@@ -24,10 +25,7 @@ enum BackOfficeSection {
 /// App frame: dark sidebar + light top bar + section content.
 /// Desktop-first; the sidebar collapses to icons below 1280px.
 class BackOfficeShell extends StatefulWidget {
-  const BackOfficeShell({
-    super.key,
-    required this.sectionBuilder,
-  });
+  const BackOfficeShell({super.key, required this.sectionBuilder});
 
   /// Builds the content widget for a section (keeps shell independent
   /// from feature screens for easy testing).
@@ -38,7 +36,7 @@ class BackOfficeShell extends StatefulWidget {
 }
 
 class _BackOfficeShellState extends State<BackOfficeShell> {
-  BackOfficeSection _section = BackOfficeSection.menu;
+  BackOfficeSection _section = BackOfficeSection.dashboard;
 
   @override
   Widget build(BuildContext context) {
@@ -113,8 +111,7 @@ class _Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final expanded =
-            MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
+        final expanded = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           width: expanded ? _expandedWidth : _collapsedWidth,
@@ -210,8 +207,9 @@ class _SidebarItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
-          mainAxisAlignment:
-              expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
+          mainAxisAlignment: expanded
+              ? MainAxisAlignment.start
+              : MainAxisAlignment.center,
           children: [
             Icon(section.icon, color: color, size: 20),
             if (expanded) ...[

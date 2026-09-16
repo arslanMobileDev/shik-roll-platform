@@ -1,3 +1,6 @@
+import '../features/dashboard/data/dashboard_repository.dart';
+import '../features/dashboard/bloc/dashboard_cubit.dart';
+import '../features/dashboard/view/dashboard_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -33,12 +36,14 @@ class BackOfficeApp extends StatelessWidget {
     required this.repository,
     required this.cookShiftsRepository,
     required this.ordersRepository,
+    required this.dashboardRepository,
   });
 
   final AuthRepository authRepository;
   final BackOfficeRepository repository;
   final CookShiftsRepository cookShiftsRepository;
   final OrdersRepository ordersRepository;
+  final DashboardRepository dashboardRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +57,7 @@ class BackOfficeApp extends StatelessWidget {
           repository: repository,
           cookShiftsRepository: cookShiftsRepository,
           ordersRepository: ordersRepository,
+          dashboardRepository: dashboardRepository,
         ),
       ),
     );
@@ -65,11 +71,13 @@ class _AuthenticatedShell extends StatelessWidget {
     required this.repository,
     required this.cookShiftsRepository,
     required this.ordersRepository,
+    required this.dashboardRepository,
   });
 
   final BackOfficeRepository repository;
   final CookShiftsRepository cookShiftsRepository;
   final OrdersRepository ordersRepository;
+  final DashboardRepository dashboardRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -79,36 +87,46 @@ class _AuthenticatedShell extends StatelessWidget {
         providers: [
           BlocProvider(create: (_) => BranchCubit()),
           BlocProvider(
-            create: (_) =>
-                MenuCatalogBloc(repository: repository)..add(
-                  MenuCatalogRequested(branchId: BranchCubit.branches.first.id),
-                ),
+            create: (context) =>
+                DashboardCubit(repository: dashboardRepository)
+                  ..load(context.read<BranchCubit>().state.id),
           ),
           BlocProvider(
-            create: (_) => BranchSettingsCubit()
-              ..selectBranch(BranchCubit.branches.first.id),
-          ),
-          BlocProvider(
-            create: (_) => CookShiftsCubit(repository: cookShiftsRepository)
-              ..load(BranchCubit.branches.first.id),
+            create: (_) => MenuCatalogBloc(repository: repository)
+              ..add(
+                MenuCatalogRequested(branchId: BranchCubit.branches.first.id),
+              ),
           ),
           BlocProvider(
             create: (_) =>
-                OrdersJournalBloc(repository: ordersRepository)..add(
-                  OrdersJournalRequested(
-                    branchId: BranchCubit.branches.first.id,
-                  ),
-                ),
+                BranchSettingsCubit()
+                  ..selectBranch(BranchCubit.branches.first.id),
+          ),
+          BlocProvider(
+            create: (_) =>
+                CookShiftsCubit(repository: cookShiftsRepository)
+                  ..load(BranchCubit.branches.first.id),
+          ),
+          BlocProvider(
+            create: (_) => OrdersJournalBloc(repository: ordersRepository)
+              ..add(
+                OrdersJournalRequested(branchId: BranchCubit.branches.first.id),
+              ),
           ),
         ],
-        child: BackOfficeShell(
-          sectionBuilder: (section) => switch (section) {
-            BackOfficeSection.menu => const MenuListScreen(),
-            BackOfficeSection.stopLists => const StopListScreen(),
-            BackOfficeSection.orders => const OrdersJournalScreen(),
-            BackOfficeSection.cookShifts => const CookShiftsScreen(),
-            BackOfficeSection.branchSettings => const BranchSettingsScreen(),
-          },
+        child: BlocListener<BranchCubit, Branch>(
+          listener: (context, branch) =>
+              context.read<DashboardCubit>().load(branch.id),
+          child: BackOfficeShell(
+            sectionBuilder: (section) => switch (section) {
+              BackOfficeSection.dashboard => const DashboardScreen(),
+              BackOfficeSection.menu => const MenuListScreen(),
+              BackOfficeSection.stopLists => const StopListScreen(),
+              BackOfficeSection.orders => const OrdersJournalScreen(),
+              BackOfficeSection.cookShifts => const CookShiftsScreen(),
+              BackOfficeSection.branchSettings => const BranchSettingsScreen(),
+            },
+          ),
         ),
       ),
     );

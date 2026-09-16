@@ -28,7 +28,7 @@ void main() {
       (tester) async {
     await pumpShell(tester);
 
-    expect(find.text('screen:menu'), findsOneWidget);
+    expect(find.text('screen:dashboard'), findsOneWidget);
     expect(find.text('Меню и блюда'), findsWidgets); // sidebar + top bar
     expect(find.text('Стоп-листы'), findsOneWidget);
     expect(find.text('Настройки точки'), findsOneWidget);
