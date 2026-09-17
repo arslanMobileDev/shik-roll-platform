@@ -1,3 +1,8 @@
+import 'package:back_office/features/menu/data/models/menu_ref.dart';
+import 'package:back_office/features/menu/data/models/menu_category_ref.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:back_office/features/menu/data/back_office_repository.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:back_office/features/menu/bloc/menu_catalog_bloc.dart';
 import 'package:back_office/features/menu/bloc/menu_catalog_event.dart';
 import 'package:back_office/features/menu/data/fake_back_office_repository.dart';
@@ -7,11 +12,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+class _ReferenceRepository extends Mock implements BackOfficeRepository {}
+
 void main() {
-  late FakeBackOfficeRepository repository;
+  late BackOfficeRepository repository;
   late MenuCatalogBloc bloc;
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({
+      'staff.id': 'staff',
+      'staff.name': 'Test',
+      'staff.role': 'OWNER',
+      'staff.brandId': 'brand',
+      'staff.token': 'test-token',
+    });
     repository = FakeBackOfficeRepository(latency: Duration.zero);
   });
 
@@ -39,6 +53,57 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('chips use reference names and UUIDs, not legacy enum names', (
+    tester,
+  ) async {
+    final remote = _ReferenceRepository();
+    when(() => remote.fetchMenus(brandId: 'brand')).thenAnswer(
+      (_) async => [const MenuRef(id: 'menu', name: 'Меню', brandId: 'brand')],
+    );
+    when(() => remote.fetchCategories(menuId: 'menu')).thenAnswer(
+      (_) async => [
+        const MenuCategoryRef(
+          id: 'custom-id',
+          name: 'Авторские завтраки',
+          menuId: 'menu',
+        ),
+      ],
+    );
+    when(
+      () => remote.fetchMenuItems(branchId: 'branch-center'),
+    ).thenAnswer((_) async => []);
+    repository = remote;
+    await pumpScreen(tester);
+    expect(
+      find.widgetWithText(ChoiceChip, 'Авторские завтраки'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(ChoiceChip, 'Роллы'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('categoryFilter.custom-id')));
+    await tester.pump();
+    expect(bloc.state.categoryFilter, 'custom-id');
+    await tester.tap(find.byKey(const ValueKey('categoryFilter.all')));
+    await tester.pump();
+    expect(bloc.state.categoryFilter, isNull);
+  });
+
+  testWidgets('empty categories show only All chip', (tester) async {
+    final remote = _ReferenceRepository();
+    when(() => remote.fetchMenus(brandId: 'brand')).thenAnswer(
+      (_) async => [const MenuRef(id: 'menu', name: 'Меню', brandId: 'brand')],
+    );
+    when(
+      () => remote.fetchCategories(menuId: 'menu'),
+    ).thenAnswer((_) async => []);
+    when(
+      () => remote.fetchMenuItems(branchId: 'branch-center'),
+    ).thenAnswer((_) async => []);
+    repository = remote;
+    await pumpScreen(tester);
+    expect(find.byType(ChoiceChip), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Все'), findsOneWidget);
+  });
+
   testWidgets('renders catalog table with items after load', (tester) async {
     await pumpScreen(tester);
 
@@ -54,7 +119,11 @@ void main() {
   testWidgets('filters items by category', (tester) async {
     await pumpScreen(tester);
 
-    await tester.tap(find.byKey(const ValueKey('categoryFilter.sets')));
+    await tester.tap(
+      find.byKey(
+        const ValueKey('categoryFilter.00000000-0000-4000-8000-000000000102'),
+      ),
+    );
     await tester.pump();
 
     expect(find.text('Сет «Халяль Микс»'), findsOneWidget);
@@ -65,8 +134,9 @@ void main() {
     expect(find.text('Филадельфия классик'), findsOneWidget);
   });
 
-  testWidgets('stop-list switch toggles availability with notice',
-      (tester) async {
+  testWidgets('stop-list switch toggles availability with notice', (
+    tester,
+  ) async {
     await pumpScreen(tester);
 
     expect(
@@ -101,7 +171,9 @@ void main() {
 
     expect(find.byType(MenuItemFormDialog), findsOneWidget);
     expect(find.text('Редактировать блюдо'), findsOneWidget);
-    expect(find.widgetWithText(TextFormField, 'Филадельфия классик'),
-        findsOneWidget);
+    expect(
+      find.widgetWithText(TextFormField, 'Филадельфия классик'),
+      findsOneWidget,
+    );
   });
 }

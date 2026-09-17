@@ -12,6 +12,8 @@ const _existing = MenuItem(
   price: Money(44900),
   isHalal: true,
   isAvailable: true,
+  imageUrl: 'https://example.test/photo.webp',
+  allergens: 'Соя',
 );
 
 void main() {
@@ -20,6 +22,10 @@ void main() {
     MenuItem? initial,
     required void Function(MenuItemDraft?) onResult,
   }) async {
+    tester.view.physicalSize = const Size(1200, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
@@ -71,8 +77,9 @@ void main() {
     expect(called, isFalse);
   });
 
-  testWidgets('creates draft with parsed kopecks and chosen category',
-      (tester) async {
+  testWidgets('creates draft with parsed kopecks and chosen category', (
+    tester,
+  ) async {
     MenuItemDraft? result;
     await openDialog(tester, onResult: (draft) => result = draft);
 
@@ -85,6 +92,10 @@ void main() {
       '349.9',
     );
 
+    await tester.enterText(
+      find.byKey(const ValueKey('menuItemForm.allergens')),
+      'Глютен',
+    );
     await tester.tap(find.byKey(const ValueKey('menuItemForm.category')));
     await tester.pumpAndSettle();
     await tester.tap(find.text(MenuCategory.sets.label).last);
@@ -99,6 +110,8 @@ void main() {
     expect(result!.category, MenuCategory.sets);
     expect(result!.isHalal, isTrue);
     expect(result!.imageUrl, isNull);
+    expect(result!.allergens, 'Глютен');
+    expect(result!.toJson()['allergens'], 'Глютен');
   });
 
   testWidgets('halal switch toggles draft flag', (tester) async {
@@ -122,8 +135,9 @@ void main() {
     expect(result!.isHalal, isFalse);
   });
 
-  testWidgets('edit mode prefills fields and returns updated draft',
-      (tester) async {
+  testWidgets('edit mode prefills fields and returns updated draft', (
+    tester,
+  ) async {
     MenuItemDraft? result;
     await openDialog(
       tester,
@@ -132,10 +146,7 @@ void main() {
     );
 
     expect(find.text('Редактировать блюдо'), findsOneWidget);
-    expect(
-      find.widgetWithText(TextFormField, 'Филадельфия'),
-      findsOneWidget,
-    );
+    expect(find.widgetWithText(TextFormField, 'Филадельфия'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, '449.00'), findsOneWidget);
 
     await tester.enterText(
@@ -148,6 +159,49 @@ void main() {
     expect(result, isNotNull);
     expect(result!.name, 'Филадельфия');
     expect(result!.price, const Money(50000));
+    expect(result!.allergens, 'Соя');
+    expect(result!.imageUrl, 'https://example.test/photo.webp');
+    expect(result!.toJson()['allergens'], 'Соя');
+  });
+
+  testWidgets(
+    'editing preloads allergens and photo; clearing returns null in draft',
+    (tester) async {
+      MenuItemDraft? result;
+      await openDialog(
+        tester,
+        initial: _existing,
+        onResult: (draft) => result = draft,
+      );
+      expect(find.widgetWithText(TextFormField, 'Соя'), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('menuImage.remove')));
+      await tester.enterText(
+        find.byKey(const ValueKey('menuItemForm.allergens')),
+        '',
+      );
+      await tester.tap(find.byKey(const ValueKey('menuItemForm.save')));
+      await tester.pumpAndSettle();
+      expect(result, isNotNull);
+      expect(result!.imageUrl, isNull);
+      expect(result!.allergens, isNull);
+    },
+  );
+
+  testWidgets('allergens validator rejects over 500 characters', (
+    tester,
+  ) async {
+    await openDialog(tester, initial: _existing, onResult: (_) {});
+    tester
+            .widget<TextFormField>(
+              find.byKey(const ValueKey('menuItemForm.allergens')),
+            )
+            .controller!
+            .text =
+        'a' * 501;
+    await tester.tap(find.byKey(const ValueKey('menuItemForm.save')));
+    await tester.pump();
+    expect(find.text('Не более 500 символов'), findsOneWidget);
   });
 
   testWidgets('cancel pops without a draft', (tester) async {

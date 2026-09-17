@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../cubit/menu_image_upload_cubit.dart';
+import '../../cubit/menu_image_upload_state.dart';
+import 'menu_image_upload_field.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/money.dart';
@@ -9,10 +13,11 @@ import '../../data/models/menu_item.dart';
 ///
 /// Pops with a [MenuItemDraft] on successful validation, `null` on cancel.
 class MenuItemFormDialog extends StatefulWidget {
-  const MenuItemFormDialog({super.key, this.initial});
+  const MenuItemFormDialog({super.key, this.initial, this.uploadCubit});
 
   /// When non-null the dialog edits this item instead of creating one.
   final MenuItem? initial;
+  final MenuImageUploadCubit? uploadCubit;
 
   static Future<MenuItemDraft?> show(
     BuildContext context, {
@@ -36,6 +41,8 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
   late final TextEditingController _descriptionController;
   late final TextEditingController _priceController;
   late final TextEditingController _imageUrlController;
+  late final TextEditingController _allergensController;
+  late final MenuImageUploadCubit _uploadCubit;
   late MenuCategory _category;
   late bool _isHalal;
 
@@ -46,19 +53,27 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
     super.initState();
     final initial = widget.initial;
     _nameController = TextEditingController(text: initial?.name ?? '');
-    _descriptionController =
-        TextEditingController(text: initial?.description ?? '');
+    _descriptionController = TextEditingController(
+      text: initial?.description ?? '',
+    );
     _priceController = TextEditingController(
       text: initial == null ? '' : initial.price.rubles.toStringAsFixed(2),
     );
-    _imageUrlController =
-        TextEditingController(text: initial?.imageUrl ?? '');
+    _imageUrlController = TextEditingController(text: initial?.imageUrl ?? '');
+    _allergensController = TextEditingController(
+      text: initial?.allergens ?? '',
+    );
+    _uploadCubit =
+        widget.uploadCubit ??
+        MenuImageUploadCubit(initialUrl: initial?.imageUrl);
     _category = initial?.category ?? MenuCategory.rolls;
     _isHalal = initial?.isHalal ?? true;
   }
 
   @override
   void dispose() {
+    if (widget.uploadCubit == null) _uploadCubit.close();
+    _allergensController.dispose();
     _nameController.dispose();
     _descriptionController.dispose();
     _priceController.dispose();
@@ -67,6 +82,7 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
   }
 
   void _submit() {
+    if (_uploadCubit.state.isBusy) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final imageUrl = _imageUrlController.text.trim();
     Navigator.of(context).pop(
@@ -76,6 +92,9 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
         category: _category,
         price: Money.parse(_priceController.text),
         imageUrl: imageUrl.isEmpty ? null : imageUrl,
+        allergens: _allergensController.text.trim().isEmpty
+            ? null
+            : _allergensController.text.trim(),
         isHalal: _isHalal,
       ),
     );
@@ -115,138 +134,166 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _isEditing ? 'Редактировать блюдо' : 'Новое блюдо',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  key: const ValueKey('menuItemForm.name'),
-                  controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Название'),
-                  textInputAction: TextInputAction.next,
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Укажите название'
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  key: const ValueKey('menuItemForm.description'),
-                  controller: _descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Описание / состав',
+    return BlocBuilder<MenuImageUploadCubit, MenuImageUploadState>(
+      bloc: _uploadCubit,
+      builder: (context, uploadState) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _isEditing ? 'Редактировать блюдо' : 'Новое блюдо',
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
-                  minLines: 2,
-                  maxLines: 4,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<MenuCategory>(
-                        key: const ValueKey('menuItemForm.category'),
-                        initialValue: _category,
-                        decoration: const InputDecoration(
-                          labelText: 'Категория',
-                        ),
-                        items: [
-                          for (final category in MenuCategory.values)
-                            DropdownMenuItem(
-                              value: category,
-                              child: Text(category.label),
-                            ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() => _category = value);
-                          }
-                        },
-                      ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    key: const ValueKey('menuItemForm.name'),
+                    controller: _nameController,
+                    decoration: const InputDecoration(labelText: 'Название'),
+                    textInputAction: TextInputAction.next,
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Укажите название'
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    key: const ValueKey('menuItemForm.description'),
+                    controller: _descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Описание / состав',
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        key: const ValueKey('menuItemForm.price'),
-                        controller: _priceController,
-                        decoration: const InputDecoration(
-                          labelText: 'Базовая цена, ₽',
-                          hintText: '349.90',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                            RegExp(r'[0-9., ]'),
+                    minLines: 2,
+                    maxLines: 4,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<MenuCategory>(
+                          key: const ValueKey('menuItemForm.category'),
+                          initialValue: _category,
+                          decoration: const InputDecoration(
+                            labelText: 'Категория',
                           ),
-                        ],
-                        validator: (value) {
-                          try {
-                            Money.parse(value ?? '');
-                            return null;
-                          } on FormatException {
-                            return 'Некорректная цена';
-                          }
-                        },
+                          items: [
+                            for (final category in MenuCategory.values)
+                              DropdownMenuItem(
+                                value: category,
+                                child: Text(category.label),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _category = value);
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          key: const ValueKey('menuItemForm.price'),
+                          controller: _priceController,
+                          decoration: const InputDecoration(
+                            labelText: 'Базовая цена, ₽',
+                            hintText: '349.90',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'[0-9., ]'),
+                            ),
+                          ],
+                          validator: (value) {
+                            try {
+                              Money.parse(value ?? '');
+                              return null;
+                            } on FormatException {
+                              return 'Некорректная цена';
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  MenuImageUploadField(
+                    cubit: _uploadCubit,
+                    controller: _imageUrlController,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    key: const ValueKey('menuItemForm.allergens'),
+                    controller: _allergensController,
+                    decoration: const InputDecoration(
+                      labelText: 'Аллергены',
+                      hintText: 'Глютен, лактоза, соя…',
+                    ),
+                    minLines: 1,
+                    maxLines: 3,
+                    maxLength: 500,
+                    validator: (value) => (value?.length ?? 0) > 500
+                        ? 'Не более 500 символов'
+                        : null,
+                  ),
+                  TextFormField(
+                    key: const ValueKey('menuItemForm.imageUrl'),
+                    enabled: !uploadState.isBusy,
+                    validator: (value) => (value?.trim().length ?? 0) > 500
+                        ? 'Не более 500 символов'
+                        : null,
+                    controller: _imageUrlController,
+                    decoration: InputDecoration(
+                      labelText: 'или вставьте URL',
+                      suffixIcon: TextButton(
+                        key: const ValueKey('menuItemForm.preview'),
+                        onPressed: _previewImage,
+                        child: const Text('Превью'),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  key: const ValueKey('menuItemForm.imageUrl'),
-                  controller: _imageUrlController,
-                  decoration: InputDecoration(
-                    labelText: 'URL изображения',
-                    suffixIcon: TextButton(
-                      key: const ValueKey('menuItemForm.preview'),
-                      onPressed: _previewImage,
-                      child: const Text('Превью'),
-                    ),
+                    keyboardType: TextInputType.url,
                   ),
-                  keyboardType: TextInputType.url,
-                ),
-                const SizedBox(height: 4),
-                SwitchListTile(
-                  key: const ValueKey('menuItemForm.halal'),
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('100% Halal'),
-                  subtitle: const Text('Позиция соответствует халяль-стандарту'),
-                  value: _isHalal,
-                  activeThumbColor: AppColors.halalGreen,
-                  onChanged: (value) => setState(() => _isHalal = value),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Отмена'),
+                  const SizedBox(height: 4),
+                  SwitchListTile(
+                    key: const ValueKey('menuItemForm.halal'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('100% Halal'),
+                    subtitle: const Text(
+                      'Позиция соответствует халяль-стандарту',
                     ),
-                    const SizedBox(width: 12),
-                    FilledButton(
-                      key: const ValueKey('menuItemForm.save'),
-                      onPressed: _submit,
-                      child: Text(_isEditing ? 'Сохранить' : 'Создать'),
-                    ),
-                  ],
-                ),
-              ],
+                    value: _isHalal,
+                    activeThumbColor: AppColors.halalGreen,
+                    onChanged: (value) => setState(() => _isHalal = value),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Отмена'),
+                      ),
+                      const SizedBox(width: 12),
+                      FilledButton(
+                        key: const ValueKey('menuItemForm.save'),
+                        onPressed: uploadState.isBusy ? null : _submit,
+                        child: Text(_isEditing ? 'Сохранить' : 'Создать'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

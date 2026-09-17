@@ -15,7 +15,8 @@ class MenuListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocListener<MenuCatalogBloc, MenuCatalogState>(
-      listenWhen: (prev, next) => next.notice != null && prev.notice != next.notice,
+      listenWhen: (prev, next) =>
+          next.notice != null && prev.notice != next.notice,
       listener: (context, state) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
@@ -50,7 +51,10 @@ class _Header extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Меню и блюда', style: Theme.of(context).textTheme.headlineSmall),
+            Text(
+              'Меню и блюда',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
             Text(
               '${state.items.length} позиций в каталоге',
               style: Theme.of(context).textTheme.bodySmall,
@@ -74,10 +78,8 @@ class _CategoryFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = context
-        .select<MenuCatalogBloc, MenuCategory?>(
-          (bloc) => bloc.state.categoryFilter,
-        );
+    final state = context.watch<MenuCatalogBloc>().state;
+    final selected = state.categoryFilter;
     final bloc = context.read<MenuCatalogBloc>();
     return Wrap(
       spacing: 8,
@@ -87,16 +89,14 @@ class _CategoryFilters extends StatelessWidget {
           key: const ValueKey('categoryFilter.all'),
           label: const Text('Все'),
           selected: selected == null,
-          onSelected: (_) =>
-              bloc.add(const MenuCategoryFilterChanged(null)),
+          onSelected: (_) => bloc.add(const MenuCategoryFilterChanged(null)),
         ),
-        for (final category in MenuCategory.values)
+        for (final category in state.categories)
           ChoiceChip(
-            key: ValueKey('categoryFilter.${category.name}'),
-            label: Text(category.label),
-            selected: selected == category,
-            onSelected: (_) =>
-                bloc.add(MenuCategoryFilterChanged(category)),
+            key: ValueKey('categoryFilter.${category.id}'),
+            label: Text(category.name),
+            selected: selected == category.id,
+            onSelected: (_) => bloc.add(MenuCategoryFilterChanged(category.id)),
           ),
       ],
     );

@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 
 import '../data/models/menu_item.dart';
+import '../data/models/menu_ref.dart';
+import '../data/models/menu_category_ref.dart';
 
 enum MenuCatalogStatus { initial, loading, ready, failure }
 
@@ -8,6 +10,9 @@ final class MenuCatalogState extends Equatable {
   const MenuCatalogState({
     this.status = MenuCatalogStatus.initial,
     this.items = const [],
+    this.menus = const [],
+    this.categories = const [],
+    this.selectedMenuId,
     this.branchId = '',
     this.categoryFilter,
     this.pendingItemIds = const {},
@@ -17,12 +22,15 @@ final class MenuCatalogState extends Equatable {
 
   final MenuCatalogStatus status;
   final List<MenuItem> items;
+  final List<MenuRef> menus;
+  final List<MenuCategoryRef> categories;
+  final String? selectedMenuId;
 
   /// Branch the catalog was loaded for.
   final String branchId;
 
   /// Active category filter; `null` = all categories.
-  final MenuCategory? categoryFilter;
+  final String? categoryFilter;
 
   /// Ids with an in-flight stop-list mutation.
   final Set<String> pendingItemIds;
@@ -37,7 +45,7 @@ final class MenuCatalogState extends Equatable {
   /// Items after applying the category filter.
   List<MenuItem> get visibleItems => categoryFilter == null
       ? items
-      : items.where((e) => e.category == categoryFilter).toList();
+      : items.where((e) => e.categoryId == categoryFilter).toList();
 
   /// Items currently on the branch stop-list.
   List<MenuItem> get stoppedItems =>
@@ -46,8 +54,12 @@ final class MenuCatalogState extends Equatable {
   MenuCatalogState copyWith({
     MenuCatalogStatus? status,
     List<MenuItem>? items,
+    List<MenuRef>? menus,
+    List<MenuCategoryRef>? categories,
+    String? selectedMenuId,
+    bool clearSelectedMenu = false,
     String? branchId,
-    MenuCategory? categoryFilter,
+    String? categoryFilter,
     bool clearCategoryFilter = false,
     Set<String>? pendingItemIds,
     String? errorMessage,
@@ -58,6 +70,11 @@ final class MenuCatalogState extends Equatable {
     return MenuCatalogState(
       status: status ?? this.status,
       items: items ?? this.items,
+      menus: menus ?? this.menus,
+      categories: categories ?? this.categories,
+      selectedMenuId: clearSelectedMenu
+          ? null
+          : selectedMenuId ?? this.selectedMenuId,
       branchId: branchId ?? this.branchId,
       categoryFilter: clearCategoryFilter
           ? null
@@ -72,6 +89,9 @@ final class MenuCatalogState extends Equatable {
   List<Object?> get props => [
     status,
     items,
+    menus,
+    categories,
+    selectedMenuId,
     branchId,
     categoryFilter,
     pendingItemIds,

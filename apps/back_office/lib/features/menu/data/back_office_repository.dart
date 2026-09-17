@@ -1,7 +1,12 @@
 import 'models/menu_item.dart';
+import 'models/menu_ref.dart';
+import 'models/menu_category_ref.dart';
 
 /// Menu catalog data source (API-706 v1.2.0 contract).
 abstract interface class BackOfficeRepository {
+  Future<List<MenuRef>> fetchMenus({required String brandId});
+  Future<List<MenuCategoryRef>> fetchCategories({required String menuId});
+
   /// GET /menu-items?branchId={id}
   Future<List<MenuItem>> fetchMenuItems({required String branchId});
 

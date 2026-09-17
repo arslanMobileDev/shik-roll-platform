@@ -21,12 +21,12 @@ final class MenuCatalogRequested extends MenuCatalogEvent {
 
 /// Filter the table by category; `null` clears the filter.
 final class MenuCategoryFilterChanged extends MenuCatalogEvent {
-  const MenuCategoryFilterChanged(this.category);
+  const MenuCategoryFilterChanged(this.categoryId);
 
-  final MenuCategory? category;
+  final String? categoryId;
 
   @override
-  List<Object?> get props => [category];
+  List<Object?> get props => [categoryId];
 }
 
 /// Quick stop-list switch in the table row.

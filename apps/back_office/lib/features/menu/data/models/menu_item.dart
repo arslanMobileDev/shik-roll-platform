@@ -39,35 +39,45 @@ final class MenuItem extends Equatable {
     required this.isHalal,
     required this.isAvailable,
     this.imageUrl,
+    this.allergens,
+    this.categoryId,
   });
 
   final String id;
+  final String? categoryId;
   final String name;
   final String description;
   final MenuCategory category;
   final Money price;
   final String? imageUrl;
+  final String? allergens;
   final bool isHalal;
 
   /// false = the item is on the stop-list for the active branch.
   final bool isAvailable;
 
   MenuItem copyWith({
+    String? categoryId,
     String? name,
     String? description,
     MenuCategory? category,
     Money? price,
     String? imageUrl,
+    String? allergens,
+    bool clearImageUrl = false,
+    bool clearAllergens = false,
     bool? isHalal,
     bool? isAvailable,
   }) {
     return MenuItem(
       id: id,
+      categoryId: categoryId ?? this.categoryId,
       name: name ?? this.name,
       description: description ?? this.description,
       category: category ?? this.category,
       price: price ?? this.price,
-      imageUrl: imageUrl ?? this.imageUrl,
+      imageUrl: clearImageUrl ? null : imageUrl ?? this.imageUrl,
+      allergens: clearAllergens ? null : allergens ?? this.allergens,
       isHalal: isHalal ?? this.isHalal,
       isAvailable: isAvailable ?? this.isAvailable,
     );
@@ -100,11 +110,13 @@ final class MenuItem extends Equatable {
 
     return MenuItem(
       id: json['id'] as String,
+      categoryId: json['category'] is Map ? (json['category'] as Map)['id'] as String? : null,
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
       category: MenuCategory.fromJson(json['category']),
       price: price,
       imageUrl: json['imageUrl'] as String?,
+      allergens: json['allergens'] as String?,
       isHalal: json['isHalal'] as bool? ?? true,
       isAvailable: available,
     );
@@ -116,17 +128,20 @@ final class MenuItem extends Equatable {
     'category': category.name,
     'price': price.toJson(),
     'imageUrl': imageUrl,
+    'allergens': allergens,
     'isHalal': isHalal,
   };
 
   @override
   List<Object?> get props => [
     id,
+    categoryId,
     name,
     description,
     category,
     price,
     imageUrl,
+    allergens,
     isHalal,
     isAvailable,
   ];
@@ -141,6 +156,7 @@ final class MenuItemDraft extends Equatable {
     required this.price,
     required this.isHalal,
     this.imageUrl,
+    this.allergens,
   });
 
   final String name;
@@ -148,6 +164,7 @@ final class MenuItemDraft extends Equatable {
   final MenuCategory category;
   final Money price;
   final String? imageUrl;
+  final String? allergens;
   final bool isHalal;
 
   Map<String, dynamic> toJson() => {
@@ -156,6 +173,7 @@ final class MenuItemDraft extends Equatable {
     'category': category.name,
     'price': price.toJson(),
     'imageUrl': imageUrl,
+    'allergens': allergens,
     'isHalal': isHalal,
   };
 
@@ -166,6 +184,7 @@ final class MenuItemDraft extends Equatable {
     category,
     price,
     imageUrl,
+    allergens,
     isHalal,
   ];
 }

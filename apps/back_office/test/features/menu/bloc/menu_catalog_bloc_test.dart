@@ -1,3 +1,6 @@
+import 'package:back_office/features/menu/data/models/menu_ref.dart';
+import 'package:back_office/features/menu/data/models/menu_category_ref.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:back_office/core/utils/money.dart';
 import 'package:back_office/features/menu/bloc/menu_catalog_bloc.dart';
 import 'package:back_office/features/menu/bloc/menu_catalog_event.dart';
@@ -15,6 +18,7 @@ const _roll = MenuItem(
   name: 'Филадельфия',
   description: 'Лосось, сыр',
   category: MenuCategory.rolls,
+  categoryId: 'cat-roll',
   price: Money(44900),
   isHalal: true,
   isAvailable: true,
@@ -25,12 +29,14 @@ const _burger = MenuItem(
   name: 'ШИК бургер',
   description: 'Говядина',
   category: MenuCategory.burgers,
+  categoryId: 'cat-burger',
   price: Money(34900),
   isHalal: true,
   isAvailable: true,
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late _MockRepository repository;
 
   setUpAll(() {
@@ -47,7 +53,22 @@ void main() {
   });
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({
+      'staff.id': 'staff',
+      'staff.name': 'Test',
+      'staff.role': 'OWNER',
+      'staff.brandId': 'brand',
+      'staff.token': 'test-token',
+    });
     repository = _MockRepository();
+    when(() => repository.fetchMenus(brandId: 'brand')).thenAnswer(
+      (_) async => [const MenuRef(id: 'menu', name: 'Меню', brandId: 'brand')],
+    );
+    when(() => repository.fetchCategories(menuId: 'menu')).thenAnswer(
+      (_) async => [
+        const MenuCategoryRef(id: 'cat-roll', name: 'Роллы', menuId: 'menu'),
+      ],
+    );
   });
 
   MenuCatalogBloc buildBloc() => MenuCatalogBloc(repository: repository);
@@ -56,8 +77,9 @@ void main() {
     blocTest<MenuCatalogBloc, MenuCatalogState>(
       'emits loading then ready with fetched items',
       setUp: () {
-        when(() => repository.fetchMenuItems(branchId: 'b1'))
-            .thenAnswer((_) async => [_roll, _burger]);
+        when(
+          () => repository.fetchMenuItems(branchId: 'b1'),
+        ).thenAnswer((_) async => [_roll, _burger]);
       },
       build: buildBloc,
       act: (bloc) => bloc.add(const MenuCatalogRequested(branchId: 'b1')),
@@ -74,14 +96,18 @@ void main() {
     blocTest<MenuCatalogBloc, MenuCatalogState>(
       'emits loading then failure on repository error',
       setUp: () {
-        when(() => repository.fetchMenuItems(branchId: 'b1'))
-            .thenThrow(const BackOfficeApiException('boom'));
+        when(
+          () => repository.fetchMenuItems(branchId: 'b1'),
+        ).thenThrow(const BackOfficeApiException('boom'));
       },
       build: buildBloc,
       act: (bloc) => bloc.add(const MenuCatalogRequested(branchId: 'b1')),
       expect: () => [
-        isA<MenuCatalogState>()
-            .having((s) => s.status, 'status', MenuCatalogStatus.loading),
+        isA<MenuCatalogState>().having(
+          (s) => s.status,
+          'status',
+          MenuCatalogStatus.loading,
+        ),
         isA<MenuCatalogState>()
             .having((s) => s.status, 'status', MenuCatalogStatus.failure)
             .having((s) => s.errorMessage, 'errorMessage', isNotNull),
@@ -89,12 +115,115 @@ void main() {
     );
   });
 
+  group('reference loading', () {
+    blocTest<MenuCatalogBloc, MenuCatalogState>(
+      'uses profile brand and executes menus/categories/items in order',
+      setUp: () => when(
+        () => repository.fetchMenuItems(branchId: 'b1'),
+      ).thenAnswer((_) async => [_roll]),
+      build: buildBloc,
+      act: (bloc) => bloc.add(const MenuCatalogRequested(branchId: 'b1')),
+      verify: (bloc) {
+        verifyInOrder([
+          () => repository.fetchMenus(brandId: 'brand'),
+          () => repository.fetchCategories(menuId: 'menu'),
+          () => repository.fetchMenuItems(branchId: 'b1'),
+        ]);
+        expect(bloc.state.status, MenuCatalogStatus.ready);
+        expect(bloc.state.selectedMenuId, 'menu');
+        expect(bloc.state.categories.single.id, 'cat-roll');
+      },
+    );
+    blocTest<MenuCatalogBloc, MenuCatalogState>(
+      'empty menus fail without loading categories or items',
+      setUp: () => when(
+        () => repository.fetchMenus(brandId: 'brand'),
+      ).thenAnswer((_) async => []),
+      build: buildBloc,
+      act: (bloc) => bloc.add(const MenuCatalogRequested(branchId: 'b1')),
+      verify: (bloc) {
+        expect(bloc.state.status, MenuCatalogStatus.failure);
+        expect(bloc.state.errorMessage, 'Меню не настроены');
+        verifyNever(
+          () => repository.fetchCategories(menuId: any(named: 'menuId')),
+        );
+        verifyNever(
+          () => repository.fetchMenuItems(branchId: any(named: 'branchId')),
+        );
+      },
+    );
+    for (final stage in ['menus', 'categories']) {
+      blocTest<MenuCatalogBloc, MenuCatalogState>(
+        '$stage failure is translated and does not request items',
+        setUp: () {
+          if (stage == 'menus') {
+            when(
+              () => repository.fetchMenus(brandId: 'brand'),
+            ).thenThrow(Exception('offline'));
+          } else {
+            when(
+              () => repository.fetchCategories(menuId: 'menu'),
+            ).thenThrow(Exception('offline'));
+          }
+        },
+        build: buildBloc,
+        act: (bloc) => bloc.add(const MenuCatalogRequested(branchId: 'b1')),
+        verify: (bloc) {
+          expect(bloc.state.status, MenuCatalogStatus.failure);
+          expect(
+            bloc.state.errorMessage,
+            stage == 'menus'
+                ? 'Не удалось загрузить меню'
+                : 'Не удалось загрузить категории',
+          );
+          verifyNever(
+            () => repository.fetchMenuItems(branchId: any(named: 'branchId')),
+          );
+        },
+      );
+    }
+    blocTest<MenuCatalogBloc, MenuCatalogState>(
+      'multiple menus preserve order and select first',
+      setUp: () {
+        when(() => repository.fetchMenus(brandId: 'brand')).thenAnswer(
+          (_) async => [
+            const MenuRef(id: 'menu', name: 'Z', brandId: 'brand'),
+            const MenuRef(id: 'other', name: 'A', brandId: 'brand'),
+          ],
+        );
+        when(
+          () => repository.fetchMenuItems(branchId: 'b1'),
+        ).thenAnswer((_) async => []);
+      },
+      build: buildBloc,
+      act: (bloc) => bloc.add(const MenuCatalogRequested(branchId: 'b1')),
+      verify: (bloc) {
+        expect(bloc.state.selectedMenuId, 'menu');
+        expect(bloc.state.menus.length, 2);
+        verifyNever(() => repository.fetchCategories(menuId: 'other'));
+      },
+    );
+    blocTest<MenuCatalogBloc, MenuCatalogState>(
+      'missing profile fails without backend calls',
+      setUp: () => SharedPreferences.setMockInitialValues({}),
+      build: buildBloc,
+      act: (bloc) => bloc.add(const MenuCatalogRequested(branchId: 'b1')),
+      verify: (bloc) {
+        expect(bloc.state.errorMessage, contains('Войдите'));
+        verifyNever(
+          () => repository.fetchMenus(brandId: any(named: 'brandId')),
+        );
+      },
+    );
+  });
+
   group('MenuCategoryFilterChanged', () {
     blocTest<MenuCatalogBloc, MenuCatalogState>(
       'filters visibleItems by category and clears on null',
       setUp: () {
-        when(() => repository.fetchMenuItems(branchId: 'b1'))
-            .thenAnswer((_) async => [_roll, _burger]);
+        when(
+          () => repository.fetchMenuItems(branchId: 'b1'),
+        ).thenAnswer((_) async => [_roll, _burger]);
       },
       build: buildBloc,
       seed: () => const MenuCatalogState(
@@ -103,11 +232,11 @@ void main() {
         items: [_roll, _burger],
       ),
       act: (bloc) => bloc
-        ..add(const MenuCategoryFilterChanged(MenuCategory.rolls))
+        ..add(const MenuCategoryFilterChanged('cat-roll'))
         ..add(const MenuCategoryFilterChanged(null)),
       expect: () => [
         isA<MenuCatalogState>()
-            .having((s) => s.categoryFilter, 'filter', MenuCategory.rolls)
+            .having((s) => s.categoryFilter, 'filter', 'cat-roll')
             .having((s) => s.visibleItems, 'visible', [_roll]),
         isA<MenuCatalogState>()
             .having((s) => s.categoryFilter, 'filter', isNull)
@@ -173,8 +302,11 @@ void main() {
       ),
       act: (bloc) => bloc.add(const MenuItemStopListToggled('r1')),
       expect: () => [
-        isA<MenuCatalogState>()
-            .having((s) => s.items.single.isAvailable, 'available', false),
+        isA<MenuCatalogState>().having(
+          (s) => s.items.single.isAvailable,
+          'available',
+          false,
+        ),
         isA<MenuCatalogState>()
             .having((s) => s.items.single.isAvailable, 'available', true)
             .having((s) => s.notice, 'notice', contains('Ошибка')),
@@ -194,8 +326,9 @@ void main() {
     blocTest<MenuCatalogBloc, MenuCatalogState>(
       'creates item and appends to catalog',
       setUp: () {
-        when(() => repository.createMenuItem(any()))
-            .thenAnswer((_) async => _roll);
+        when(
+          () => repository.createMenuItem(any()),
+        ).thenAnswer((_) async => _roll);
       },
       build: buildBloc,
       seed: () => const MenuCatalogState(
@@ -233,9 +366,11 @@ void main() {
             .having((s) => s.notice, 'notice', contains('обновлено')),
       ],
       verify: (_) {
-        final captured = verify(() => repository.updateMenuItem(captureAny()))
-            .captured
-            .single as MenuItem;
+        final captured =
+            verify(
+                  () => repository.updateMenuItem(captureAny()),
+                ).captured.single
+                as MenuItem;
         expect(captured.id, 'r1');
         expect(captured.name, draft.name);
         expect(captured.isAvailable, isTrue);
@@ -245,8 +380,9 @@ void main() {
     blocTest<MenuCatalogBloc, MenuCatalogState>(
       'emits error notice when save fails',
       setUp: () {
-        when(() => repository.createMenuItem(any()))
-            .thenThrow(const BackOfficeApiException('validation'));
+        when(
+          () => repository.createMenuItem(any()),
+        ).thenThrow(const BackOfficeApiException('validation'));
       },
       build: buildBloc,
       seed: () => const MenuCatalogState(
@@ -255,8 +391,11 @@ void main() {
       ),
       act: (bloc) => bloc.add(const MenuItemSubmitted(draft: draft)),
       expect: () => [
-        isA<MenuCatalogState>()
-            .having((s) => s.notice, 'notice', contains('Не удалось')),
+        isA<MenuCatalogState>().having(
+          (s) => s.notice,
+          'notice',
+          contains('Не удалось'),
+        ),
       ],
     );
   });

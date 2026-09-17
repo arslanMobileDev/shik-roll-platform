@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/auth/auth_storage.dart';
 
 import '../data/back_office_repository.dart';
 import '../data/models/menu_item.dart';
@@ -17,13 +18,19 @@ final class MenuCatalogBloc extends Bloc<MenuCatalogEvent, MenuCatalogState> {
   }
 
   final BackOfficeRepository _repository;
+  int _loadGeneration = 0;
 
   Future<void> _onRequested(
     MenuCatalogRequested event,
     Emitter<MenuCatalogState> emit,
   ) async {
+    final generation = ++_loadGeneration;
     emit(
       state.copyWith(
+        items: const [],
+        menus: const [],
+        categories: const [],
+        clearSelectedMenu: true,
         status: MenuCatalogStatus.loading,
         branchId: event.branchId,
         clearError: true,
@@ -31,16 +38,54 @@ final class MenuCatalogBloc extends Bloc<MenuCatalogEvent, MenuCatalogState> {
         clearCategoryFilter: true,
       ),
     );
+    var failureMessage = 'Не удалось прочитать профиль сотрудника';
     try {
-      final items = await _repository.fetchMenuItems(
-        branchId: event.branchId,
+      final profile = await AuthStorage.getProfile();
+      if (generation != _loadGeneration || emit.isDone) return;
+      if (profile == null || profile.brandId.trim().isEmpty) {
+        emit(
+          state.copyWith(
+            status: MenuCatalogStatus.failure,
+            errorMessage: 'Войдите в аккаунт сотрудника для загрузки меню',
+          ),
+        );
+        return;
+      }
+      failureMessage = 'Не удалось загрузить меню';
+      final menus = await _repository.fetchMenus(brandId: profile.brandId);
+      if (generation != _loadGeneration || emit.isDone) return;
+      if (menus.isEmpty) {
+        emit(
+          state.copyWith(
+            status: MenuCatalogStatus.failure,
+            errorMessage: 'Меню не настроены',
+          ),
+        );
+        return;
+      }
+      // TODO: offer a menu selector when a brand has several menus; preserve API order for now.
+      final menuId = menus.first.id;
+      failureMessage = 'Не удалось загрузить категории';
+      final categories = await _repository.fetchCategories(menuId: menuId);
+      if (generation != _loadGeneration || emit.isDone) return;
+      failureMessage = 'Не удалось загрузить блюда';
+      final items = await _repository.fetchMenuItems(branchId: event.branchId);
+      if (generation != _loadGeneration || emit.isDone) return;
+      emit(
+        state.copyWith(
+          status: MenuCatalogStatus.ready,
+          items: items,
+          menus: menus,
+          categories: categories,
+          selectedMenuId: menuId,
+        ),
       );
-      emit(state.copyWith(status: MenuCatalogStatus.ready, items: items));
-    } on Object catch (e) {
+    } on Object {
+      if (generation != _loadGeneration || emit.isDone) return;
       emit(
         state.copyWith(
           status: MenuCatalogStatus.failure,
-          errorMessage: 'Не удалось загрузить меню: $e',
+          errorMessage: failureMessage,
         ),
       );
     }
@@ -50,10 +95,10 @@ final class MenuCatalogBloc extends Bloc<MenuCatalogEvent, MenuCatalogState> {
     MenuCategoryFilterChanged event,
     Emitter<MenuCatalogState> emit,
   ) {
-    if (event.category == null) {
+    if (event.categoryId == null) {
       emit(state.copyWith(clearCategoryFilter: true));
     } else {
-      emit(state.copyWith(categoryFilter: event.category));
+      emit(state.copyWith(categoryFilter: event.categoryId));
     }
   }
 
@@ -125,11 +170,13 @@ final class MenuCatalogBloc extends Bloc<MenuCatalogEvent, MenuCatalogState> {
         final updated = await _repository.updateMenuItem(
           MenuItem(
             id: existing.id,
+            categoryId: existing.categoryId,
             name: event.draft.name,
             description: event.draft.description,
             category: event.draft.category,
             price: event.draft.price,
             imageUrl: event.draft.imageUrl,
+            allergens: event.draft.allergens,
             isHalal: event.draft.isHalal,
             isAvailable: existing.isAvailable,
           ),

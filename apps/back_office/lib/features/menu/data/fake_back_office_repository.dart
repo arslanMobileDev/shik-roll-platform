@@ -1,6 +1,8 @@
 import '../../../core/utils/money.dart';
 import 'back_office_repository.dart';
 import 'models/menu_item.dart';
+import 'models/menu_ref.dart';
+import 'models/menu_category_ref.dart';
 
 /// In-memory demo repository used while the backend is offline.
 ///
@@ -11,6 +13,34 @@ final class FakeBackOfficeRepository implements BackOfficeRepository {
   FakeBackOfficeRepository({this.latency = const Duration(milliseconds: 200)});
 
   final Duration latency;
+  static const menuId = '00000000-0000-4000-8000-000000000100';
+  static const categoryIds = {
+    MenuCategory.rolls: '00000000-0000-4000-8000-000000000101',
+    MenuCategory.sets: '00000000-0000-4000-8000-000000000102',
+    MenuCategory.fastfood: '00000000-0000-4000-8000-000000000103',
+    MenuCategory.burgers: '00000000-0000-4000-8000-000000000104',
+    MenuCategory.drinks: '00000000-0000-4000-8000-000000000105',
+  };
+
+  @override
+  Future<List<MenuRef>> fetchMenus({required String brandId}) async {
+    await Future<void>.delayed(latency);
+    return [
+      MenuRef(id: menuId, name: 'Демонстрационное меню', brandId: brandId),
+    ];
+  }
+
+  @override
+  Future<List<MenuCategoryRef>> fetchCategories({
+    required String menuId,
+  }) async {
+    await Future<void>.delayed(latency);
+    if (menuId != FakeBackOfficeRepository.menuId) return [];
+    return [
+      for (final entry in categoryIds.entries)
+        MenuCategoryRef(id: entry.value, name: entry.key.label, menuId: menuId),
+    ];
+  }
 
   int _nextId = 100;
 
@@ -99,7 +129,10 @@ final class FakeBackOfficeRepository implements BackOfficeRepository {
     final stopped = _stoppedByBranch[branchId] ?? const <String>{};
     return [
       for (final item in _items)
-        item.copyWith(isAvailable: !stopped.contains(item.id)),
+        item.copyWith(
+          isAvailable: !stopped.contains(item.id),
+          categoryId: categoryIds[item.category],
+        ),
     ];
   }
 
@@ -112,7 +145,9 @@ final class FakeBackOfficeRepository implements BackOfficeRepository {
       description: draft.description,
       category: draft.category,
       price: draft.price,
+      categoryId: categoryIds[draft.category],
       imageUrl: draft.imageUrl,
+      allergens: draft.allergens,
       isHalal: draft.isHalal,
       isAvailable: true,
     );
@@ -133,7 +168,11 @@ final class FakeBackOfficeRepository implements BackOfficeRepository {
       description: item.description,
       category: item.category,
       price: item.price,
+      categoryId: item.categoryId ?? categoryIds[item.category],
       imageUrl: item.imageUrl,
+      allergens: item.allergens,
+      clearImageUrl: item.imageUrl == null,
+      clearAllergens: item.allergens == null,
       isHalal: item.isHalal,
     );
     _items[index] = updated;
