@@ -18,6 +18,8 @@ function makeRecord(overrides: Partial<MenuItemRecord> = {}): MenuItemRecord {
     name: 'Филадельфия',
     slug: 'filadelfija',
     description: null,
+    imageUrl: null,
+    allergens: null,
     weight: null,
     calories: null,
     preparationTime: null,
@@ -49,6 +51,12 @@ function makeRecord(overrides: Partial<MenuItemRecord> = {}): MenuItemRecord {
 }
 
 describe('toMenuItemEntity', () => {
+  it('exposes image and allergens including nullable defaults', () => {
+    expect(toMenuItemEntity(makeRecord())).toMatchObject({ imageUrl: null, allergens: null });
+    expect(toMenuItemEntity(makeRecord({ imageUrl: '/uploads/menu/photo.webp', allergens: 'Соя' })))
+      .toMatchObject({ imageUrl: '/uploads/menu/photo.webp', allergens: 'Соя' });
+  });
+
   it('uses the base price when no branch override exists', () => {
     const entity = toMenuItemEntity(makeRecord());
     expect(entity.price).toEqual({ base: 400, branch: null, effective: 400, currency: 'RUB' });

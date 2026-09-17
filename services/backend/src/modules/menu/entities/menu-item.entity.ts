@@ -125,6 +125,12 @@ export class MenuItemEntity {
   @ApiPropertyOptional({ nullable: true })
   description!: string | null;
 
+  @ApiPropertyOptional({ nullable: true, type: String })
+  imageUrl!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  allergens!: string | null;
+
   @ApiProperty()
   category!: MenuItemCategoryRef;
 

@@ -4,6 +4,7 @@ import { INestApplication, ValidationPipe, BadRequestException } from '@nestjs/c
 import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
+import * as bcrypt from 'bcryptjs';
 import { AppModule } from '../src/app.module';
 
 /**
@@ -55,6 +56,7 @@ async function truncateAll(): Promise<void> {
   await prisma.menu.deleteMany();
   await prisma.brandBranch.deleteMany();
   await prisma.branch.deleteMany();
+  await prisma.staff.deleteMany();
   await prisma.brand.deleteMany();
 }
 
@@ -253,6 +255,7 @@ async function seedFixtures(): Promise<Fixture> {
 describe('Menu & Product API (e2e)', () => {
   let app: INestApplication;
   let fx: Fixture;
+  let staffToken: string;
 
   beforeAll(async () => {
     execSync('pnpm prisma migrate deploy', {
@@ -282,6 +285,13 @@ describe('Menu & Product API (e2e)', () => {
       }),
     );
     await app.init();
+    await prisma.staff.create({ data: {
+      name: 'Menu E2E', phone: '+79990000022', pinHash: await bcrypt.hash('1234', 4),
+      role: 'OWNER', brandId: fx.brandA,
+    } });
+    const login = await request(app.getHttpServer()).post('/staff/auth/pin')
+      .send({ phone: '+79990000022', pin: '1234' }).expect(200);
+    staffToken = login.body.token;
   });
 
   afterAll(async () => {
@@ -290,6 +300,37 @@ describe('Menu & Product API (e2e)', () => {
   });
 
   const get = (url: string) => request(app.getHttpServer()).get(url);
+
+  it('persists image and allergens through create, independent PATCH and GET', async () => {
+    const created = await request(app.getHttpServer()).post('/menu-items').set('Authorization', `Bearer ${staffToken}`).send({
+      categoryId: fx.categorySets, sku: 'IMAGE-001', name: 'Фото', basePrice: 100,
+      imageUrl: 'https://api.shik-roll.ru/uploads/menu/a.webp', allergens: 'Соя',
+    }).expect(201);
+    const id = created.body.id;
+    expect(created.body).toMatchObject({ imageUrl: 'https://api.shik-roll.ru/uploads/menu/a.webp', allergens: 'Соя' });
+    expect(await prisma.menuItem.findUnique({ where: { id } })).toMatchObject({ imageUrl: created.body.imageUrl, allergens: 'Соя' });
+    await request(app.getHttpServer()).patch(`/menu-items/${id}`).set('Authorization', `Bearer ${staffToken}`).send({ allergens: 'Глютен' }).expect(200);
+    let fetched = await get(`/menu-items/${id}`).expect(200);
+    expect(fetched.body).toMatchObject({ imageUrl: created.body.imageUrl, allergens: 'Глютен' });
+    await request(app.getHttpServer()).patch(`/menu-items/${id}`).set('Authorization', `Bearer ${staffToken}`).send({ imageUrl: '/uploads/menu/b.webp' }).expect(200);
+    fetched = await get(`/menu-items/${id}`).expect(200);
+    expect(fetched.body).toMatchObject({ imageUrl: '/uploads/menu/b.webp', allergens: 'Глютен' });
+    await request(app.getHttpServer()).patch(`/menu-items/${id}`).set('Authorization', `Bearer ${staffToken}`).send({ imageUrl: null, allergens: null }).expect(200);
+    expect((await get(`/menu-items/${id}`).expect(200)).body).toMatchObject({ imageUrl: null, allergens: null });
+  });
+
+  it('defaults omitted fields to null and validates 500-character limits over HTTP', async () => {
+    const created = await request(app.getHttpServer()).post('/menu-items').set('Authorization', `Bearer ${staffToken}`).send({
+      categoryId: fx.categorySets, sku: 'IMAGE-002', name: 'Без фото', basePrice: 100,
+    }).expect(201);
+    expect(created.body).toMatchObject({ imageUrl: null, allergens: null });
+    expect(await prisma.menuItem.findUnique({ where: { id: created.body.id } })).toMatchObject({ imageUrl: null, allergens: null });
+    for (const field of ['imageUrl', 'allergens']) {
+      await request(app.getHttpServer()).post('/menu-items').set('Authorization', `Bearer ${staffToken}`).send({ categoryId: fx.categorySets, sku: `LONG-${field}`, name: 'Длина', basePrice: 100, [field]: 'a'.repeat(501) }).expect(400);
+      await request(app.getHttpServer()).patch(`/menu-items/${created.body.id}`).set('Authorization', `Bearer ${staffToken}`).send({ [field]: 'a'.repeat(501) }).expect(400);
+      await request(app.getHttpServer()).patch(`/menu-items/${created.body.id}`).set('Authorization', `Bearer ${staffToken}`).send({ [field]: 'a'.repeat(500) }).expect(200);
+    }
+  });
 
   it('GET /menus returns menus filtered by brand', async () => {
     const res = await get(`/menus?brandId=${fx.brandA}`).expect(200);
@@ -403,7 +444,7 @@ describe('Menu & Product API (e2e)', () => {
   it('admin: PATCH price creates and replaces the branch override', async () => {
     await request(app.getHttpServer())
       .patch(`/menu-items/${fx.itemStopListed}/price`)
-      .send({ branchId: fx.branchA2, price: 320 })
+      .set('Authorization', `Bearer ${staffToken}`).send({ branchId: fx.branchA2, price: 320 })
       .expect(200);
 
     let res = await get(`/menu-items/${fx.itemStopListed}?branchId=${fx.branchA2}`).expect(200);
@@ -411,7 +452,7 @@ describe('Menu & Product API (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch(`/menu-items/${fx.itemStopListed}/price`)
-      .send({ branchId: fx.branchA2, price: 310 })
+      .set('Authorization', `Bearer ${staffToken}`).send({ branchId: fx.branchA2, price: 310 })
       .expect(200);
 
     res = await get(`/menu-items/${fx.itemStopListed}?branchId=${fx.branchA2}`).expect(200);
@@ -426,7 +467,7 @@ describe('Menu & Product API (e2e)', () => {
   it('admin: PATCH availability toggles the per-branch flag', async () => {
     await request(app.getHttpServer())
       .patch(`/menu-items/${fx.itemHalalPriced}/availability`)
-      .send({ branchId: fx.branchA2, isAvailable: false })
+      .set('Authorization', `Bearer ${staffToken}`).send({ branchId: fx.branchA2, isAvailable: false })
       .expect(200);
 
     const res = await get(`/menu-items/${fx.itemHalalPriced}?branchId=${fx.branchA2}`).expect(200);
@@ -436,14 +477,14 @@ describe('Menu & Product API (e2e)', () => {
     // Restore shared fixture state for the following tests.
     await request(app.getHttpServer())
       .patch(`/menu-items/${fx.itemHalalPriced}/availability`)
-      .send({ branchId: fx.branchA2, isAvailable: true })
+      .set('Authorization', `Bearer ${staffToken}`).send({ branchId: fx.branchA2, isAvailable: true })
       .expect(200);
   });
 
   it('admin: PATCH stop-list adds and removes the item with a reason', async () => {
     await request(app.getHttpServer())
       .patch(`/menu-items/${fx.itemHalalPriced}/stop-list`)
-      .send({ branchId: fx.branchA2, isActive: true, reason: 'Нет риса' })
+      .set('Authorization', `Bearer ${staffToken}`).send({ branchId: fx.branchA2, isActive: true, reason: 'Нет риса' })
       .expect(200);
 
     let res = await get(`/menu-items/${fx.itemHalalPriced}?branchId=${fx.branchA2}`).expect(200);
@@ -452,7 +493,7 @@ describe('Menu & Product API (e2e)', () => {
 
     await request(app.getHttpServer())
       .patch(`/menu-items/${fx.itemHalalPriced}/stop-list`)
-      .send({ branchId: fx.branchA2, isActive: false })
+      .set('Authorization', `Bearer ${staffToken}`).send({ branchId: fx.branchA2, isActive: false })
       .expect(200);
 
     res = await get(`/menu-items/${fx.itemHalalPriced}?branchId=${fx.branchA2}`).expect(200);
@@ -463,7 +504,7 @@ describe('Menu & Product API (e2e)', () => {
   it('admin: POST /menu-items validates input and reports VALIDATION_ERROR', async () => {
     const res = await request(app.getHttpServer())
       .post('/menu-items')
-      .send({ categoryId: fx.categoryRolls, sku: 'X', name: 'X', basePrice: -10 })
+      .set('Authorization', `Bearer ${staffToken}`).send({ categoryId: fx.categoryRolls, sku: 'X', name: 'X', basePrice: -10 })
       .expect(400);
     expect(res.body.code).toBe('VALIDATION_ERROR');
   });
@@ -471,7 +512,7 @@ describe('Menu & Product API (e2e)', () => {
   it('admin: POST /menu-items reports CATEGORY_NOT_FOUND for a bogus category', async () => {
     const res = await request(app.getHttpServer())
       .post('/menu-items')
-      .send({
+      .set('Authorization', `Bearer ${staffToken}`).send({
         categoryId: '00000000-0000-4000-8000-000000000000',
         sku: 'X-1',
         name: 'X',
@@ -484,7 +525,7 @@ describe('Menu & Product API (e2e)', () => {
   it('admin: POST then PATCH /menu-items creates and updates an item', async () => {
     const created = await request(app.getHttpServer())
       .post('/menu-items')
-      .send({
+      .set('Authorization', `Bearer ${staffToken}`).send({
         categoryId: fx.categorySets,
         sku: 'SET-002',
         name: 'Сет Филадельфия',
@@ -497,7 +538,7 @@ describe('Menu & Product API (e2e)', () => {
 
     const updated = await request(app.getHttpServer())
       .patch(`/menu-items/${created.body.id}`)
-      .send({ basePrice: 1150, isFeatured: true })
+      .set('Authorization', `Bearer ${staffToken}`).send({ basePrice: 1150, isFeatured: true })
       .expect(200);
     expect(updated.body.price.base).toBe(1150);
     expect(updated.body.isFeatured).toBe(true);
@@ -509,13 +550,13 @@ describe('Menu & Product API (e2e)', () => {
 
     const created = await request(app.getHttpServer())
       .post('/categories')
-      .send({ menuId, name: 'Напитки', sortOrder: 2, isActive: true })
+      .set('Authorization', `Bearer ${staffToken}`).send({ menuId, name: 'Напитки', sortOrder: 2, isActive: true })
       .expect(201);
     expect(created.body).toMatchObject({ name: 'Напитки', brandId: fx.brandA, menuId });
 
     const updated = await request(app.getHttpServer())
       .patch(`/categories/${created.body.id}`)
-      .send({ sortOrder: 5 })
+      .set('Authorization', `Bearer ${staffToken}`).send({ sortOrder: 5 })
       .expect(200);
     expect(updated.body.sortOrder).toBe(5);
   });
@@ -523,7 +564,7 @@ describe('Menu & Product API (e2e)', () => {
   it('admin: PATCH /categories rejects a parent cycle', async () => {
     const res = await request(app.getHttpServer())
       .patch(`/categories/${fx.categoryRolls}`)
-      .send({ parentId: fx.categoryRolls })
+      .set('Authorization', `Bearer ${staffToken}`).send({ parentId: fx.categoryRolls })
       .expect(400);
     expect(res.body.code).toBe('VALIDATION_ERROR');
   });
@@ -549,20 +590,20 @@ describe('Menu & Product API (e2e)', () => {
   it('lifecycle: DRAFT→PUBLISHED→HIDDEN→PUBLISHED; rejects invalid transitions', async () => {
     const publish = await request(app.getHttpServer())
       .patch(`/menu-items/${fx.itemDraft}/status`)
-      .send({ status: 'PUBLISHED' })
+      .set('Authorization', `Bearer ${staffToken}`).send({ status: 'PUBLISHED' })
       .expect(200);
     expect(publish.body.status).toBe('PUBLISHED');
     expect(publish.body.lifecycle.publishedAt).not.toBeNull();
 
     const invalid = await request(app.getHttpServer())
       .patch(`/menu-items/${fx.itemDraft}/status`)
-      .send({ status: 'DRAFT' })
+      .set('Authorization', `Bearer ${staffToken}`).send({ status: 'DRAFT' })
       .expect(400);
     expect(invalid.body.code).toBe('INVALID_PRODUCT_STATUS_TRANSITION');
 
     const hidden = await request(app.getHttpServer())
       .patch(`/menu-items/${fx.itemDraft}/status`)
-      .send({ status: 'HIDDEN' })
+      .set('Authorization', `Bearer ${staffToken}`).send({ status: 'HIDDEN' })
       .expect(200);
     expect(hidden.body.status).toBe('HIDDEN');
     expect(hidden.body.lifecycle.hiddenAt).not.toBeNull();
@@ -570,7 +611,7 @@ describe('Menu & Product API (e2e)', () => {
 
     const republished = await request(app.getHttpServer())
       .patch(`/menu-items/${fx.itemDraft}/status`)
-      .send({ status: 'PUBLISHED' })
+      .set('Authorization', `Bearer ${staffToken}`).send({ status: 'PUBLISHED' })
       .expect(200);
     expect(republished.body.status).toBe('PUBLISHED');
   });
@@ -578,7 +619,7 @@ describe('Menu & Product API (e2e)', () => {
   it('merchandising flags are independent manual toggles', async () => {
     const res = await request(app.getHttpServer())
       .patch(`/menu-items/${fx.itemHalalPriced}/merchandising`)
-      .send({ isPopular: true, isNew: true })
+      .set('Authorization', `Bearer ${staffToken}`).send({ isPopular: true, isNew: true })
       .expect(200);
     expect(res.body).toMatchObject({ isPopular: true, isNew: true, isFeatured: false });
   });
@@ -586,12 +627,13 @@ describe('Menu & Product API (e2e)', () => {
   it('DELETE /menu-items/:id archives the product and excludes it from the catalog', async () => {
     const created = await request(app.getHttpServer())
       .post('/menu-items')
-      .send({ categoryId: fx.categorySets, sku: 'SET-009', name: 'Архивный сет', basePrice: 500 })
+      .set('Authorization', `Bearer ${staffToken}`).send({ categoryId: fx.categorySets, sku: 'SET-009', name: 'Архивный сет', basePrice: 500 })
       .expect(201);
     expect(created.body.status).toBe('DRAFT');
 
     const archived = await request(app.getHttpServer())
       .delete(`/menu-items/${created.body.id}`)
+      .set('Authorization', `Bearer ${staffToken}`)
       .expect(200);
     expect(archived.body.status).toBe('ARCHIVED');
     expect(archived.body.lifecycle.archivedAt).not.toBeNull();
@@ -600,7 +642,7 @@ describe('Menu & Product API (e2e)', () => {
   it('ordering: categories and products reorder by ids', async () => {
     const reordered = await request(app.getHttpServer())
       .patch(`/categories/order?menuId=${fx.menuA}`)
-      .send({ ids: [fx.categorySets, fx.categoryRolls] })
+      .set('Authorization', `Bearer ${staffToken}`).send({ ids: [fx.categorySets, fx.categoryRolls] })
       .expect(200);
     expect(reordered.body.updated).toBe(2);
 
@@ -613,7 +655,7 @@ describe('Menu & Product API (e2e)', () => {
 
     const prodOrder = await request(app.getHttpServer())
       .patch(`/categories/${fx.categoryRolls}/products/order`)
-      .send({ ids: [fx.itemHalalPriced, fx.itemStopListed] })
+      .set('Authorization', `Bearer ${staffToken}`).send({ ids: [fx.itemHalalPriced, fx.itemStopListed] })
       .expect(200);
     expect(prodOrder.body.updated).toBe(2);
 

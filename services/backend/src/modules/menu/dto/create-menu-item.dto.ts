@@ -81,6 +81,18 @@ export class CreateMenuItemDto {
   @MaxLength(4000)
   description?: string;
 
+  @ApiPropertyOptional({ nullable: true, maxLength: 500, type: String })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  imageUrl?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, maxLength: 500, type: String })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  allergens?: string | null;
+
   @ApiProperty({ description: 'Base price in RUB (branch overrides via PATCH price)' })
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)

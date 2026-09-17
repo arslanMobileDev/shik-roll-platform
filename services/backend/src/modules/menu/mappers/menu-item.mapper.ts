@@ -145,6 +145,8 @@ export function toMenuItemEntity(record: MenuItemRecord, branchId?: string): Men
     name: record.name,
     slug: record.slug,
     description: record.description,
+    imageUrl: record.imageUrl,
+    allergens: record.allergens,
     category: {
       id: record.category.id,
       name: record.category.name,
