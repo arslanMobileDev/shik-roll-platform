@@ -15,6 +15,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart' show FlutterSecureStorage;
 
 class TestAdapter implements HttpClientAdapter {
   int status = 201;
@@ -91,6 +92,7 @@ void main() {
   );
   setUp(() {
     SharedPreferences.setMockInitialValues({'staff.token': 'staff-test-token'});
+    FlutterSecureStorage.setMockInitialValues({'staff.token': 'staff-test-token'});
     final client = ApiClient(
       baseUrl: 'https://api.example.test/api',
       diagnostics: false,

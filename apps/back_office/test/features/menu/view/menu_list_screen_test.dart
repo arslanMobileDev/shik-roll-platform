@@ -1,6 +1,7 @@
 import 'package:back_office/features/menu/data/models/menu_ref.dart';
 import 'package:back_office/features/menu/data/models/menu_category_ref.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart' show FlutterSecureStorage;
 import 'package:back_office/features/menu/data/back_office_repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:back_office/features/menu/bloc/menu_catalog_bloc.dart';
@@ -26,6 +27,7 @@ void main() {
       'staff.brandId': 'brand',
       'staff.token': 'test-token',
     });
+    FlutterSecureStorage.setMockInitialValues({'staff.token': 'test-token'});
     repository = FakeBackOfficeRepository(latency: Duration.zero);
   });
 

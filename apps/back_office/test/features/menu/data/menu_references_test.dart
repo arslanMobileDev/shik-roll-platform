@@ -11,6 +11,7 @@ import 'package:back_office/features/menu/data/models/menu_category_ref.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart' show FlutterSecureStorage;
 
 class _Adapter implements HttpClientAdapter {
   _Adapter(this.responses);
@@ -39,9 +40,10 @@ class _Adapter implements HttpClientAdapter {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUp(
-    () => SharedPreferences.setMockInitialValues({'staff.token': 'test-staff'}),
-  );
+  setUp(() {
+    SharedPreferences.setMockInitialValues({'staff.token': 'test-staff'});
+    FlutterSecureStorage.setMockInitialValues({'staff.token': 'test-staff'});
+  });
   const menu = {
     'id': '00000000-0000-4000-8000-000000000100',
     'name': 'Меню',
