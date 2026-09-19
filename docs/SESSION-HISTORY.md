@@ -14,34 +14,72 @@
 
 ## 2026-09-19
 
-### Сделано
-- Все 6 MCP в Claude Code работают: agent-memory, ai-router, context7, github, obsidian-vault, timeweb.
-- Claude Code через OpenRouter → Kimi K3 ожил (был отозван старый ключ).
-- `ai-router-mcp`: slug `:free` → платные модели (OpenRouter убрал free-версии).
-- Написан собственный MCP `agent-memory` (~250 строк): 5 tools, PostgreSQL + pgvector,
-  DSN из macOS Keychain, только SELECT и INSERT.
-- `postgres-memory` (raw SQL) удалён из `~/.claude.json` — заменён `agent-memory`.
-- AGENTS.md обновлён — раздел MCP Memory Server для агентов.
+### Security-фиксы (5 findings закрыты)
+- **Docker root:** nginx → nginxinc/nginx-unprivileged:1.27-alpine, порт 8080.
+- **SharedPreferences токен:** → FlutterSecureStorage (WebCrypto/Keychain/EncryptedSharedPreferences) + lazy migration.
+- **LGPL sharp:** ADR-016 + THIRD_PARTY_LICENSES.md (10 платформ libvips).
+- **multer CVE (3 шт):** pnpm.overrides.multer = ^2.4.0.
+- **deepmerge-ts CVE:** ADR-017 (accepted risk, используется только Prisma CLI).
+- Все 5 в main (коммит 445554d). Тесты: 541 backend + 127 back-office зелёные.
 
-### Обнаружено
-- В репе SHIK-ROLL-PLATFORM есть своя папка `02-Architecture-Decisions/`
-  с 3 ADR (ADR-001-BLoC, ADR-004-Cart-Money, ADR-008-Image-Optimization).
-- В vault AI-Brain — 14 других ADR (ADR-002…ADR-015).
-- **Конфликт номеров:** ADR-004 и ADR-008 заняты разными решениями.
+### Инфраструктура агентов
+- **CodeInspectus 3.2.0** + Trivy DB (1.3 ГБ): установлен, движки через curl (Node fetch не работал).
+- **DSH (DeepSeek Harness) 0.1.5-rc.2** развёрнут: `npx @deepseek-ai/dsh web`.
+- **dsh-mcp-manager 0.6.0** установлен через `pnpm add -w` + `cordis.patch.yml`.
+
+### Claude Code (финальное состояние)
+- **10 MCP, 100 tools:** agent-memory (5), ai-router (4), code-guard (3),
+  codeinspectus (7), context7 (2), drawio (7), github (26), obsidian-vault (14),
+  playwright (25), timeweb (7).
+- **Модель:** DeepSeek V4 Flash (~/.claude/settings.json: `anthropic/deepseek/deepseek-v4-flash`).
+  Переключена с Kimi K3 для экономии (в 3.3 раза дешевле).
+
+### DSH (DeepSeek Harness)
+- **Провайдеры:** DeepSeek напрямую (баланс 0, не используется) + OpenRouter (рабочий).
+- **Модели через OpenRouter:** deepseek-chat, deepseek-v4-flash, gpt-5.6-luna,
+  glm-5.3-flash, kimi-k3.
+- **9 MCP подключено:** agent-memory, obsidian-vault, ai-router, timeweb, playwright,
+  drawio, codeinspectus, code-guard, context7 (74 tools).
+
+### ai-router-mcp расширен
+- Добавлены `ask_gpt` (openai/gpt-5.6-luna) и `ask_glm` (z-ai/glm-5.3-flash).
+- Итого 4 tools: ask_deepseek, ask_llama, ask_gpt, ask_glm.
+
+### Ключи (все в Bitwarden + macOS Keychain)
+- deepseek, openrouter, context7, agent-memory-postgres.
+- ai-router-mcp/server.mjs: убран хардкод, читает `process.env.OPENROUTER_API_KEY`.
+- openrouter key: отозван старый (утечка), создан новый, перенесён в Keychain.
+
+### Бэкап инфраструктуры
+- `~/Backups/agents-20260919/` (248 KB) + копия в iCloud.
+- Состав: claude.json.backup, ai-router-mcp/, agent-memory-mcp/, vault.bundle,
+  ssh-config.backup, com.user.postgres-tunnel.plist, keychain-items.txt.
+- Секретов в бэкапе нет.
+
+### Бюджет OpenRouter
+- Баланс: **$8.70** (было $11.25).
+- Kimi K3 съел $2.43 за 3.21M токенов (77 запросов) — 95% расхода.
+- После переключения на DeepSeek V4 Flash расход снижен в 3.3 раза.
+
+### Обнаружено (не решено)
+- **Конфликт ADR:** в репе `02-Architecture-Decisions/` есть 3 ADR
+  (ADR-001-BLoC, ADR-004-Cart-Money, ADR-008-Image-Optimization),
+  в vault AI-Brain — 14 других ADR (ADR-002…ADR-015). Номера 004 и 008 заняты разными решениями.
 - Требуется решение: где источник истины для ADR (репа/vault/гибрид).
 
 ### Решения
-- MCP памяти — свой, а не готовый пакет (готовые не работают с нашей `project_memories`).
-- DeepSeek Harness — кандидат на Этап 4 (оркестрация), но не сейчас.
+- MCP памяти — свой `agent-memory`, а не готовый пакет (готовые не работают с нашей схемой).
+- DSH-клиент: используем DeepSeek V4 Flash для повседневки, Kimi K3 — точечно для сложных.
+- DeepSeek напрямую (без OpenRouter) — отложено (баланс 0, российские карты не проходят).
+- Этап C (gascity) — отложен на свежую голову.
 - ADR конфликт — отложен, отдельной задачей.
 
 ### Следующий шаг
-- Этап 3: специализированные MCP — playwright, drawio, code-guard.
-- Решение по ADR (репа vs vault).
-- Возврат к A.2b (ChatGPT ждёт сброса лимитов).
+- Обкатать связку Claude Code + DSH на реальной задаче (P1 realtime или A.2b).
+- Пополнить OpenRouter ($10-20) — решить в течение 2-3 дней.
+- Этап C (gascity) — после обкатки текущего.
 
 ---
-
 ## 2026-09-18
 
 ### Сделано
