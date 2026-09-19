@@ -8,12 +8,17 @@
 
 ### libvips (через `@img/sharp-libvips-*`)
 
-- **Пакеты:**
+- **Пакеты (полный список платформ):**
   - `@img/sharp-libvips-darwin-arm64`
   - `@img/sharp-libvips-darwin-x64`
-  - `@img/sharp-libvips-linux-x64`
+  - `@img/sharp-libvips-linux-arm`
   - `@img/sharp-libvips-linux-arm64`
-  - `@img/sharp-libvips-win32-x64`
+  - `@img/sharp-libvips-linux-ppc64`
+  - `@img/sharp-libvips-linux-riscv64`
+  - `@img/sharp-libvips-linux-s390x`
+  - `@img/sharp-libvips-linux-x64`
+  - `@img/sharp-libvips-linuxmusl-arm64`
+  - `@img/sharp-libvips-linuxmusl-x64`
 - **Лицензия:** LGPL-3.0-or-later
 - **Использование:** обработка и оптимизация изображений меню (ресайз, кроп, конвертация в WebP). См. ADR-008 `Sharp-Uploads-Pipeline`.
 - **Способ связывания:** динамическая линковка через npm-пакет `sharp`.
