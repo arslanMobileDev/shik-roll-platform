@@ -1,8 +1,16 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Persistent storage for the staff JWT and the signed-in actor's profile.
-/// Backed by shared_preferences (localStorage on Web), so the session
-/// survives a page refresh. The token TTL (12h) is enforced by the backend.
+///
+/// The JWT is stored in [FlutterSecureStorage] — on Web this uses WebCrypto
+/// (AES-GCM with a key held in IndexedDB), so the token is not readable as
+/// plain text in localStorage. On mobile it uses Keychain / EncryptedSharedPrefs.
+/// The token TTL (12h) is enforced by the backend.
+///
+/// The non-sensitive profile (id, name, role, brandId) is kept in
+/// [SharedPreferences] because it is only displayed in the shell header;
+/// compromising it would not give API access.
 class AuthStorage {
   AuthStorage._();
 
@@ -12,10 +20,26 @@ class AuthStorage {
   static const _staffRoleKey = 'staff.role';
   static const _staffBrandIdKey = 'staff.brandId';
 
+  static const _secure = FlutterSecureStorage();
+
   /// Load the stored access token, or null when not signed in.
+  ///
+  /// Migration: if the token was previously saved in [SharedPreferences]
+  /// (legacy versions), it is moved to secure storage and removed from
+  /// the legacy store on first read.
   static Future<String?> getToken() async {
+    final secureToken = await _secure.read(key: _tokenKey);
+    if (secureToken != null) return secureToken;
+
+    // Legacy fallback: pre-migration token in SharedPreferences.
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey);
+    final legacyToken = prefs.getString(_tokenKey);
+    if (legacyToken != null) {
+      await _secure.write(key: _tokenKey, value: legacyToken);
+      await prefs.remove(_tokenKey);
+      return legacyToken;
+    }
+    return null;
   }
 
   /// Persist a successful login.
@@ -26,12 +50,14 @@ class AuthStorage {
     required String role,
     required String brandId,
   }) async {
+    await _secure.write(key: _tokenKey, value: token);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
     await prefs.setString(_staffIdKey, id);
     await prefs.setString(_staffNameKey, name);
     await prefs.setString(_staffRoleKey, role);
     await prefs.setString(_staffBrandIdKey, brandId);
+    // Ensure no stale legacy token remains after a successful login.
+    await prefs.remove(_tokenKey);
   }
 
   /// Read the cached staff profile (for UI display); null when not signed in.
@@ -49,6 +75,7 @@ class AuthStorage {
 
   /// Drop the session — used by logout and on any 401 from the backend.
   static Future<void> clear() async {
+    await _secure.delete(key: _tokenKey);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_staffIdKey);

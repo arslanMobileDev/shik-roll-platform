@@ -1,6 +1,7 @@
 import 'package:back_office/features/menu/data/models/menu_ref.dart';
 import 'package:back_office/features/menu/data/models/menu_category_ref.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart' show FlutterSecureStorage;
 import 'package:back_office/core/utils/money.dart';
 import 'package:back_office/features/menu/bloc/menu_catalog_bloc.dart';
 import 'package:back_office/features/menu/bloc/menu_catalog_event.dart';
@@ -60,6 +61,7 @@ void main() {
       'staff.brandId': 'brand',
       'staff.token': 'test-token',
     });
+    FlutterSecureStorage.setMockInitialValues({'staff.token': 'test-token'});
     repository = _MockRepository();
     when(() => repository.fetchMenus(brandId: 'brand')).thenAnswer(
       (_) async => [const MenuRef(id: 'menu', name: 'Меню', brandId: 'brand')],

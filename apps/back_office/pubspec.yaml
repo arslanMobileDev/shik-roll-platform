@@ -16,6 +16,7 @@ dependencies:
   flutter_bloc: ^9.1.1
   intl: ^0.20.3
   shared_preferences: ^2.3.3
+  flutter_secure_storage: ^11.0.0
 
 dev_dependencies:
   flutter_test:
