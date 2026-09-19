@@ -597,3 +597,7 @@ SHIK-ROLL-PLATFORM
 # SHIK Platform
 
 Building the next generation restaurant operating system.
+
+## Third-Party Licenses
+
+Список сторонних библиотек под LGPL/GPL см. в [THIRD_PARTY_LICENSES.md](./THIRD_PARTY_LICENSES.md).
