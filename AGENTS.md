@@ -58,3 +58,46 @@ After every package:
 - Do not create a pull request without a separate explicit command.
 - Do not merge, rebase, squash, force-push, or rewrite history without separate explicit permission.
 - Never modify `main` directly during documentation QA.
+
+## MCP Memory Server
+
+Для агентов доступен MCP `agent-memory` — семантическая память проекта.
+
+### Использование
+
+- **Pre-Flight check:** перед началом работы вызови
+  `memory_pitfalls(project_name="SHIK-ROLL-PLATFORM")` — увидишь уроки
+  предыдущих сессий и правила, которых нельзя нарушать.
+- **Post-Mortem:** после критической ошибки или зацикливания вызови
+  `memory_save(project_name="SHIK-ROLL-PLATFORM", category="pitfalls_and_failures", content="1. Что сломалось. 2. Почему. 3. Жёсткое правило.")`.
+
+### Инструменты
+
+| Tool | Назначение |
+|---|---|
+| `memory_save` | Сохранить запись (project_name, category, content) |
+| `memory_search` | Найти по проекту, категории, подстроке |
+| `memory_pitfalls` | Уроки и грабли проекта |
+| `memory_categories` | Список категорий |
+| `memory_stats` | Статистика по проекту |
+
+### Технические детали
+
+- Бэкенд: PostgreSQL + pgvector на VPS Майами через autossh-туннель.
+- Реализация: `~/.agent-memory-mcp/server.js` (5 tools, только SELECT и INSERT).
+- DSN хранится в macOS Keychain (`agent-memory-postgres`).
+
+### Категории (используемые)
+
+- `pitfalls_and_failures` — уроки и грабли (Pre-Flight check)
+- `testing_and_multer_gotchas` — особенности тестов
+- `deployment_workflow` — деплой
+- `roles_architecture`, `roles_engineering`, `roles_qa_audit` — роли агентов
+- `routing_rules` — правила маршрутизации задач
+- `infrastructure` — инфраструктура
+
+### Правила
+
+- Не удаляй записи через БД напрямую — только `memory_save`.
+- Используй `pitfalls_and_failures` для уроков и грабель.
+- Указывай `project_name="SHIK-ROLL-PLATFORM"` для этого проекта.
