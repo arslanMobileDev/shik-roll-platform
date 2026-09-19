@@ -12,6 +12,56 @@
 
 ---
 
+## 2026-09-19
+
+### Сделано
+- Все 6 MCP в Claude Code работают: agent-memory, ai-router, context7, github, obsidian-vault, timeweb.
+- Claude Code через OpenRouter → Kimi K3 ожил (был отозван старый ключ).
+- `ai-router-mcp`: slug `:free` → платные модели (OpenRouter убрал free-версии).
+- Написан собственный MCP `agent-memory` (~250 строк): 5 tools, PostgreSQL + pgvector,
+  DSN из macOS Keychain, только SELECT и INSERT.
+- `postgres-memory` (raw SQL) удалён из `~/.claude.json` — заменён `agent-memory`.
+- AGENTS.md обновлён — раздел MCP Memory Server для агентов.
+
+### Обнаружено
+- В репе SHIK-ROLL-PLATFORM есть своя папка `02-Architecture-Decisions/`
+  с 3 ADR (ADR-001-BLoC, ADR-004-Cart-Money, ADR-008-Image-Optimization).
+- В vault AI-Brain — 14 других ADR (ADR-002…ADR-015).
+- **Конфликт номеров:** ADR-004 и ADR-008 заняты разными решениями.
+- Требуется решение: где источник истины для ADR (репа/vault/гибрид).
+
+### Решения
+- MCP памяти — свой, а не готовый пакет (готовые не работают с нашей `project_memories`).
+- DeepSeek Harness — кандидат на Этап 4 (оркестрация), но не сейчас.
+- ADR конфликт — отложен, отдельной задачей.
+
+### Следующий шаг
+- Этап 3: специализированные MCP — playwright, drawio, code-guard.
+- Решение по ADR (репа vs vault).
+- Возврат к A.2b (ChatGPT ждёт сброса лимитов).
+
+---
+
+## 2026-09-18
+
+### Сделано
+- Отозваны старые ключи: GitHub PAT, OpenRouter, Context7 (когда заработает).
+- Созданы новые ключи → Bitwarden.
+- PostgreSQL: пароль сменён, старый не работает; `pg_hba.conf` → `scram-sha-256`
+  для TCP, socket trust для recovery; `.env` с правами 600.
+- Swap 4 GB на VPS Майами (`/swapfile`).
+- Vault AI-Brain перенесён из `~/Documents` в `~/Projects` (TCC-проблема), git init (30 файлов).
+- `~/.claude.json`: обновлены пароли, пути, удалён `gemini`.
+- OpenRouter key перенесён в macOS Keychain (`security find-generic-password -s openrouter`).
+- Autossh Mac → Майами как LaunchAgent, автоперезапуск (закрыт 17.09).
+
+### Решения
+- Ключи хранить только в Bitwarden + macOS Keychain. В файлах — не хранить.
+- Все MCP, которые требуют секретов — читать их из Keychain, не из env.
+
+### Следующий шаг (закрыт 19.09)
+- Этап 2: базовый MCP-слой.
+
 ## 2026-09-17
 
 ### Сделано
