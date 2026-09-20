@@ -19,5 +19,5 @@ deploy/nginx/.rendered/
 # Gas City runtime
 .gc/
 
-# Gas City runtime
-.gc/
+# Beads credentials (defense-in-depth)
+.beads/.env
