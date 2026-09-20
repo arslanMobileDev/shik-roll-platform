@@ -11,3 +11,13 @@ deploy/nginx/.rendered/
 .beads-credential-key
 .beads/proxieddb/
 *.gate.lock*
+
+# Gas City
+.beads/*
+!.beads/identity.toml
+
+# Gas City runtime
+.gc/
+
+# Gas City runtime
+.gc/
