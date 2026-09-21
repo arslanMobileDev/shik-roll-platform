@@ -21,3 +21,6 @@ deploy/nginx/.rendered/
 
 # Beads credentials (defense-in-depth)
 .beads/.env
+
+# Gas City per-WI worktrees
+worktrees/
