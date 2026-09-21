@@ -123,12 +123,32 @@ export class OrdersRepository {
     });
   }
 
-  async nextOrderSequence(branchId: string): Promise<number> {
-    // Daily sequence per branch; order_number = <branch>-<yyyymmdd>-<seq>.
-    const dayStart = new Date();
-    dayStart.setUTCHours(0, 0, 0, 0);
-    return this.prisma.order.count({
-      where: { branchId, createdAt: { gte: dayStart } },
-    });
+  /**
+   * Allocates the next daily sequence value for a branch-day.
+   *
+   * One atomic statement: the row is created on first use and incremented on
+   * every later call, so concurrent creates cannot observe the same value.
+   * Gaps are expected — a rolled-back create burns its value.
+   */
+  async nextOrderSequence(
+    branchId: string,
+    now: Date = new Date(),
+  ): Promise<{ sequence: number; day: Date }> {
+    const day = new Date(now);
+    day.setUTCHours(0, 0, 0, 0);
+    // Bind the day as an explicit date string: Prisma binds a JS Date as
+    // timestamptz, so a `::date` cast on it would resolve in the session
+    // timezone and key the counter on the previous day under a negative
+    // UTC offset.
+    const dayKey = day.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+    const rows = await this.prisma.$queryRaw<{ last_value: number }[]>`
+      INSERT INTO "order_sequences" ("branch_id", "day", "last_value", "updated_at")
+      VALUES (${branchId}::uuid, ${dayKey}::date, 1, now())
+      ON CONFLICT ("branch_id", "day")
+      DO UPDATE SET "last_value" = "order_sequences"."last_value" + 1,
+                    "updated_at" = now()
+      RETURNING "last_value"
+    `;
+    return { sequence: rows[0].last_value, day };
   }
 }
