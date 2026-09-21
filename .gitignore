@@ -24,3 +24,6 @@ deploy/nginx/.rendered/
 
 # Gas City per-WI worktrees
 worktrees/
+
+# Gas City Claude Code skills (machine-specific symlinks)
+.claude/skills/
