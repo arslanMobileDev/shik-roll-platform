@@ -33,6 +33,10 @@ const MENU_ITEM_ID = '33333333-3333-3333-3333-333333333333';
 const MODIFIER_ID = '44444444-4444-4444-4444-444444444444';
 const ORDER_ID = '55555555-5555-5555-5555-555555555555';
 const CUSTOMER_ID = '10101010-1010-1010-1010-101010101010';
+/** Allocation day fixed in UTC: the rendered number must not depend on the clock. */
+const ALLOCATION_DAY = new Date(Date.UTC(2026, 7, 30));
+/** BRANCH_ID prefix + ALLOCATION_DAY + first sequence value. */
+const ALLOCATED_ORDER_NUMBER = '2222-20260830-0001';
 
 function makeOrderRecord(
   status: OrderStatus = OrderStatus.NEW,
@@ -130,7 +134,13 @@ describe('OrdersService', () => {
       findById: jest.fn(),
       create: jest.fn(),
       transitionStatus: jest.fn(),
-      nextOrderSequence: jest.fn().mockResolvedValue(0),
+      // Allocation now returns the counter value and the day it was allocated
+      // for; formatOrderNumber renders the date from it instead of reading the
+      // clock, so a fixed day makes the rendered number deterministic.
+      nextOrderSequence: jest.fn().mockResolvedValue({
+        sequence: 1,
+        day: ALLOCATION_DAY,
+      }),
     };
     queues = { scheduleOrderProcessing: jest.fn().mockResolvedValue(undefined) };
     prisma = {
@@ -285,6 +295,10 @@ describe('OrdersService', () => {
 
       expect(repository.create).toHaveBeenCalledTimes(1);
       const createArg = repository.create.mock.calls[0][0];
+      // The number is rendered from the day handed back by the allocation, so
+      // this assertion is deterministic instead of date-dependent.
+      expect(repository.nextOrderSequence).toHaveBeenCalledWith(BRANCH_ID);
+      expect(createArg.orderNumber).toBe(ALLOCATED_ORDER_NUMBER);
       // (400 + 50) * 2 = 900
       expect(createArg.subtotalAmount.toString()).toBe('900');
       expect(createArg.totalAmount.toString()).toBe('900');
@@ -365,6 +379,43 @@ describe('OrdersService', () => {
       const createArg = repository.create.mock.calls[0][0];
       expect(createArg.appliedBonusPoints).toBe(0);
       expect(createArg.bonusDiscountAmount.toString()).toBe('0');
+    });
+  });
+
+  describe('order number allocation (B-1)', () => {
+    it('renders the day the sequence was allocated for, not the wall clock', async () => {
+      const prismaStub = {
+        $queryRaw: jest.fn().mockResolvedValue([{ last_value: 1 }]),
+        order: { count: jest.fn() },
+      };
+      const realRepository = new OrdersRepository(
+        prismaStub as unknown as PrismaService,
+      );
+      // 23:30 UTC is already the next day in a positive-offset timezone and
+      // still the previous day in a negative-offset one: only the UTC day of
+      // allocation keeps the counter and the rendered number on one date.
+      const now = new Date('2026-08-30T23:30:00.000Z');
+
+      const { sequence, day } = await realRepository.nextOrderSequence(
+        BRANCH_ID,
+        now,
+      );
+      const rendered = (
+        service as unknown as {
+          formatOrderNumber(branchId: string, seq: number, d: Date): string;
+        }
+      ).formatOrderNumber(BRANCH_ID, sequence, day);
+
+      expect(rendered).toBe(ALLOCATED_ORDER_NUMBER);
+      // B-1 regression guard: the allocated day and the date segment rendered
+      // into the order number are the same date — pinned, not assumed.
+      expect(rendered.split('-')[1]).toBe(
+        day.toISOString().slice(0, 10).replace(/-/g, ''),
+      );
+      // ...and the day reaches SQL as a date string, so no session timezone
+      // can cast it onto the previous day.
+      const [, boundDay] = prismaStub.$queryRaw.mock.calls[0].slice(1);
+      expect(boundDay).toBe('2026-08-30');
     });
   });
 
