@@ -204,8 +204,8 @@ export class OrdersService {
       }
     }
 
-    const sequence = await this.repository.nextOrderSequence(dto.branchId);
-    const orderNumber = this.formatOrderNumber(dto.branchId, sequence);
+    const { sequence, day } = await this.repository.nextOrderSequence(dto.branchId);
+    const orderNumber = this.formatOrderNumber(dto.branchId, sequence, day);
 
     const itemInputs = dto.items.map((item) => {
       const menuItem = menuItemById.get(item.menuItemId)!;
@@ -433,15 +433,14 @@ export class OrdersService {
     };
   }
 
-  private formatOrderNumber(branchId: string, sequence: number): string {
-    const now = new Date();
+  private formatOrderNumber(branchId: string, sequence: number, day: Date): string {
     const yyyymmdd = [
-      now.getUTCFullYear(),
-      String(now.getUTCMonth() + 1).padStart(2, '0'),
-      String(now.getUTCDate()).padStart(2, '0'),
+      day.getUTCFullYear(),
+      String(day.getUTCMonth() + 1).padStart(2, '0'),
+      String(day.getUTCDate()).padStart(2, '0'),
     ].join('');
     const branchPrefix = branchId.slice(0, 4).toUpperCase();
-    return `${branchPrefix}-${yyyymmdd}-${String(sequence + 1).padStart(4, '0')}`;
+    return `${branchPrefix}-${yyyymmdd}-${String(sequence).padStart(4, '0')}`;
   }
   getKdsStream(branchId: string): Observable<MessageEvent> {
     return this.ordersEvents.getKdsStream(branchId);
