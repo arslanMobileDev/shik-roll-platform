@@ -1,10 +1,13 @@
 import { execSync } from 'node:child_process';
 import * as path from 'node:path';
 import { INestApplication, ValidationPipe, BadRequestException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { OrderStatus, PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { OrdersRepository } from '../src/modules/orders/orders.repository';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 /**
  * E2E coverage of the Order module (API-707 surface, DB-608, BE-907):
@@ -51,7 +54,13 @@ async function truncateAll(): Promise<void> {
   await prisma.category.deleteMany();
   await prisma.menu.deleteMany();
   await prisma.brandBranch.deleteMany();
+  // order_sequences.branch_id is ON DELETE RESTRICT (WI-1): counter rows must
+  // be deleted before the branch they belong to.
+  await prisma.orderSequence.deleteMany();
   await prisma.branch.deleteMany();
+  // menu.e2e-spec.ts creates a staff row and leaves it behind: staff.brand_id is
+  // `fk_staff_brands`, so the brand delete below needs this table cleared first.
+  await prisma.staff.deleteMany();
   await prisma.brand.deleteMany();
 }
 
@@ -489,6 +498,176 @@ describe('Orders API (e2e)', () => {
         .send({ status: 'CONFIRMED' })
         .expect(404);
       expect(res.body.code).toBe('ORDER_NOT_FOUND');
+    });
+  });
+
+  /**
+   * WI-5: the allocation is atomic, so the race the old `COUNT(*)` allocator
+   * lost is observable here and nowhere cheaper. Every case runs on a branch
+   * created for it, so the numbers asserted below never depend on the orders
+   * the cases above already created.
+   */
+  describe('order number allocation (WI-5)', () => {
+    const createBranch = async (code: string): Promise<string> => {
+      const branch = await prisma.branch.create({ data: { code, name: `Branch ${code}` } });
+      await prisma.brandBranch.create({ data: { brandId: fx.brandA, branchId: branch.id } });
+      return branch.id;
+    };
+
+    const postOrder = (branchId: string, extra: Record<string, unknown> = {}) =>
+      http()
+        .post('/orders')
+        .send({
+          type: 'TAKEAWAY',
+          brandId: fx.brandA,
+          branchId,
+          items: [{ menuItemId: fx.itemCalifornia, quantity: 1 }],
+          ...extra,
+        });
+
+    const prefixOf = (branchId: string): string => branchId.slice(0, 4).toUpperCase();
+
+    /** Sequence segment of a `<BRANCH>-<yyyymmdd>-<seq>` order number. */
+    const sequenceOf = (orderNumber: string): number => Number(orderNumber.split('-')[2]);
+
+    it('AC-1: 10 parallel creates for one branch all succeed with distinct numbers', async () => {
+      const branchId = await createBranch('C-01');
+      const parallelRequests = 10;
+
+      const responses = await Promise.all(
+        Array.from({ length: parallelRequests }, () => postOrder(branchId)),
+      );
+
+      // (a) every response is 2xx and (c) no body carries a P2002.
+      responses.forEach((res) => {
+        expect(res.status).toBe(201);
+        expect(JSON.stringify(res.body)).not.toContain('P2002');
+      });
+
+      // (b) the returned numbers are pairwise distinct, ...
+      const numbers = responses.map((res) => res.body.orderNumber as string);
+      expect(new Set(numbers).size).toBe(parallelRequests);
+      // ... each one is this branch's own day number, ...
+      numbers.forEach((number) => {
+        expect(number).toMatch(new RegExp(`^${prefixOf(branchId)}-\\d{8}-\\d{4,}$`));
+      });
+      // ... and the counter advanced exactly once per request.
+      expect(await prisma.order.count({ where: { branchId } })).toBe(parallelRequests);
+    });
+
+    it('day rollover: each UTC day of a branch starts its own sequence at 0001', async () => {
+      const branchId = await createBranch('C-02');
+      const repository = new OrdersRepository(prisma as unknown as PrismaService);
+
+      // The injectable `now` WI-2 added: no test waits for real midnight.
+      const beforeMidnight = await repository.nextOrderSequence(
+        branchId,
+        new Date('2026-08-30T23:59:00.000Z'),
+      );
+      const afterMidnight = await repository.nextOrderSequence(
+        branchId,
+        new Date('2026-08-31T00:01:00.000Z'),
+      );
+
+      expect(beforeMidnight.sequence).toBe(1);
+      expect(beforeMidnight.day.toISOString()).toBe('2026-08-30T00:00:00.000Z');
+      expect(afterMidnight.sequence).toBe(1);
+      expect(afterMidnight.day.toISOString()).toBe('2026-08-31T00:00:00.000Z');
+
+      // Two counter rows, each at 1: the rollover reset the sequence.
+      const counters = await prisma.orderSequence.findMany({
+        where: { branchId },
+        orderBy: { day: 'asc' },
+      });
+      expect(counters.map((row) => row.day.toISOString().slice(0, 10))).toEqual([
+        '2026-08-30',
+        '2026-08-31',
+      ]);
+      expect(counters.map((row) => row.lastValue)).toEqual([1, 1]);
+
+      // A later create on the second day continues that day, not the first.
+      const laterSameDay = await repository.nextOrderSequence(
+        branchId,
+        new Date('2026-08-31T12:00:00.000Z'),
+      );
+      expect(laterSameDay.sequence).toBe(2);
+    });
+
+    it('branches are independent: each branch starts at 0001', async () => {
+      const branchOne = await createBranch('C-03');
+      const branchTwo = await createBranch('C-04');
+
+      const firstBranch = await postOrder(branchOne).expect(201);
+      const secondBranch = await postOrder(branchTwo).expect(201);
+
+      expect(firstBranch.body.orderNumber).toMatch(
+        new RegExp(`^${prefixOf(branchOne)}-\\d{8}-0001$`),
+      );
+      expect(secondBranch.body.orderNumber).toMatch(
+        new RegExp(`^${prefixOf(branchTwo)}-\\d{8}-0001$`),
+      );
+      // ... because the counter is keyed per branch, not globally.
+      expect(
+        await prisma.orderSequence.count({
+          where: { branchId: { in: [branchOne, branchTwo] } },
+        }),
+      ).toBe(2);
+    });
+
+    it('AC-9: a rejected create does not release the value it burned', async () => {
+      const branchId = await createBranch('C-05');
+      // No bonus account at all, so the balance is 0 and any spend is refused.
+      const customer = await prisma.customer.create({
+        data: { phone: `+7999${String(Date.now() % 10_000_000).padStart(7, '0')}` },
+      });
+      const token = app.get(JwtService).sign({
+        sub: customer.id,
+        phone: customer.phone,
+        role: 'CUSTOMER',
+        type: 'access',
+      });
+
+      const first = await postOrder(branchId).expect(201);
+
+      const rejected = await postOrder(branchId, { useBonusPoints: 1 })
+        .set('Authorization', `Bearer ${token}`)
+        .expect(409);
+      expect(rejected.body.code).toBe('INSUFFICIENT_BONUS_BALANCE');
+
+      const second = await postOrder(branchId).expect(201);
+
+      // The rejected create burned the value between the two committed numbers,
+      // so the next success is two ahead: the burned value was not reissued.
+      expect(sequenceOf(second.body.orderNumber)).toBe(
+        sequenceOf(first.body.orderNumber) + 2,
+      );
+
+      const committed = (
+        await prisma.order.findMany({ where: { branchId }, select: { orderNumber: true } })
+      ).map((order) => order.orderNumber);
+      expect(committed).toHaveLength(2);
+      expect(new Set(committed).size).toBe(2);
+    });
+
+    it('AC-10: deleting an order does not release its number', async () => {
+      const branchId = await createBranch('C-06');
+
+      const first = await postOrder(branchId).expect(201);
+      const second = await postOrder(branchId).expect(201);
+      await prisma.order.delete({ where: { id: second.body.id } });
+      const third = await postOrder(branchId).expect(201);
+
+      const [firstNumber, secondNumber, thirdNumber] = [
+        first.body.orderNumber as string,
+        second.body.orderNumber as string,
+        third.body.orderNumber as string,
+      ];
+      // Strictly greater than both, and never a reuse of the deleted number.
+      expect(sequenceOf(thirdNumber)).toBeGreaterThan(sequenceOf(secondNumber));
+      expect(sequenceOf(thirdNumber)).toBeGreaterThan(sequenceOf(firstNumber));
+      expect(thirdNumber).not.toBe(secondNumber);
+      expect(await prisma.order.count({ where: { orderNumber: secondNumber } })).toBe(0);
+      expect(await prisma.order.count({ where: { branchId } })).toBe(2);
     });
   });
 });

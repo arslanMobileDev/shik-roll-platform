@@ -55,6 +55,9 @@ async function truncateAll(): Promise<void> {
   await prisma.category.deleteMany();
   await prisma.menu.deleteMany();
   await prisma.brandBranch.deleteMany();
+  // order_sequences.branch_id is ON DELETE RESTRICT (WI-1): added defensively
+  // so this spec's teardown stays FK-safe if it ever creates an order.
+  await prisma.orderSequence.deleteMany();
   await prisma.branch.deleteMany();
   await prisma.staff.deleteMany();
   await prisma.brand.deleteMany();

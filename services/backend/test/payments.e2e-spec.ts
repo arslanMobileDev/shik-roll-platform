@@ -33,7 +33,13 @@ async function truncateAll(): Promise<void> {
   await prisma.category.deleteMany();
   await prisma.menu.deleteMany();
   await prisma.brandBranch.deleteMany();
+  // order_sequences.branch_id is ON DELETE RESTRICT (WI-1): this spec creates
+  // an order (POST /orders), so its counter rows must go before the branch.
+  await prisma.orderSequence.deleteMany();
   await prisma.branch.deleteMany();
+  // menu.e2e-spec.ts creates a staff row and leaves it behind: staff.brand_id is
+  // `fk_staff_brands`, so the brand delete below needs this table cleared first.
+  await prisma.staff.deleteMany();
   await prisma.brand.deleteMany();
 }
 
