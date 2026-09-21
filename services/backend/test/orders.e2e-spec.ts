@@ -58,7 +58,7 @@ async function truncateAll(): Promise<void> {
   // be deleted before the branch they belong to.
   await prisma.orderSequence.deleteMany();
   await prisma.branch.deleteMany();
-  // menu.e2e-spec.ts creates a staff row and leaves it behind: staff.brand_id is
+  // A staff row may survive from an earlier suite: staff.brand_id is
   // `fk_staff_brands`, so the brand delete below needs this table cleared first.
   await prisma.staff.deleteMany();
   await prisma.brand.deleteMany();

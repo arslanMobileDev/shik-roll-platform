@@ -55,8 +55,8 @@ async function truncateAll(): Promise<void> {
   await prisma.category.deleteMany();
   await prisma.menu.deleteMany();
   await prisma.brandBranch.deleteMany();
-  // order_sequences.branch_id is ON DELETE RESTRICT (WI-1): added defensively
-  // so this spec's teardown stays FK-safe if it ever creates an order.
+  // order_sequences.branch_id is ON DELETE RESTRICT (WI-1): counter rows may
+  // survive from an earlier suite, so they must go before the branch.
   await prisma.orderSequence.deleteMany();
   await prisma.branch.deleteMany();
   await prisma.staff.deleteMany();
@@ -299,6 +299,9 @@ describe('Menu & Product API (e2e)', () => {
 
   afterAll(async () => {
     await app?.close();
+    // This suite created the staff row at :291; `staff.brand_id` is
+    // `fk_staff_brands`, so leaving it behind breaks the next suite's brand delete.
+    await prisma.staff.deleteMany();
     await prisma.$disconnect();
   });
 
