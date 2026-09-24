@@ -228,6 +228,23 @@ describe('Orders API (e2e)', () => {
 
   const http = () => request(app.getHttpServer());
 
+  /**
+   * GET /orders and GET /orders/:id are customer-scoped (ADR-1617):
+   * only orders bound to the authenticated customer are returned.
+   * A guest Bearer token at POST time binds the order to that customer.
+   */
+  const createCustomerWithToken = async (): Promise<{ id: string; token: string }> => {
+    const phone = `+7999${String(Math.floor(Math.random() * 10_000_000)).padStart(7, '0')}`;
+    const customer = await prisma.customer.create({ data: { phone } });
+    const token = app.get(JwtService).sign({
+      sub: customer.id,
+      phone: customer.phone,
+      role: 'CUSTOMER',
+      type: 'access',
+    });
+    return { id: customer.id, token };
+  };
+
   describe('POST /orders', () => {
     it('creates an order with server-side pricing (branch override + modifiers)', async () => {
       const res = await http()
@@ -319,11 +336,27 @@ describe('Orders API (e2e)', () => {
   });
 
   describe('GET /orders', () => {
+    const placeOrder = (token: string) =>
+      http()
+        .post('/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          type: 'TAKEAWAY',
+          brandId: fx.brandA,
+          branchId: fx.branchA1,
+          items: [{ menuItemId: fx.itemCalifornia, quantity: 1 }],
+        });
+
     it('filters by branchId and status with pagination meta', async () => {
+      const { token } = await createCustomerWithToken();
+      await placeOrder(token).expect(201);
+      await placeOrder(token).expect(201);
+
       const res = await http()
         .get(`/orders?branchId=${fx.branchA1}&status=NEW`)
+        .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      expect(res.body.meta.total).toBeGreaterThanOrEqual(1);
+      expect(res.body.meta.total).toBeGreaterThanOrEqual(2);
       expect(res.body.meta.page).toBe(1);
       expect(
         res.body.data.every(
@@ -334,22 +367,41 @@ describe('Orders API (e2e)', () => {
     });
 
     it('multi-brand isolation: brand B sees no brand A orders', async () => {
-      const res = await http().get(`/orders?brandId=${fx.brandB}`).expect(200);
+      const { token } = await createCustomerWithToken();
+      await placeOrder(token).expect(201);
+
+      const res = await http()
+        .get(`/orders?brandId=${fx.brandB}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
       expect(res.body.meta.total).toBe(0);
     });
 
-    it('paginates', async () => {
-      const res = await http().get('/orders?page=1&limit=1').expect(200);
+    it('paginates own orders', async () => {
+      const { token } = await createCustomerWithToken();
+      await placeOrder(token).expect(201);
+      await placeOrder(token).expect(201);
+
+      const res = await http()
+        .get('/orders?page=1&limit=1')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
       expect(res.body.data).toHaveLength(1);
       expect(res.body.meta.total).toBeGreaterThanOrEqual(2);
       expect(res.body.meta.totalPages).toBeGreaterThanOrEqual(2);
     });
+
+    it('requires authentication (401 without token)', async () => {
+      await http().get('/orders').expect(401);
+    });
   });
 
   describe('GET /orders/:id', () => {
-    it('returns the order', async () => {
+    it('returns the order bound to the authenticated customer', async () => {
+      const { token } = await createCustomerWithToken();
       const created = await http()
         .post('/orders')
+        .set('Authorization', `Bearer ${token}`)
         .send({
           type: 'TAKEAWAY',
           brandId: fx.brandA,
@@ -357,16 +409,26 @@ describe('Orders API (e2e)', () => {
           items: [{ menuItemId: fx.itemCalifornia, quantity: 1 }],
         })
         .expect(201);
-      const res = await http().get(`/orders/${created.body.id}`).expect(200);
+
+      const res = await http()
+        .get(`/orders/${created.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
       expect(res.body.id).toBe(created.body.id);
       expect(res.body.items[0].name).toBe('Калифорния');
     });
 
     it('404 ORDER_NOT_FOUND for a missing id', async () => {
+      const { token } = await createCustomerWithToken();
       const res = await http()
         .get('/orders/99999999-9999-9999-9999-999999999999')
+        .set('Authorization', `Bearer ${token}`)
         .expect(404);
       expect(res.body.code).toBe('ORDER_NOT_FOUND');
+    });
+
+    it('requires authentication (401 without token)', async () => {
+      await http().get(`/orders/${fx.brandA}`).expect(401);
     });
   });
 

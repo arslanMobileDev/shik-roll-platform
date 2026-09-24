@@ -481,9 +481,8 @@ describe('Auth API (e2e)', () => {
       expect(listB.body.meta.total).toBe(1);
       expect(listB.body.data[0].customerId).toBe(guestB.customerId);
 
-      // Staff (no token) keeps the unscoped list.
-      const listAll = await http().get('/orders').expect(200);
-      expect(listAll.body.meta.total).toBeGreaterThanOrEqual(3);
+      // GET /orders is customer-scoped now: without a token it must 401.
+      await http().get('/orders').expect(401);
     });
 
     it('rejects a guest request with an invalid token (401)', async () => {
