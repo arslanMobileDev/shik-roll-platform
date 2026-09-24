@@ -58,6 +58,11 @@ async function truncateAll(): Promise<void> {
   // order_sequences.branch_id is ON DELETE RESTRICT (WI-1): counter rows may
   // survive from an earlier suite, so they must go before the branch.
   await prisma.orderSequence.deleteMany();
+  // kitchen_terminals.branch_id -> branches (FK, ON DELETE RESTRICT).
+  // Added because kitchen.e2e-spec.ts runs before this suite against
+  // the same shik_menu_test database.
+  await prisma.cookShift.deleteMany();
+  await prisma.kitchenTerminal.deleteMany();
   await prisma.branch.deleteMany();
   await prisma.staff.deleteMany();
   await prisma.brand.deleteMany();
