@@ -67,6 +67,11 @@ async function truncateAll(): Promise<void> {
   // order_sequences.branch_id is ON DELETE RESTRICT (WI-1): this spec creates
   // orders (8x POST /orders), so its counter rows must go before the branch.
   await prisma.orderSequence.deleteMany();
+  // kitchen_terminals.branch_id -> branches (FK, ON DELETE RESTRICT).
+  // Added here because kitchen.e2e-spec.ts runs before these suites
+  // against the same shik_menu_test database.
+  await prisma.cookShift.deleteMany();
+  await prisma.kitchenTerminal.deleteMany();
   await prisma.branch.deleteMany();
   // A staff row may survive from an earlier suite: staff.brand_id is
   // `fk_staff_brands`, so the brand delete below needs this table cleared first.

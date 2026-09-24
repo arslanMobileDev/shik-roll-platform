@@ -57,6 +57,11 @@ async function truncateAll(): Promise<void> {
   // order_sequences.branch_id is ON DELETE RESTRICT (WI-1): counter rows must
   // be deleted before the branch they belong to.
   await prisma.orderSequence.deleteMany();
+  // kitchen_terminals.branch_id -> branches (FK, ON DELETE RESTRICT).
+  // Added here because kitchen.e2e-spec.ts runs before these suites
+  // against the same shik_menu_test database.
+  await prisma.cookShift.deleteMany();
+  await prisma.kitchenTerminal.deleteMany();
   await prisma.branch.deleteMany();
   // A staff row may survive from an earlier suite: staff.brand_id is
   // `fk_staff_brands`, so the brand delete below needs this table cleared first.
@@ -432,136 +437,12 @@ describe('Orders API (e2e)', () => {
     });
   });
 
-  describe('PATCH /orders/:id/status', () => {
-    it('walks the full lifecycle NEW -> CONFIRMED -> COOKING -> READY -> COMPLETED', async () => {
-      const created = await http()
-        .post('/orders')
-        .send({
-          type: 'DINE_IN',
-          brandId: fx.brandA,
-          branchId: fx.branchA1,
-          items: [{ menuItemId: fx.itemCalifornia, quantity: 1 }],
-        })
-        .expect(201);
-      const id = created.body.id as string;
-
-      for (const status of ['CONFIRMED', 'COOKING', 'READY', 'COMPLETED'] as const) {
-        const res = await http().patch(`/orders/${id}/status`).send({ status }).expect(200);
-        expect(res.body.status).toBe(status);
-      }
-      const completed = await http().get(`/orders/${id}`).expect(200);
-      expect(completed.body.completedAt).not.toBeNull();
-
-      // Every transition is audited (DB-608 order_status_history).
-      const history = await prisma.orderStatusHistory.findMany({
-        where: { orderId: id },
-        orderBy: { changedAt: 'asc' },
-      });
-      expect(history.map((h) => `${h.previousStatus}->${h.newStatus}`)).toEqual([
-        'NEW->CONFIRMED',
-        'CONFIRMED->COOKING',
-        'COOKING->READY',
-        'READY->COMPLETED',
-      ]);
-    });
-
-    it('cancels from NEW with a reason', async () => {
-      const created = await http()
-        .post('/orders')
-        .send({
-          type: 'DELIVERY',
-          brandId: fx.brandA,
-          branchId: fx.branchA1,
-          deliveryAddress: 'ул. Лермонтова, 5',
-          items: [{ menuItemId: fx.itemCalifornia, quantity: 1 }],
-        })
-        .expect(201);
-
-      const res = await http()
-        .patch(`/orders/${created.body.id}/status`)
-        .send({ status: 'CANCELLED', reason: 'Клиент передумал' })
-        .expect(200);
-      expect(res.body.status).toBe('CANCELLED');
-      expect(res.body.cancelledAt).not.toBeNull();
-
-      const order = await prisma.order.findUnique({ where: { id: created.body.id } });
-      expect(order?.cancelReason).toBe('Клиент передумал');
-    });
-
-    it.each([
-      ['NEW', 'COOKING'],
-      ['NEW', 'READY'],
-      ['NEW', 'COMPLETED'],
-      ['CONFIRMED', 'READY'],
-      ['COOKING', 'COMPLETED'],
-      ['READY', 'CONFIRMED'],
-    ])(
-      'rejects %s -> %s with 400 INVALID_ORDER_STATUS_TRANSITION',
-      async (from, to) => {
-        const created = await http()
-          .post('/orders')
-          .send({
-            type: 'TAKEAWAY',
-            brandId: fx.brandA,
-            branchId: fx.branchA1,
-            items: [{ menuItemId: fx.itemCalifornia, quantity: 1 }],
-          })
-          .expect(201);
-        const id = created.body.id as string;
-
-        // Walk to the `from` state through legal transitions.
-        const path: Record<string, string[]> = {
-          NEW: [],
-          CONFIRMED: ['CONFIRMED'],
-          COOKING: ['CONFIRMED', 'COOKING'],
-          READY: ['CONFIRMED', 'COOKING', 'READY'],
-        };
-        for (const step of path[from]) {
-          await http().patch(`/orders/${id}/status`).send({ status: step }).expect(200);
-        }
-
-        const res = await http()
-          .patch(`/orders/${id}/status`)
-          .send({ status: to })
-          .expect(400);
-        expect(res.body.code).toBe('INVALID_ORDER_STATUS_TRANSITION');
-        expect(res.body.message).toBe(`Invalid order status transition: ${from} -> ${to}`);
-
-        // The order did not move.
-        const after = await http().get(`/orders/${id}`).expect(200);
-        expect(after.body.status).toBe(from);
-      },
-    );
-
-    it('rejects any transition out of terminal COMPLETED', async () => {
-      const created = await http()
-        .post('/orders')
-        .send({
-          type: 'DINE_IN',
-          brandId: fx.brandA,
-          branchId: fx.branchA1,
-          items: [{ menuItemId: fx.itemCalifornia, quantity: 1 }],
-        })
-        .expect(201);
-      const id = created.body.id as string;
-      for (const status of ['CONFIRMED', 'COOKING', 'READY', 'COMPLETED']) {
-        await http().patch(`/orders/${id}/status`).send({ status }).expect(200);
-      }
-      const res = await http()
-        .patch(`/orders/${id}/status`)
-        .send({ status: OrderStatus.CANCELLED })
-        .expect(400);
-      expect(res.body.code).toBe('INVALID_ORDER_STATUS_TRANSITION');
-    });
-
-    it('404 ORDER_NOT_FOUND for a missing id', async () => {
-      const res = await http()
-        .patch('/orders/99999999-9999-9999-9999-999999999999/status')
-        .send({ status: 'CONFIRMED' })
-        .expect(404);
-      expect(res.body.code).toBe('ORDER_NOT_FOUND');
-    });
-  });
+  // PATCH /orders/:id/status retired: returns 410 LEGACY_STATUS_ENDPOINT_DISABLED.
+  // Order transitions are now distributed across dedicated authenticated surfaces:
+  //   - kitchen.e2e-spec.ts: NEW/CONFIRMED -> COOKING -> READY (ADR-1618)
+  //   - couriers.e2e-spec.ts: READY -> ON_WAY -> COMPLETED (ADR-1617, part 3/3)
+  //   - payments.service.ts webhook: PENDING_PAYMENT -> CONFIRMED | CANCELLED
+  // Explicit staff-driven cancellation has no endpoint yet; tracked separately.
 
   /**
    * WI-5: the allocation is atomic, so the race the old `COUNT(*)` allocator
