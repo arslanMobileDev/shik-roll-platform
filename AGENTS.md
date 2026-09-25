@@ -53,6 +53,30 @@ After every package:
 7. Report any commit created for the package; if no commit was authorized, state that no commit was created.
 8. Stop until the next confirmation unless the project owner explicitly waived that pause for the package.
 
+## Interrupted Work Protocol
+
+When a task is interrupted mid-flight (usage limit, session end, error), the work-in-progress commit message MUST contain an explicit handoff:
+
+    WIP(<area>): <what was done>
+
+    INTERRUPTED: <reason - limits / session ended / error>
+    DONE: <what was verified and works>
+    NOT DONE: <what remains>
+    NEXT: <first action on resume>
+    VERIFY BEFORE CONTINUE: <tests to run before new changes>
+
+Example:
+
+    WIP(orders): add JwtAuthGuard to GET /orders
+
+    INTERRUPTED: ChatGPT limit reached mid-task
+    DONE: guard added, service.list() now requires customerId
+    NOT DONE: e2e tests not updated (15 fail)
+    NEXT: update orders.e2e-spec.ts with customer JWT
+    VERIFY BEFORE CONTINUE: pnpm test:e2e
+
+Rule: an interrupted WIP commit must be either finished or reverted within 48 hours. Do not leave it hanging without a decision.
+
 ## Publishing
 
 - Do not create a pull request without a separate explicit command.
@@ -76,15 +100,17 @@ After every package:
 | Tool | Назначение |
 |---|---|
 | `memory_save` | Сохранить запись (project_name, category, content) |
-| `memory_search` | Найти по проекту, категории, подстроке |
+| `memory_search` | Семантический поиск (query + фильтры), fallback на текстовый |
 | `memory_pitfalls` | Уроки и грабли проекта |
 | `memory_categories` | Список категорий |
 | `memory_stats` | Статистика по проекту |
+| `memory_delete` | Удалить по id / project_name / category / before. dry_run=true по умолчанию, >5 записей — только с force=true |
 
 ### Технические детали
 
-- Бэкенд: PostgreSQL + pgvector на VPS Майами через autossh-туннель.
-- Реализация: `~/.agent-memory-mcp/server.js` (5 tools, только SELECT и INSERT).
+- Бэкенд: PostgreSQL + pgvector **локально на Mac** (Docker, контейнер `agent-memory-postgres`, порт **5433**).
+- Embeddings: Ollama + `bge-m3` (1024 dims), порог косинуса 0.45.
+- Реализация: `~/.agent-memory-mcp/server.js` (**6 tools**, включая `memory_delete`).
 - DSN хранится в macOS Keychain (`agent-memory-postgres`).
 
 ### Категории (используемые)
@@ -98,6 +124,8 @@ After every package:
 
 ### Правила
 
-- Не удаляй записи через БД напрямую — только `memory_save`.
+- Для удаления записей используй `memory_delete` (не SQL напрямую).
+- `memory_delete` по умолчанию `dry_run=true` — всегда проверяй preview перед удалением.
+- Не пиши в `content` слова-команды типа "удалить" — агент воспримет как инструкцию.
 - Используй `pitfalls_and_failures` для уроков и грабель.
 - Указывай `project_name="SHIK-ROLL-PLATFORM"` для этого проекта.
