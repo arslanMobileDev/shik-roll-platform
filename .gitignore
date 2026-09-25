@@ -4,3 +4,26 @@ deploy/nginx/.rendered/
 .vscode/
 .DS_Store
 **/.DS_Store
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
+*.gate.lock*
+
+# Gas City
+.beads/*
+!.beads/identity.toml
+
+# Gas City runtime
+.gc/
+
+# Beads credentials (defense-in-depth)
+.beads/.env
+
+# Gas City per-WI worktrees
+worktrees/
+
+# Gas City Claude Code skills (machine-specific symlinks)
+.claude/skills/

@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import * as path from 'node:path';
 import { BadRequestException, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { JwtService } from '@nestjs/jwt';
 import { PaymentStatus, PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
@@ -33,7 +34,18 @@ async function truncateAll(): Promise<void> {
   await prisma.category.deleteMany();
   await prisma.menu.deleteMany();
   await prisma.brandBranch.deleteMany();
+  // order_sequences.branch_id is ON DELETE RESTRICT (WI-1): this spec creates
+  // an order (POST /orders), so its counter rows must go before the branch.
+  await prisma.orderSequence.deleteMany();
+  // kitchen_terminals.branch_id -> branches (FK, ON DELETE RESTRICT).
+  // Added because kitchen.e2e-spec.ts runs before this suite against
+  // the same shik_menu_test database.
+  await prisma.cookShift.deleteMany();
+  await prisma.kitchenTerminal.deleteMany();
   await prisma.branch.deleteMany();
+  // A staff row may survive from an earlier suite: staff.brand_id is
+  // `fk_staff_brands`, so the brand delete below needs this table cleared first.
+  await prisma.staff.deleteMany();
   await prisma.brand.deleteMany();
 }
 
@@ -95,14 +107,35 @@ describe('Payments API (e2e)', () => {
   });
 
   const http = () => request(app.getHttpServer());
-  async function createOnlineOrder(): Promise<{ id: string; paymentId: string; paymentUrl: string }> {
-    const response = await http().post('/orders').send({
+
+  /**
+   * GET /orders/:id is customer-scoped (ADR-1617): the order must be created
+   * with the same Bearer token that later reads it back. The token is optional
+   * here because the "creates a pending payment" test verifies only the DB row.
+   */
+  const createCustomerWithToken = async (): Promise<string> => {
+    const phone = `+7999${String(Math.floor(Math.random() * 10_000_000)).padStart(7, '0')}`;
+    const customer = await prisma.customer.create({ data: { phone } });
+    return app.get(JwtService).sign({
+      sub: customer.id,
+      phone: customer.phone,
+      role: 'CUSTOMER',
+      type: 'access',
+    });
+  };
+
+  async function createOnlineOrder(
+    token?: string,
+  ): Promise<{ id: string; paymentId: string; paymentUrl: string }> {
+    const req = http().post('/orders').send({
       type: 'TAKEAWAY',
       paymentMethod: 'ONLINE',
       brandId,
       branchId,
       items: [{ menuItemId: itemId, quantity: 1 }],
-    }).expect(201);
+    });
+    if (token) req.set('Authorization', `Bearer ${token}`);
+    const response = await req.expect(201);
     return response.body;
   }
 
@@ -116,7 +149,8 @@ describe('Payments API (e2e)', () => {
   });
 
   it('confirms an order after a succeeded webhook', async () => {
-    const order = await createOnlineOrder();
+    const token = await createCustomerWithToken();
+    const order = await createOnlineOrder(token);
     await http().post('/payments/webhook').send({
       type: 'notification',
       event: 'payment.succeeded',
@@ -129,7 +163,10 @@ describe('Payments API (e2e)', () => {
       },
     }).expect(200, { status: 'processed' });
 
-    const updated = await http().get(`/orders/${order.id}`).expect(200);
+    const updated = await http()
+      .get(`/orders/${order.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
     expect(updated.body.status).toBe('CONFIRMED');
     expect(updated.body.confirmedAt).toBeTruthy();
     const history = await prisma.orderStatusHistory.findMany({ where: { orderId: order.id } });
@@ -139,7 +176,8 @@ describe('Payments API (e2e)', () => {
   });
 
   it('cancels an order through the legacy webhook alias', async () => {
-    const order = await createOnlineOrder();
+    const token = await createCustomerWithToken();
+    const order = await createOnlineOrder(token);
     await http().post('/payments/webhook/yookassa').send({
       type: 'notification',
       event: 'payment.canceled',
@@ -151,7 +189,10 @@ describe('Payments API (e2e)', () => {
       },
     }).expect(200, { status: 'processed' });
 
-    const updated = await http().get(`/orders/${order.id}`).expect(200);
+    const updated = await http()
+      .get(`/orders/${order.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
     expect(updated.body.status).toBe('CANCELLED');
     expect(updated.body.cancelledAt).toBeTruthy();
   });

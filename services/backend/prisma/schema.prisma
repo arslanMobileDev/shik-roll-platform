@@ -99,6 +99,7 @@ model Branch {
   availability  BranchMenuItemAvailability[]
   stopList      StopListEntry[]
   orders        Order[]
+  orderSequences OrderSequence[]
   kitchenTerminals KitchenTerminal[]
   cooks Cook[]
   cookShifts CookShift[]
@@ -553,6 +554,21 @@ model Order {
   @@index([courierId], map: "idx_orders_courier_id")
   @@index([createdAt], map: "idx_orders_created_at")
   @@map("orders")
+}
+
+// Atomic order-number allocation state: the last sequence value handed out for
+// a (branch, day) pair. @db.Date is deliberate — the key is a calendar day, so
+// the upsert conflict target is unambiguous and timezone-free.
+model OrderSequence {
+  branchId  String   @map("branch_id") @db.Uuid
+  day       DateTime @db.Date
+  lastValue Int      @default(0) @map("last_value")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_order_sequences_branches")
+
+  @@id([branchId, day], map: "pk_order_sequences")
+  @@map("order_sequences")
 }
 
 // ---------------------------------------------------------------------------

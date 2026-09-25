@@ -1,10 +1,13 @@
 import { execSync } from 'node:child_process';
 import * as path from 'node:path';
 import { INestApplication, ValidationPipe, BadRequestException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { OrderStatus, PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { OrdersRepository } from '../src/modules/orders/orders.repository';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 /**
  * E2E coverage of the Order module (API-707 surface, DB-608, BE-907):
@@ -51,7 +54,18 @@ async function truncateAll(): Promise<void> {
   await prisma.category.deleteMany();
   await prisma.menu.deleteMany();
   await prisma.brandBranch.deleteMany();
+  // order_sequences.branch_id is ON DELETE RESTRICT (WI-1): counter rows must
+  // be deleted before the branch they belong to.
+  await prisma.orderSequence.deleteMany();
+  // kitchen_terminals.branch_id -> branches (FK, ON DELETE RESTRICT).
+  // Added here because kitchen.e2e-spec.ts runs before these suites
+  // against the same shik_menu_test database.
+  await prisma.cookShift.deleteMany();
+  await prisma.kitchenTerminal.deleteMany();
   await prisma.branch.deleteMany();
+  // A staff row may survive from an earlier suite: staff.brand_id is
+  // `fk_staff_brands`, so the brand delete below needs this table cleared first.
+  await prisma.staff.deleteMany();
   await prisma.brand.deleteMany();
 }
 
@@ -219,6 +233,23 @@ describe('Orders API (e2e)', () => {
 
   const http = () => request(app.getHttpServer());
 
+  /**
+   * GET /orders and GET /orders/:id are customer-scoped (ADR-1617):
+   * only orders bound to the authenticated customer are returned.
+   * A guest Bearer token at POST time binds the order to that customer.
+   */
+  const createCustomerWithToken = async (): Promise<{ id: string; token: string }> => {
+    const phone = `+7999${String(Math.floor(Math.random() * 10_000_000)).padStart(7, '0')}`;
+    const customer = await prisma.customer.create({ data: { phone } });
+    const token = app.get(JwtService).sign({
+      sub: customer.id,
+      phone: customer.phone,
+      role: 'CUSTOMER',
+      type: 'access',
+    });
+    return { id: customer.id, token };
+  };
+
   describe('POST /orders', () => {
     it('creates an order with server-side pricing (branch override + modifiers)', async () => {
       const res = await http()
@@ -310,11 +341,27 @@ describe('Orders API (e2e)', () => {
   });
 
   describe('GET /orders', () => {
+    const placeOrder = (token: string) =>
+      http()
+        .post('/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          type: 'TAKEAWAY',
+          brandId: fx.brandA,
+          branchId: fx.branchA1,
+          items: [{ menuItemId: fx.itemCalifornia, quantity: 1 }],
+        });
+
     it('filters by branchId and status with pagination meta', async () => {
+      const { token } = await createCustomerWithToken();
+      await placeOrder(token).expect(201);
+      await placeOrder(token).expect(201);
+
       const res = await http()
         .get(`/orders?branchId=${fx.branchA1}&status=NEW`)
+        .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      expect(res.body.meta.total).toBeGreaterThanOrEqual(1);
+      expect(res.body.meta.total).toBeGreaterThanOrEqual(2);
       expect(res.body.meta.page).toBe(1);
       expect(
         res.body.data.every(
@@ -325,22 +372,41 @@ describe('Orders API (e2e)', () => {
     });
 
     it('multi-brand isolation: brand B sees no brand A orders', async () => {
-      const res = await http().get(`/orders?brandId=${fx.brandB}`).expect(200);
+      const { token } = await createCustomerWithToken();
+      await placeOrder(token).expect(201);
+
+      const res = await http()
+        .get(`/orders?brandId=${fx.brandB}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
       expect(res.body.meta.total).toBe(0);
     });
 
-    it('paginates', async () => {
-      const res = await http().get('/orders?page=1&limit=1').expect(200);
+    it('paginates own orders', async () => {
+      const { token } = await createCustomerWithToken();
+      await placeOrder(token).expect(201);
+      await placeOrder(token).expect(201);
+
+      const res = await http()
+        .get('/orders?page=1&limit=1')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
       expect(res.body.data).toHaveLength(1);
       expect(res.body.meta.total).toBeGreaterThanOrEqual(2);
       expect(res.body.meta.totalPages).toBeGreaterThanOrEqual(2);
     });
+
+    it('requires authentication (401 without token)', async () => {
+      await http().get('/orders').expect(401);
+    });
   });
 
   describe('GET /orders/:id', () => {
-    it('returns the order', async () => {
+    it('returns the order bound to the authenticated customer', async () => {
+      const { token } = await createCustomerWithToken();
       const created = await http()
         .post('/orders')
+        .set('Authorization', `Bearer ${token}`)
         .send({
           type: 'TAKEAWAY',
           brandId: fx.brandA,
@@ -348,147 +414,203 @@ describe('Orders API (e2e)', () => {
           items: [{ menuItemId: fx.itemCalifornia, quantity: 1 }],
         })
         .expect(201);
-      const res = await http().get(`/orders/${created.body.id}`).expect(200);
+
+      const res = await http()
+        .get(`/orders/${created.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
       expect(res.body.id).toBe(created.body.id);
       expect(res.body.items[0].name).toBe('Калифорния');
     });
 
     it('404 ORDER_NOT_FOUND for a missing id', async () => {
+      const { token } = await createCustomerWithToken();
       const res = await http()
         .get('/orders/99999999-9999-9999-9999-999999999999')
+        .set('Authorization', `Bearer ${token}`)
         .expect(404);
       expect(res.body.code).toBe('ORDER_NOT_FOUND');
+    });
+
+    it('requires authentication (401 without token)', async () => {
+      await http().get(`/orders/${fx.brandA}`).expect(401);
     });
   });
 
-  describe('PATCH /orders/:id/status', () => {
-    it('walks the full lifecycle NEW -> CONFIRMED -> COOKING -> READY -> COMPLETED', async () => {
-      const created = await http()
+  // PATCH /orders/:id/status retired: returns 410 LEGACY_STATUS_ENDPOINT_DISABLED.
+  // Order transitions are now distributed across dedicated authenticated surfaces:
+  //   - kitchen.e2e-spec.ts: NEW/CONFIRMED -> COOKING -> READY (ADR-1618)
+  //   - couriers.e2e-spec.ts: READY -> ON_WAY -> COMPLETED (ADR-1617, part 3/3)
+  //   - payments.service.ts webhook: PENDING_PAYMENT -> CONFIRMED | CANCELLED
+  // Explicit staff-driven cancellation has no endpoint yet; tracked separately.
+
+  /**
+   * WI-5: the allocation is atomic, so the race the old `COUNT(*)` allocator
+   * lost is observable here and nowhere cheaper. Every case runs on a branch
+   * created for it, so the numbers asserted below never depend on the orders
+   * the cases above already created.
+   */
+  describe('order number allocation (WI-5)', () => {
+    const createBranch = async (code: string): Promise<string> => {
+      const branch = await prisma.branch.create({ data: { code, name: `Branch ${code}` } });
+      await prisma.brandBranch.create({ data: { brandId: fx.brandA, branchId: branch.id } });
+      return branch.id;
+    };
+
+    const postOrder = (branchId: string, extra: Record<string, unknown> = {}) =>
+      http()
         .post('/orders')
         .send({
-          type: 'DINE_IN',
+          type: 'TAKEAWAY',
           brandId: fx.brandA,
-          branchId: fx.branchA1,
+          branchId,
           items: [{ menuItemId: fx.itemCalifornia, quantity: 1 }],
-        })
-        .expect(201);
-      const id = created.body.id as string;
+          ...extra,
+        });
 
-      for (const status of ['CONFIRMED', 'COOKING', 'READY', 'COMPLETED'] as const) {
-        const res = await http().patch(`/orders/${id}/status`).send({ status }).expect(200);
-        expect(res.body.status).toBe(status);
-      }
-      const completed = await http().get(`/orders/${id}`).expect(200);
-      expect(completed.body.completedAt).not.toBeNull();
+    const prefixOf = (branchId: string): string => branchId.slice(0, 4).toUpperCase();
 
-      // Every transition is audited (DB-608 order_status_history).
-      const history = await prisma.orderStatusHistory.findMany({
-        where: { orderId: id },
-        orderBy: { changedAt: 'asc' },
+    /** Sequence segment of a `<BRANCH>-<yyyymmdd>-<seq>` order number. */
+    const sequenceOf = (orderNumber: string): number => Number(orderNumber.split('-')[2]);
+
+    it('AC-1: 10 parallel creates for one branch all succeed with distinct numbers', async () => {
+      const branchId = await createBranch('C-01');
+      const parallelRequests = 10;
+
+      const responses = await Promise.all(
+        Array.from({ length: parallelRequests }, () => postOrder(branchId)),
+      );
+
+      // (a) every response is 2xx and (c) no body carries a P2002.
+      responses.forEach((res) => {
+        expect(res.status).toBe(201);
+        expect(JSON.stringify(res.body)).not.toContain('P2002');
       });
-      expect(history.map((h) => `${h.previousStatus}->${h.newStatus}`)).toEqual([
-        'NEW->CONFIRMED',
-        'CONFIRMED->COOKING',
-        'COOKING->READY',
-        'READY->COMPLETED',
+
+      // (b) the returned numbers are pairwise distinct, ...
+      const numbers = responses.map((res) => res.body.orderNumber as string);
+      expect(new Set(numbers).size).toBe(parallelRequests);
+      // ... each one is this branch's own day number, ...
+      numbers.forEach((number) => {
+        expect(number).toMatch(new RegExp(`^${prefixOf(branchId)}-\\d{8}-\\d{4,}$`));
+      });
+      // ... and the counter advanced exactly once per request.
+      expect(await prisma.order.count({ where: { branchId } })).toBe(parallelRequests);
+    });
+
+    it('day rollover: each UTC day of a branch starts its own sequence at 0001', async () => {
+      const branchId = await createBranch('C-02');
+      const repository = new OrdersRepository(prisma as unknown as PrismaService);
+
+      // The injectable `now` WI-2 added: no test waits for real midnight.
+      const beforeMidnight = await repository.nextOrderSequence(
+        branchId,
+        new Date('2026-08-30T23:59:00.000Z'),
+      );
+      const afterMidnight = await repository.nextOrderSequence(
+        branchId,
+        new Date('2026-08-31T00:01:00.000Z'),
+      );
+
+      expect(beforeMidnight.sequence).toBe(1);
+      expect(beforeMidnight.day.toISOString()).toBe('2026-08-30T00:00:00.000Z');
+      expect(afterMidnight.sequence).toBe(1);
+      expect(afterMidnight.day.toISOString()).toBe('2026-08-31T00:00:00.000Z');
+
+      // Two counter rows, each at 1: the rollover reset the sequence.
+      const counters = await prisma.orderSequence.findMany({
+        where: { branchId },
+        orderBy: { day: 'asc' },
+      });
+      expect(counters.map((row) => row.day.toISOString().slice(0, 10))).toEqual([
+        '2026-08-30',
+        '2026-08-31',
       ]);
+      expect(counters.map((row) => row.lastValue)).toEqual([1, 1]);
+
+      // A later create on the second day continues that day, not the first.
+      const laterSameDay = await repository.nextOrderSequence(
+        branchId,
+        new Date('2026-08-31T12:00:00.000Z'),
+      );
+      expect(laterSameDay.sequence).toBe(2);
     });
 
-    it('cancels from NEW with a reason', async () => {
-      const created = await http()
-        .post('/orders')
-        .send({
-          type: 'DELIVERY',
-          brandId: fx.brandA,
-          branchId: fx.branchA1,
-          deliveryAddress: 'ул. Лермонтова, 5',
-          items: [{ menuItemId: fx.itemCalifornia, quantity: 1 }],
-        })
-        .expect(201);
+    it('branches are independent: each branch starts at 0001', async () => {
+      const branchOne = await createBranch('C-03');
+      const branchTwo = await createBranch('C-04');
 
-      const res = await http()
-        .patch(`/orders/${created.body.id}/status`)
-        .send({ status: 'CANCELLED', reason: 'Клиент передумал' })
-        .expect(200);
-      expect(res.body.status).toBe('CANCELLED');
-      expect(res.body.cancelledAt).not.toBeNull();
+      const firstBranch = await postOrder(branchOne).expect(201);
+      const secondBranch = await postOrder(branchTwo).expect(201);
 
-      const order = await prisma.order.findUnique({ where: { id: created.body.id } });
-      expect(order?.cancelReason).toBe('Клиент передумал');
+      expect(firstBranch.body.orderNumber).toMatch(
+        new RegExp(`^${prefixOf(branchOne)}-\\d{8}-0001$`),
+      );
+      expect(secondBranch.body.orderNumber).toMatch(
+        new RegExp(`^${prefixOf(branchTwo)}-\\d{8}-0001$`),
+      );
+      // ... because the counter is keyed per branch, not globally.
+      expect(
+        await prisma.orderSequence.count({
+          where: { branchId: { in: [branchOne, branchTwo] } },
+        }),
+      ).toBe(2);
     });
 
-    it.each([
-      ['NEW', 'COOKING'],
-      ['NEW', 'READY'],
-      ['NEW', 'COMPLETED'],
-      ['CONFIRMED', 'READY'],
-      ['COOKING', 'COMPLETED'],
-      ['READY', 'CONFIRMED'],
-    ])(
-      'rejects %s -> %s with 400 INVALID_ORDER_STATUS_TRANSITION',
-      async (from, to) => {
-        const created = await http()
-          .post('/orders')
-          .send({
-            type: 'TAKEAWAY',
-            brandId: fx.brandA,
-            branchId: fx.branchA1,
-            items: [{ menuItemId: fx.itemCalifornia, quantity: 1 }],
-          })
-          .expect(201);
-        const id = created.body.id as string;
+    it('AC-9: a rejected create does not release the value it burned', async () => {
+      const branchId = await createBranch('C-05');
+      // No bonus account at all, so the balance is 0 and any spend is refused.
+      const customer = await prisma.customer.create({
+        data: { phone: `+7999${String(Date.now() % 10_000_000).padStart(7, '0')}` },
+      });
+      const token = app.get(JwtService).sign({
+        sub: customer.id,
+        phone: customer.phone,
+        role: 'CUSTOMER',
+        type: 'access',
+      });
 
-        // Walk to the `from` state through legal transitions.
-        const path: Record<string, string[]> = {
-          NEW: [],
-          CONFIRMED: ['CONFIRMED'],
-          COOKING: ['CONFIRMED', 'COOKING'],
-          READY: ['CONFIRMED', 'COOKING', 'READY'],
-        };
-        for (const step of path[from]) {
-          await http().patch(`/orders/${id}/status`).send({ status: step }).expect(200);
-        }
+      const first = await postOrder(branchId).expect(201);
 
-        const res = await http()
-          .patch(`/orders/${id}/status`)
-          .send({ status: to })
-          .expect(400);
-        expect(res.body.code).toBe('INVALID_ORDER_STATUS_TRANSITION');
-        expect(res.body.message).toBe(`Invalid order status transition: ${from} -> ${to}`);
+      const rejected = await postOrder(branchId, { useBonusPoints: 1 })
+        .set('Authorization', `Bearer ${token}`)
+        .expect(409);
+      expect(rejected.body.code).toBe('INSUFFICIENT_BONUS_BALANCE');
 
-        // The order did not move.
-        const after = await http().get(`/orders/${id}`).expect(200);
-        expect(after.body.status).toBe(from);
-      },
-    );
+      const second = await postOrder(branchId).expect(201);
 
-    it('rejects any transition out of terminal COMPLETED', async () => {
-      const created = await http()
-        .post('/orders')
-        .send({
-          type: 'DINE_IN',
-          brandId: fx.brandA,
-          branchId: fx.branchA1,
-          items: [{ menuItemId: fx.itemCalifornia, quantity: 1 }],
-        })
-        .expect(201);
-      const id = created.body.id as string;
-      for (const status of ['CONFIRMED', 'COOKING', 'READY', 'COMPLETED']) {
-        await http().patch(`/orders/${id}/status`).send({ status }).expect(200);
-      }
-      const res = await http()
-        .patch(`/orders/${id}/status`)
-        .send({ status: OrderStatus.CANCELLED })
-        .expect(400);
-      expect(res.body.code).toBe('INVALID_ORDER_STATUS_TRANSITION');
+      // The rejected create burned the value between the two committed numbers,
+      // so the next success is two ahead: the burned value was not reissued.
+      expect(sequenceOf(second.body.orderNumber)).toBe(
+        sequenceOf(first.body.orderNumber) + 2,
+      );
+
+      const committed = (
+        await prisma.order.findMany({ where: { branchId }, select: { orderNumber: true } })
+      ).map((order) => order.orderNumber);
+      expect(committed).toHaveLength(2);
+      expect(new Set(committed).size).toBe(2);
     });
 
-    it('404 ORDER_NOT_FOUND for a missing id', async () => {
-      const res = await http()
-        .patch('/orders/99999999-9999-9999-9999-999999999999/status')
-        .send({ status: 'CONFIRMED' })
-        .expect(404);
-      expect(res.body.code).toBe('ORDER_NOT_FOUND');
+    it('AC-10: deleting an order does not release its number', async () => {
+      const branchId = await createBranch('C-06');
+
+      const first = await postOrder(branchId).expect(201);
+      const second = await postOrder(branchId).expect(201);
+      await prisma.order.delete({ where: { id: second.body.id } });
+      const third = await postOrder(branchId).expect(201);
+
+      const [firstNumber, secondNumber, thirdNumber] = [
+        first.body.orderNumber as string,
+        second.body.orderNumber as string,
+        third.body.orderNumber as string,
+      ];
+      // Strictly greater than both, and never a reuse of the deleted number.
+      expect(sequenceOf(thirdNumber)).toBeGreaterThan(sequenceOf(secondNumber));
+      expect(sequenceOf(thirdNumber)).toBeGreaterThan(sequenceOf(firstNumber));
+      expect(thirdNumber).not.toBe(secondNumber);
+      expect(await prisma.order.count({ where: { orderNumber: secondNumber } })).toBe(0);
+      expect(await prisma.order.count({ where: { branchId } })).toBe(2);
     });
   });
 });
