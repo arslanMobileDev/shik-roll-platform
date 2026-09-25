@@ -1,0 +1,22 @@
+# Trivy ignore list — documented false positives.
+#
+# Every entry must have a justification. Re-check this list when a new
+# Dockerfile or new base image is added to the repository.
+
+# DS-0002 "Container running as root".
+#
+# back_office/Dockerfile.web and kds/Dockerfile.web use
+# nginxinc/nginx-unprivileged:1.27-alpine, which runs as UID 101 and
+# listens on port 8080. Trivy only checks for a literal `USER`
+# instruction in the Dockerfile and does not inspect the base image's
+# default user, so it flags these as root even though they are not.
+#
+# customer_mobile/Dockerfile.web was migrated to nginx-unprivileged on
+# 2026-09-25, so the rule no longer matches it either.
+DS-0002
+
+# LGPL-3.0-or-later findings for @img/sharp-* are license
+# classification, not vulnerabilities. Documented in
+# THIRD_PARTY_LICENSES.md and ADR-016. Trivy's `license` scanner
+# classifies them as `restricted`; the project has already reviewed
+# the dynamic-linking position and published the required notice.
