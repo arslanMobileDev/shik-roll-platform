@@ -1,7 +1,7 @@
 {
   "name": "@shik/backend",
   "version": "0.1.0",
-  "description": "SHIK Platform backend — Menu & Product catalog service (DB-607, API-706, BE-906)",
+  "description": "SHIK Platform backend \u2014 Menu & Product catalog service (DB-607, API-706, BE-906)",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
@@ -78,7 +78,8 @@
   },
   "pnpm": {
     "overrides": {
-      "multer": "^2.4.0"
+      "multer": "^2.4.0",
+      "deepmerge-ts": "^8.0.0"
     }
   }
 }
