@@ -88,6 +88,10 @@ jobs:
         working-directory: services/backend
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma client
+        working-directory: services/backend
+        run: pnpm prisma generate
+
       - name: Create test database
         env:
           PGPASSWORD: postgres
