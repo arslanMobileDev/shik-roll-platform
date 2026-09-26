@@ -70,7 +70,7 @@ class _CourierLoginScreenState extends State<CourierLoginScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Курьер · Internal Use Only',
+                        'Курьер',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium,
                       ),

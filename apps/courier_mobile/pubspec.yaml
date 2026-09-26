@@ -1,5 +1,5 @@
 name: courier_mobile
-description: "SHIK Platform Courier App — Internal Use Only. Delivery lifecycle for SHIK ROLL orders."
+description: "Courier Platform — delivery lifecycle management for restaurant chains and courier teams."
 publish_to: 'none'
 version: 0.1.0+1
 

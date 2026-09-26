@@ -1,4 +1,4 @@
-# SHIK ROLL Courier App (Internal Use Only)
+# Courier Platform — Mobile App
 
 Лёгкое служебное приложение курьера: забор заказов с кухни и подтверждение доставки.
 Flutter, Android / PWA. State management — BLoC (Cubit).

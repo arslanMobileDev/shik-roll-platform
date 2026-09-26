@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// SHIK ROLL design tokens — Courier App (Internal Use Only).
+/// Design tokens for the Courier Platform mobile app.
 abstract final class ShikColors {
   /// Terracotta brand accent.
   static const Color terracotta = Color(0xFFFF5722);

@@ -13,7 +13,7 @@ import 'features/location/data/courier_location_repository.dart';
 import 'features/location/data/courier_location_source.dart';
 import 'features/orders/view/courier_orders_screen.dart';
 
-/// Root widget of the SHIK ROLL Courier App (Internal Use Only).
+/// Root widget of the Courier Platform mobile app.
 ///
 /// Composition root: the authenticated cubit owns restore/login/logout; the
 /// optional [authInterceptor] (remote mode) forwards a 401 to
