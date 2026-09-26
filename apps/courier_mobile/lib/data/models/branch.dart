@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-/// SHIK ROLL branch (точка/филиал).
+/// DOSTERRA branch (точка/филиал).
 class Branch extends Equatable {
   const Branch({required this.id, required this.name});
 

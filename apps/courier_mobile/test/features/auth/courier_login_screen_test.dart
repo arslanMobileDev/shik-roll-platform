@@ -32,7 +32,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(CourierLoginScreen), findsOneWidget);
-    expect(find.text('SHIK ROLL'), findsOneWidget);
+    expect(find.text('DOSTERRA'), findsOneWidget);
     expect(find.text('100% Halal'), findsOneWidget);
     expect(find.byKey(const Key('login_phone_field')), findsOneWidget);
     expect(find.byKey(const Key('login_pin_field')), findsOneWidget);

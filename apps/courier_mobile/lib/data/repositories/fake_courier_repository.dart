@@ -6,7 +6,7 @@ import '../models/courier_order.dart';
 import '../models/courier_order_event.dart';
 import 'courier_repository.dart';
 
-/// Offline demo repository with mock SHIK ROLL delivery orders.
+/// Offline demo repository with mock DOSTERRA delivery orders.
 ///
 /// Any 4-digit PIN is accepted; the courier is always «Мухаммад» attached to
 /// 'branch-center'. Mutations mirror the backend transition rules and emit

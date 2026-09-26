@@ -62,7 +62,7 @@ class _CourierLoginScreenState extends State<CourierLoginScreen> {
                     children: [
                       const SizedBox(height: 16),
                       Text(
-                        'SHIK ROLL',
+                        'DOSTERRA',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.headlineLarge?.copyWith(
                           letterSpacing: 2,

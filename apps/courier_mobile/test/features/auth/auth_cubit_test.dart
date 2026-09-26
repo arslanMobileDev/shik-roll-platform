@@ -144,7 +144,7 @@ void main() {
         final legacyJson = jsonEncode({
           'token': validJwt,
           'courier': {'id': 'courier-muhammad', 'name': 'Мухаммад'},
-          'branch': {'id': 'branch-center', 'name': 'SHIK ROLL — Центр'},
+          'branch': {'id': 'branch-center', 'name': 'DOSTERRA — Центр'},
           'phone': '+79170000000',
         });
         final s = await freshStorages(

@@ -57,7 +57,7 @@ class GeolocatorLocationSource implements CourierLocationSource {
           distanceFilter: 5,
           intervalDuration: const Duration(seconds: 5),
           foregroundNotificationConfig: const ForegroundNotificationConfig(
-            notificationTitle: 'SHIK ROLL: доставка в пути',
+            notificationTitle: 'DOSTERRA: доставка в пути',
             notificationText:
                 'Геолокация передаётся, пока заказ в статусе «В пути»',
             enableWakeLock: false,

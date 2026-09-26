@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'shik_colors.dart';
 
-/// SHIK ROLL theme factory — compact mobile layout, terracotta accent.
+/// DOSTERRA theme factory — compact mobile layout, terracotta accent.
 abstract final class ShikTheme {
   static ThemeData light() => _base(
         brightness: Brightness.light,

@@ -7,7 +7,7 @@ import 'package:courier_mobile/data/models/courier_order.dart';
 import 'package:courier_mobile/data/models/courier_session.dart';
 import 'package:courier_mobile/features/location/data/courier_location_source.dart';
 
-const testBranch = Branch(id: 'branch-center', name: 'SHIK ROLL — Центр');
+const testBranch = Branch(id: 'branch-center', name: 'DOSTERRA — Центр');
 
 const testCourier = Courier(id: 'courier-muhammad', name: 'Мухаммад');
 

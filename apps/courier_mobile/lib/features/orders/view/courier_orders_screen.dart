@@ -95,7 +95,7 @@ class _CourierOrdersViewState extends State<_CourierOrdersView>
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('SHIK ROLL Курьер', style: theme.textTheme.titleMedium),
+            Text('DOSTERRA', style: theme.textTheme.titleMedium),
             BlocBuilder<OrdersCubit, OrdersState>(
               builder: (context, state) => Text(
                 state is OrdersLoaded ? 'Активных: ${state.orders.length}' : '',

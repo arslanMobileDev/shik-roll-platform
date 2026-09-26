@@ -58,7 +58,7 @@ class CourierApp extends StatelessWidget {
           return cubit..restore();
         },
         child: MaterialApp(
-          title: 'SHIK ROLL Курьер',
+          title: 'DOSTERRA',
           debugShowCheckedModeBanner: false,
           theme: ShikTheme.light(),
           darkTheme: ShikTheme.dark(),
