@@ -1,4 +1,4 @@
-package com.shikroll.courier_mobile
+package com.dosterra.courier
 
 import io.flutter.embedding.android.FlutterActivity
 
