@@ -120,8 +120,11 @@ describe('Auth API (e2e)', () => {
     });
     await truncateAll();
 
-    const brand = await prisma.brand.create({ data: { code: 'SHIK_ROLL', name: 'SHIK ROLL' } });
-    const branch = await prisma.branch.create({ data: { code: 'A-01', name: 'Branch A1' } });
+    // ADR-1622: tenant #1 comes from the backfill migration (truncateAll leaves
+    // it alone), so it is resolved by code — the UUID is minted per database.
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { code: 'SHIK_ROLL' } });
+    const brand = await prisma.brand.create({ data: { code: 'SHIK_ROLL', name: 'SHIK ROLL', tenantId: tenant.id } });
+    const branch = await prisma.branch.create({ data: { code: 'A-01', name: 'Branch A1', tenantId: tenant.id } });
     await prisma.brandBranch.create({ data: { brandId: brand.id, branchId: branch.id } });
     const menu = await prisma.menu.create({
       data: { brandId: brand.id, name: 'Main Menu', status: 'PUBLISHED', publishedAt: new Date() },

@@ -21,10 +21,13 @@ const url = process.env.TEST_COOK_DATABASE_URL;
     afterAll(async () => { await db?.$disconnect(); });
     it('serializes concurrent logins, persists attribution, computes metrics and revokes logout', async () => {
         const suffix = randomUUID();
-        const brand = await db.brand.create({ data: { code: suffix, name: 'Test brand' } });
-        const branch = await db.branch.create({ data: { code: suffix, name: 'Test branch' } });
+        // ADR-1622: tenant #1 comes from the backfill migration, so it is
+        // resolved by code — the UUID is minted per database.
+        const tenant = await db.tenant.findUniqueOrThrow({ where: { code: 'SHIK_ROLL' } });
+        const brand = await db.brand.create({ data: { code: suffix, name: 'Test brand', tenantId: tenant.id } });
+        const branch = await db.branch.create({ data: { code: suffix, name: 'Test branch', tenantId: tenant.id } });
         await db.brandBranch.create({ data: { brandId: brand.id, branchId: branch.id } });
-        const station = await db.kitchenTerminal.create({ data: { code: suffix, name: 'Test KDS', pinHash: 'unused', branchId: branch.id } });
+        const station = await db.kitchenTerminal.create({ data: { code: suffix, name: 'Test KDS', pinHash: 'unused', branchId: branch.id, tenantId: tenant.id } });
         const terminal = { ...station, role: 'KITCHEN' as const };
         const staff = { id: randomUUID(), phone: '+70000000000', role: 'OWNER' as const, brandId: brand.id };
         const jwt = new JwtService({ secret: 'integration-only' });
@@ -46,7 +49,7 @@ const url = process.env.TEST_COOK_DATABASE_URL;
         app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
         await app.init();
         const terminalToken = jwt.sign({ sub: terminal.id, role: 'KITCHEN', type: 'access', branchId: branch.id });
-        const order = await db.order.create({ data: { orderNumber: suffix, brandId: brand.id, branchId: branch.id, type: 'DELIVERY' } });
+        const order = await db.order.create({ data: { orderNumber: suffix, brandId: brand.id, branchId: branch.id, type: 'DELIVERY', tenantId: tenant.id } });
         const tracking: string[] = [];
         const feed: string[] = [];
         const kitchenFeed: string[] = [];
@@ -70,7 +73,7 @@ const url = process.env.TEST_COOK_DATABASE_URL;
             await cooks.logout(actor);
             await expect(sessions.verify('Bearer ' + first.token)).rejects.toThrow();
             expect((await db.cookShift.findUniqueOrThrow({ where: { id: first.shiftId } })).endedReason).toBe('logout');
-            const legacy = await db.order.create({ data: { orderNumber: randomUUID(), brandId: brand.id, branchId: branch.id, type: 'TAKEAWAY' } });
+            const legacy = await db.order.create({ data: { orderNumber: randomUUID(), brandId: brand.id, branchId: branch.id, type: 'TAKEAWAY', tenantId: tenant.id } });
             await kitchen.updateOrderStatus(terminal, legacy.id, { status: 'COOKING', expectedVersion: 1, cookId: 'forged', shiftId: 'forged' });
             const row = await db.orderStatusHistory.findFirstOrThrow({ where: { orderId: legacy.id } });
             expect(row.cookId).toBeNull();

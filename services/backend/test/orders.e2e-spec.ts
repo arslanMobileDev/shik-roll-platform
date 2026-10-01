@@ -70,6 +70,7 @@ async function truncateAll(): Promise<void> {
 }
 
 interface Fixture {
+  tenantId: string;
   brandA: string;
   brandB: string;
   branchA1: string;
@@ -83,12 +84,16 @@ interface Fixture {
 }
 
 async function seedFixtures(): Promise<Fixture> {
-  const brandA = await prisma.brand.create({ data: { code: 'SHIK_ROLL', name: 'SHIK ROLL' } });
-  const brandB = await prisma.brand.create({ data: { code: 'OTHER_BRAND', name: 'Other Brand' } });
+  // ADR-1622: tenant #1 comes from the backfill migration, so it is resolved by
+  // code — the UUID is minted per database. Both brands stay inside tenant #1:
+  // cross-tenant isolation is a later step, not this suite's subject.
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { code: 'SHIK_ROLL' } });
+  const brandA = await prisma.brand.create({ data: { code: 'SHIK_ROLL', name: 'SHIK ROLL', tenantId: tenant.id } });
+  const brandB = await prisma.brand.create({ data: { code: 'OTHER_BRAND', name: 'Other Brand', tenantId: tenant.id } });
 
-  const branchA1 = await prisma.branch.create({ data: { code: 'A-01', name: 'Branch A1' } });
-  const branchA2 = await prisma.branch.create({ data: { code: 'A-02', name: 'Branch A2' } });
-  const branchB1 = await prisma.branch.create({ data: { code: 'B-01', name: 'Branch B1' } });
+  const branchA1 = await prisma.branch.create({ data: { code: 'A-01', name: 'Branch A1', tenantId: tenant.id } });
+  const branchA2 = await prisma.branch.create({ data: { code: 'A-02', name: 'Branch A2', tenantId: tenant.id } });
+  const branchB1 = await prisma.branch.create({ data: { code: 'B-01', name: 'Branch B1', tenantId: tenant.id } });
 
   await prisma.brandBranch.createMany({
     data: [
@@ -180,6 +185,7 @@ async function seedFixtures(): Promise<Fixture> {
   });
 
   return {
+    tenantId: tenant.id,
     brandA: brandA.id,
     brandB: brandB.id,
     branchA1: branchA1.id,
@@ -240,7 +246,7 @@ describe('Orders API (e2e)', () => {
    */
   const createCustomerWithToken = async (): Promise<{ id: string; token: string }> => {
     const phone = `+7999${String(Math.floor(Math.random() * 10_000_000)).padStart(7, '0')}`;
-    const customer = await prisma.customer.create({ data: { phone } });
+    const customer = await prisma.customer.create({ data: { phone, tenantId: fx.tenantId } });
     const token = app.get(JwtService).sign({
       sub: customer.id,
       phone: customer.phone,
@@ -452,7 +458,7 @@ describe('Orders API (e2e)', () => {
    */
   describe('order number allocation (WI-5)', () => {
     const createBranch = async (code: string): Promise<string> => {
-      const branch = await prisma.branch.create({ data: { code, name: `Branch ${code}` } });
+      const branch = await prisma.branch.create({ data: { code, name: `Branch ${code}`, tenantId: fx.tenantId } });
       await prisma.brandBranch.create({ data: { brandId: fx.brandA, branchId: branch.id } });
       return branch.id;
     };
@@ -561,7 +567,7 @@ describe('Orders API (e2e)', () => {
       const branchId = await createBranch('C-05');
       // No bonus account at all, so the balance is 0 and any spend is refused.
       const customer = await prisma.customer.create({
-        data: { phone: `+7999${String(Date.now() % 10_000_000).padStart(7, '0')}` },
+        data: { phone: `+7999${String(Date.now() % 10_000_000).padStart(7, '0')}`, tenantId: fx.tenantId },
       });
       const token = app.get(JwtService).sign({
         sub: customer.id,

@@ -21,8 +21,12 @@ export class CooksService {
     async list(staff: AuthenticatedStaff, branchId: string) { const branch = await this.scope(staff, branchId); return this.prisma.cook.findMany({ where: { branch }, select: publicCook, orderBy: { name: 'asc' } }); }
     async create(staff: AuthenticatedStaff, dto: CreateCookDto) {
         await this.scope(staff, dto.branchId);
+        // ponytail: scope() already reads this branch but returns a where-clause,
+        // so tenancy needs its own PK lookup rather than reshaping scope() for all
+        // four callers.
+        const branch = await this.prisma.branch.findUniqueOrThrow({ where: { id: dto.branchId }, select: { tenantId: true } });
         try {
-            return await this.prisma.cook.create({ data: { name: dto.name, phone: dto.phone, branchId: dto.branchId, pinHash: await bcrypt.hash(dto.pin, 12) }, select: publicCook });
+            return await this.prisma.cook.create({ data: { name: dto.name, phone: dto.phone, branchId: dto.branchId, tenantId: branch.tenantId, pinHash: await bcrypt.hash(dto.pin, 12) }, select: publicCook });
         }
         catch (e) {
             if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002')

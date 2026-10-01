@@ -84,16 +84,24 @@ async function main() {
     halalTags.set(tag.code, upserted.id);
   }
 
+  // ADR-1622: tenant #1 is created by the backfill migration, not by the seed,
+  // so it is looked up by code. Never hardcode its UUID — the backfill minted
+  // it with gen_random_uuid(), so it differs between databases.
+  const tenant = await prisma.tenant.findUnique({ where: { code: 'SHIK_ROLL' } });
+  if (!tenant) {
+    throw new Error('Tenant SHIK_ROLL is missing — run `prisma migrate deploy` before seeding');
+  }
+
   const brand = await prisma.brand.upsert({
     where: { code: BRAND.code },
     update: { name: BRAND.name },
-    create: { code: BRAND.code, name: BRAND.name },
+    create: { code: BRAND.code, name: BRAND.name, tenantId: tenant.id },
   });
 
   const branch = await prisma.branch.upsert({
     where: { code: DEV_BRANCH.code },
     update: { name: DEV_BRANCH.name },
-    create: { code: DEV_BRANCH.code, name: DEV_BRANCH.name },
+    create: { code: DEV_BRANCH.code, name: DEV_BRANCH.name, tenantId: tenant.id },
   });
 
   await prisma.brandBranch.upsert({
@@ -111,6 +119,7 @@ async function main() {
       name: DEV_KITCHEN_TERMINAL.name,
       pinHash: await bcrypt.hash(DEV_KITCHEN_TERMINAL.pin, 10),
       branchId: branch.id,
+      tenantId: tenant.id,
     },
   });
 

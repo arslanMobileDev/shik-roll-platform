@@ -59,6 +59,22 @@ export class LoyaltyService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * ADR-1622: tenant_id is denormalized onto bonus_accounts and derived from
+   * the owning customer. Both call sites are typed as an upsert/create, so the
+   * lookup runs even when the account already exists — one PK read.
+   */
+  private async tenantIdOfCustomer(
+    customerId: string,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<string> {
+    const customer = await client.customer.findUniqueOrThrow({
+      where: { id: customerId },
+      select: { tenantId: true },
+    });
+    return customer.tenantId;
+  }
+
+  /**
    * GET /loyalty/balance: current balance, cashback rate and a page of the
    * ledger, newest first (created_at DESC, id DESC). The account is
    * auto-provisioned on first access with a zero balance.
@@ -71,7 +87,7 @@ export class LoyaltyService {
     const account = await this.prisma.bonusAccount.upsert({
       where: { customerId },
       update: {},
-      create: { customerId },
+      create: { customerId, tenantId: await this.tenantIdOfCustomer(customerId) },
     });
 
     const [transactions, total] = await this.prisma.$transaction([
@@ -281,6 +297,10 @@ export class LoyaltyService {
       return;
     }
 
+    // ADR-1622: resolved once outside the retry loop — the customer cannot
+    // change between attempts.
+    const tenantId = await this.tenantIdOfCustomer(params.customerId, tx);
+
     for (let attempt = 0; attempt < MAX_LEDGER_ATTEMPTS; attempt++) {
       let account: BonusAccount | null = await tx.bonusAccount.findUnique({
         where: { customerId: params.customerId },
@@ -291,7 +311,7 @@ export class LoyaltyService {
         }
         try {
           account = await tx.bonusAccount.create({
-            data: { customerId: params.customerId },
+            data: { customerId: params.customerId, tenantId },
           });
         } catch (error) {
           // Concurrent provisioning of the same account — re-read and retry.

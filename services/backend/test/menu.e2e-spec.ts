@@ -69,6 +69,7 @@ async function truncateAll(): Promise<void> {
 }
 
 interface Fixture {
+  tenantId: string;
   brandA: string;
   brandB: string;
   menuA: string;
@@ -86,12 +87,16 @@ interface Fixture {
 }
 
 async function seedFixtures(): Promise<Fixture> {
-  const brandA = await prisma.brand.create({ data: { code: 'SHIK_ROLL', name: 'SHIK ROLL' } });
-  const brandB = await prisma.brand.create({ data: { code: 'OTHER_BRAND', name: 'Other Brand' } });
+  // ADR-1622: tenant #1 comes from the backfill migration, so it is resolved by
+  // code — the UUID is minted per database. Both brands stay inside tenant #1:
+  // multi-tenant catalog isolation is a later step, not this suite's subject.
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { code: 'SHIK_ROLL' } });
+  const brandA = await prisma.brand.create({ data: { code: 'SHIK_ROLL', name: 'SHIK ROLL', tenantId: tenant.id } });
+  const brandB = await prisma.brand.create({ data: { code: 'OTHER_BRAND', name: 'Other Brand', tenantId: tenant.id } });
 
-  const branchA1 = await prisma.branch.create({ data: { code: 'A-01', name: 'Branch A1' } });
-  const branchA2 = await prisma.branch.create({ data: { code: 'A-02', name: 'Branch A2' } });
-  const branchB1 = await prisma.branch.create({ data: { code: 'B-01', name: 'Branch B1' } });
+  const branchA1 = await prisma.branch.create({ data: { code: 'A-01', name: 'Branch A1', tenantId: tenant.id } });
+  const branchA2 = await prisma.branch.create({ data: { code: 'A-02', name: 'Branch A2', tenantId: tenant.id } });
+  const branchB1 = await prisma.branch.create({ data: { code: 'B-01', name: 'Branch B1', tenantId: tenant.id } });
 
   await prisma.brandBranch.createMany({
     data: [
@@ -243,6 +248,7 @@ async function seedFixtures(): Promise<Fixture> {
   });
 
   return {
+    tenantId: tenant.id,
     brandA: brandA.id,
     brandB: brandB.id,
     menuA: menuA.id,
@@ -295,7 +301,7 @@ describe('Menu & Product API (e2e)', () => {
     await app.init();
     await prisma.staff.create({ data: {
       name: 'Menu E2E', phone: '+79990000022', pinHash: await bcrypt.hash('1234', 4),
-      role: 'OWNER', brandId: fx.brandA,
+      role: 'OWNER', brandId: fx.brandA, tenantId: fx.tenantId,
     } });
     const login = await request(app.getHttpServer()).post('/staff/auth/pin')
       .send({ phone: '+79990000022', pin: '1234' }).expect(200);

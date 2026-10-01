@@ -46,6 +46,7 @@ async function truncateAll(): Promise<void> {
 }
 
 interface Fixture {
+  tenantId: string;
   brandId: string;
   branchId: string;
   courierId: string;
@@ -54,11 +55,14 @@ interface Fixture {
 }
 
 async function seedFixtures(): Promise<Fixture> {
+  // ADR-1622: tenant #1 comes from the backfill migration, so it is resolved by
+  // code — the UUID is minted per database.
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { code: 'SHIK_ROLL' } });
   const brand = await prisma.brand.create({
-    data: { code: 'COURIER_E2E', name: 'Courier E2E' },
+    data: { code: 'COURIER_E2E', name: 'Courier E2E', tenantId: tenant.id },
   });
   const branch = await prisma.branch.create({
-    data: { code: 'C-E2E-01', name: 'Courier E2E Branch' },
+    data: { code: 'C-E2E-01', name: 'Courier E2E Branch', tenantId: tenant.id },
   });
   await prisma.brandBranch.create({
     data: { brandId: brand.id, branchId: branch.id },
@@ -73,12 +77,14 @@ async function seedFixtures(): Promise<Fixture> {
       pinHash: await bcrypt.hash(courierPin, 4),
       brandId: brand.id,
       branchId: branch.id,
+      tenantId: tenant.id,
       isActive: true,
       isAvailable: true,
     },
   });
 
   return {
+    tenantId: tenant.id,
     brandId: brand.id,
     branchId: branch.id,
     courierId: courier.id,
@@ -160,6 +166,7 @@ describe('Couriers API (e2e)', () => {
       data: {
         brandId: fx.brandId,
         branchId: fx.branchId,
+        tenantId: fx.tenantId,
         type: 'DELIVERY',
         status,
         orderNumber: `E2E-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,

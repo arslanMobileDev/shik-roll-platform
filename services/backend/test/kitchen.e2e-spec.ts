@@ -49,11 +49,14 @@ interface Fixture {
 }
 
 async function seedFixtures(): Promise<Fixture> {
+  // ADR-1622: tenant #1 comes from the backfill migration, so it is resolved by
+  // code — the UUID is minted per database.
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { code: 'SHIK_ROLL' } });
   const brand = await prisma.brand.create({
-    data: { code: 'KITCHEN_E2E', name: 'Kitchen E2E' },
+    data: { code: 'KITCHEN_E2E', name: 'Kitchen E2E', tenantId: tenant.id },
   });
   const branch = await prisma.branch.create({
-    data: { code: 'K-E2E-01', name: 'Kitchen E2E Branch' },
+    data: { code: 'K-E2E-01', name: 'Kitchen E2E Branch', tenantId: tenant.id },
   });
   await prisma.brandBranch.create({
     data: { brandId: brand.id, branchId: branch.id },
@@ -86,6 +89,7 @@ async function seedFixtures(): Promise<Fixture> {
       name: 'Kitchen E2E Terminal',
       pinHash: await bcrypt.hash(terminalPin, 4),
       branchId: branch.id,
+      tenantId: tenant.id,
       isActive: true,
     },
   });

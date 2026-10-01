@@ -30,6 +30,7 @@ const D = (value: string | number) => new Prisma.Decimal(value);
 
 const BRAND_ID = '11111111-1111-1111-1111-111111111111';
 const BRANCH_ID = '22222222-2222-2222-2222-222222222222';
+const TENANT_ID = '33333333-3333-3333-3333-333333333333';
 const MENU_ITEM_ID = '33333333-3333-3333-3333-333333333333';
 const MODIFIER_ID = '44444444-4444-4444-4444-444444444444';
 const ORDER_ID = '55555555-5555-5555-5555-555555555555';
@@ -115,6 +116,7 @@ describe('OrdersService', () => {
   let prisma: {
     menuItem: { findMany: jest.Mock };
     modifierItem: { findMany: jest.Mock };
+    brand: { findUniqueOrThrow: jest.Mock };
     $transaction: jest.Mock;
   };
   let loyalty: {
@@ -149,6 +151,8 @@ describe('OrdersService', () => {
     prisma = {
       menuItem: { findMany: jest.fn() },
       modifierItem: { findMany: jest.fn() },
+      // ADR-1622: orders.tenant_id is derived from the brand.
+      brand: { findUniqueOrThrow: jest.fn().mockResolvedValue({ tenantId: TENANT_ID }) },
       // Interactive transactions hand the callback a bare client stub; the
       // repository is mocked, so the client itself is never exercised.
       $transaction: jest.fn((callback: (client: unknown) => unknown) =>

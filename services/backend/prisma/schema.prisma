@@ -137,7 +137,7 @@ model CourierInvite {
 
 model Brand {
   id        String    @id @default(uuid()) @db.Uuid
-  tenantId  String?   @map("tenant_id") @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
   code      String    // e.g. SHIK_ROLL
   name      String
   legalName String?   @map("legal_name")
@@ -159,7 +159,7 @@ model Brand {
   promotionCampaigns PromotionCampaign[]
   staff           Staff[]
 
-  tenant         Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_brands_tenants")
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_brands_tenants")
   courierInvites CourierInvite[]
 
   @@unique([code], map: "uq_brands_code")
@@ -170,7 +170,7 @@ model Brand {
 
 model Branch {
   id        String    @id @default(uuid()) @db.Uuid
-  tenantId  String?   @map("tenant_id") @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
   code      String // short branch code, unique across the platform
   name      String
   address   String?
@@ -197,7 +197,7 @@ model Branch {
   cooks Cook[]
   cookShifts CookShift[]
 
-  tenant         Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_branches_tenants")
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_branches_tenants")
   courierInvites CourierInvite[]
 
   @@unique([code], map: "uq_branches_code")
@@ -599,7 +599,7 @@ enum PaymentMethod {
 
 model Order {
   id              String      @id @default(uuid()) @db.Uuid
-  tenantId        String?     @map("tenant_id") @db.Uuid
+  tenantId        String     @map("tenant_id") @db.Uuid
   orderNumber     String      @map("order_number")
   status          OrderStatus @default(NEW)
   paymentMethod   PaymentMethod @default(ON_DELIVERY) @map("payment_method")
@@ -649,7 +649,7 @@ model Order {
   payments Payment[]
   bonusTransactions BonusTransaction[]
 
-  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_orders_tenants")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_orders_tenants")
 
   @@unique([orderNumber], map: "uq_orders_order_number")
   @@index([brandId], map: "idx_orders_brand_id")
@@ -696,7 +696,7 @@ enum CustomerRole {
 
 model Customer {
   id        String       @id @default(uuid()) @db.Uuid
-  tenantId  String?      @map("tenant_id") @db.Uuid
+  tenantId  String      @map("tenant_id") @db.Uuid
   phone     String       // E.164, unique sign-in identifier
   name      String?
   email     String?
@@ -707,7 +707,7 @@ model Customer {
   orders Order[]
   bonusAccount BonusAccount?
 
-  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_customers_tenants")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_customers_tenants")
 
   @@unique([phone], map: "uq_customers_phone")
   @@index([tenantId], map: "idx_customers_tenant_id")
@@ -826,7 +826,7 @@ model OrderStatusHistory {
 
 model Courier {
   id          String   @id @default(uuid()) @db.Uuid
-  tenantId    String?  @map("tenant_id") @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
   name        String
   phone       String   @unique
   pinHash     String   @map("pin_hash")
@@ -839,7 +839,7 @@ model Courier {
 
   orders      Order[]
 
-  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_couriers_tenants")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_couriers_tenants")
 
   @@index([tenantId], map: "idx_couriers_tenant_id")
   @@map("couriers")
@@ -854,7 +854,7 @@ model Courier {
 
 model KitchenTerminal {
   id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String?  @map("tenant_id") @db.Uuid
+  tenantId  String  @map("tenant_id") @db.Uuid
   code      String   @unique
   name      String
   pinHash   String   @map("pin_hash")
@@ -867,7 +867,7 @@ model KitchenTerminal {
 
   cookShifts CookShift[]
 
-  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_kitchen_terminals_tenants")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_kitchen_terminals_tenants")
 
   @@index([branchId, isActive], map: "idx_kitchen_terminals_branch_id_is_active")
   @@index([tenantId], map: "idx_kitchen_terminals_tenant_id")
@@ -897,7 +897,7 @@ enum PromotionCampaignStatus {
 
 model BonusAccount {
   id           String   @id @default(uuid()) @db.Uuid
-  tenantId     String?  @map("tenant_id") @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
   customerId   String   @unique @map("customer_id") @db.Uuid
   balance      Int      @default(0)
   cashbackRate Decimal  @default(0) @map("cashback_rate") @db.Decimal(5, 2)
@@ -907,7 +907,7 @@ model BonusAccount {
   customer     Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict, map: "fk_bonus_accounts_customers")
   transactions BonusTransaction[]
 
-  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_bonus_accounts_tenants")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_bonus_accounts_tenants")
 
   @@index([tenantId], map: "idx_bonus_accounts_tenant_id")
   @@map("bonus_accounts")
@@ -958,7 +958,7 @@ model PromotionCampaign {
 // customer and KDS tokens are rejected.
 model Staff {
   id        String    @id @default(uuid()) @db.Uuid
-  tenantId  String?   @map("tenant_id") @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
   name      String
   phone     String    @unique
   pinHash   String    @map("pin_hash")
@@ -970,7 +970,7 @@ model Staff {
 
   brand Brand @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_staff_brands")
 
-  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_staff_tenants")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_staff_tenants")
 
   @@index([brandId, isActive], map: "idx_staff_brand_active")
   @@index([tenantId], map: "idx_staff_tenant_id")
@@ -985,7 +985,7 @@ enum StaffRole {
 
 model Cook {
   id String @id @default(uuid()) @db.Uuid
-  tenantId String? @map("tenant_id") @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
   name String
   phone String @unique
   pinHash String @map("pin_hash")
@@ -994,7 +994,7 @@ model Cook {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_cooks_tenants")
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_cooks_tenants")
   shifts CookShift[]
   history OrderStatusHistory[]
   @@index([branchId, isActive])

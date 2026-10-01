@@ -50,6 +50,30 @@ export class AuthService {
     private readonly prisma: PrismaService,
   ) {}
 
+  private cachedTenantId: string | null = null;
+
+  /**
+   * ADR-1622 step 4b (MVP stub). A brand-new customer has no brand or branch
+   * to derive a tenant from, so it is attributed to SHIK ROLL. TenantMiddleware
+   * replaces this method wholesale — the X-Tenant header is ignored here on
+   * purpose, not by oversight.
+   *
+   * Resolved by `code`, never by a hardcoded UUID: the backfill minted the
+   * tenant id with gen_random_uuid(), so it differs between databases.
+   */
+  private async defaultTenantId(): Promise<string> {
+    if (this.cachedTenantId) return this.cachedTenantId;
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { code: 'SHIK_ROLL' },
+      select: { id: true },
+    });
+    if (!tenant) {
+      throw new Error('Tenant SHIK_ROLL is missing — run prisma migrate deploy');
+    }
+    this.cachedTenantId = tenant.id;
+    return tenant.id;
+  }
+
   async sendOtp(dto: SendOtpDto, ip?: string): Promise<SendOtpResponse> {
     const slotAcquired = await this.otpStore.acquireSendSlot(
       dto.phone,
@@ -124,7 +148,7 @@ export class AuthService {
 
     const customer = await this.prisma.customer.upsert({
       where: { phone: dto.phone },
-      create: { phone: dto.phone },
+      create: { phone: dto.phone, tenantId: await this.defaultTenantId() },
       update: {},
     });
 

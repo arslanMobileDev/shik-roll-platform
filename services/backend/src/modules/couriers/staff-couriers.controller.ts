@@ -41,9 +41,10 @@ export class StaffCouriersController {
   private async assertBranch(staff: AuthenticatedStaff, branchId: string) {
     const branch = await this.prisma.branch.findFirst({
       where: { id: branchId, deletedAt: null, brandBranches: { some: { brandId: staff.brandId } } },
-      select: { id: true },
+      select: { id: true, tenantId: true },
     });
     if (!branch) throw new NotFoundException({ code: 'BRANCH_NOT_FOUND', message: 'Branch not found in staff brand' });
+    return branch;
   }
 
   @Get()
@@ -58,11 +59,11 @@ export class StaffCouriersController {
   @Post()
   @HttpCode(200)
   async create(@CurrentStaff() staff: AuthenticatedStaff, @Body() dto: CreateCourierDto) {
-    await this.assertBranch(staff, dto.branchId);
+    const branch = await this.assertBranch(staff, dto.branchId);
     try {
       return await this.prisma.courier.create({
         data: { name: dto.name, phone: dto.phone, pinHash: await bcrypt.hash(dto.pin, 12),
-          brandId: staff.brandId, branchId: dto.branchId },
+          brandId: staff.brandId, branchId: dto.branchId, tenantId: branch.tenantId },
         select: courierSelect,
       });
     } catch (error) {

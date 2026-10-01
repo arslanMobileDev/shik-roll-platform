@@ -14,11 +14,13 @@ const CUSTOMER_ID = '10101010-1010-1010-1010-101010101010';
 const ACCOUNT_ID = '20202020-2020-2020-2020-202020202020';
 const ORDER_ID = '55555555-5555-5555-5555-555555555555';
 const BRAND_ID = '11111111-1111-1111-1111-111111111111';
+const TENANT_ID = '22222222-2222-2222-2222-222222222222';
 
 function makeAccount(balance = 500, cashbackRate = '5.00') {
   return {
     id: ACCOUNT_ID,
     customerId: CUSTOMER_ID,
+    tenantId: TENANT_ID,
     balance,
     cashbackRate: D(cashbackRate),
     createdAt: new Date('2026-09-01T10:00:00Z'),
@@ -48,11 +50,13 @@ describe('LoyaltyService', () => {
     bonusTransaction: { findMany: jest.Mock; count: jest.Mock; findUnique: jest.Mock };
     promotionCampaign: { findMany: jest.Mock };
     order: { findFirst: jest.Mock };
+    customer: { findUniqueOrThrow: jest.Mock };
     $transaction: jest.Mock;
   };
   let tx: {
     bonusAccount: { findUnique: jest.Mock; create: jest.Mock; updateMany: jest.Mock };
     bonusTransaction: { findUnique: jest.Mock; create: jest.Mock };
+    customer: { findUniqueOrThrow: jest.Mock };
   };
 
   beforeEach(async () => {
@@ -63,12 +67,15 @@ describe('LoyaltyService', () => {
         updateMany: jest.fn(),
       },
       bonusTransaction: { findUnique: jest.fn(), create: jest.fn() },
+      // ADR-1622: bonus_accounts.tenant_id is derived from the owning customer.
+      customer: { findUniqueOrThrow: jest.fn().mockResolvedValue({ tenantId: TENANT_ID }) },
     };
     prisma = {
       bonusAccount: { upsert: jest.fn(), findUnique: jest.fn() },
       bonusTransaction: { findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn() },
       promotionCampaign: { findMany: jest.fn() },
       order: { findFirst: jest.fn() },
+      customer: { findUniqueOrThrow: jest.fn().mockResolvedValue({ tenantId: TENANT_ID }) },
       // Both Prisma transaction forms: batch arrays (reads) and interactive
       // callbacks (ledger mutations) share one mock.
       $transaction: jest.fn((arg: unknown) =>
@@ -96,7 +103,8 @@ describe('LoyaltyService', () => {
       expect(prisma.bonusAccount.upsert).toHaveBeenCalledWith({
         where: { customerId: CUSTOMER_ID },
         update: {},
-        create: { customerId: CUSTOMER_ID },
+        // ADR-1622: tenancy is derived from the owning customer.
+        create: { customerId: CUSTOMER_ID, tenantId: TENANT_ID },
       });
       expect(result.balance).toBe(0);
       expect(result.cashback_rate).toBe(0);

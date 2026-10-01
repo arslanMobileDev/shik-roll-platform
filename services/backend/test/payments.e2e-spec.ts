@@ -54,6 +54,7 @@ describe('Payments API (e2e)', () => {
   let brandId: string;
   let branchId: string;
   let itemId: string;
+  let tenantId: string; // ADR-1622: resolved by code in beforeAll
 
   beforeAll(async () => {
     execSync('pnpm prisma migrate deploy', {
@@ -62,8 +63,12 @@ describe('Payments API (e2e)', () => {
       stdio: 'inherit',
     });
     await truncateAll();
-    const brand = await prisma.brand.create({ data: { code: 'SHIK_ROLL', name: 'SHIK ROLL' } });
-    const branch = await prisma.branch.create({ data: { code: 'A-01', name: 'Branch A1' } });
+    // ADR-1622: tenant #1 comes from the backfill migration (truncateAll leaves
+    // it alone), so it is resolved by code — the UUID is minted per database.
+    const tenant = await prisma.tenant.findUniqueOrThrow({ where: { code: 'SHIK_ROLL' } });
+    tenantId = tenant.id;
+    const brand = await prisma.brand.create({ data: { code: 'SHIK_ROLL', name: 'SHIK ROLL', tenantId } });
+    const branch = await prisma.branch.create({ data: { code: 'A-01', name: 'Branch A1', tenantId } });
     await prisma.brandBranch.create({ data: { brandId: brand.id, branchId: branch.id } });
     const menu = await prisma.menu.create({
       data: { brandId: brand.id, name: 'Main Menu', status: 'PUBLISHED', publishedAt: new Date() },
@@ -115,7 +120,7 @@ describe('Payments API (e2e)', () => {
    */
   const createCustomerWithToken = async (): Promise<string> => {
     const phone = `+7999${String(Math.floor(Math.random() * 10_000_000)).padStart(7, '0')}`;
-    const customer = await prisma.customer.create({ data: { phone } });
+    const customer = await prisma.customer.create({ data: { phone, tenantId } });
     return app.get(JwtService).sign({
       sub: customer.id,
       phone: customer.phone,

@@ -290,12 +290,21 @@ export class OrdersService {
       geocoded = await this.geo.geocode(dto.deliveryAddress, bias);
     }
 
+    // ADR-1622: tenant_id is denormalized onto orders and derived from the
+    // brand. The object below is the checked OrderCreateInput (nested
+    // connects), so the tenant joins as a relation, not as a scalar.
+    const brand = await this.prisma.brand.findUniqueOrThrow({
+      where: { id: dto.brandId },
+      select: { tenantId: true },
+    });
+
     const data: Prisma.OrderCreateInput = {
       orderNumber,
       type: dto.type,
       status: initialStatus,
       paymentMethod,
       brand: { connect: { id: dto.brandId } },
+      tenant: { connect: { id: brand.tenantId } },
       branch: { connect: { id: dto.branchId } },
       ...(customerId ? { customer: { connect: { id: customerId } } } : {}),
       tableNumber: dto.tableNumber ?? null,

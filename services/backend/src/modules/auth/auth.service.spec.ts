@@ -15,10 +15,12 @@ import { SmsProvider } from './providers/sms/sms.provider';
 
 const PHONE = '+79991234567';
 const CUSTOMER_ID = '11111111-1111-1111-1111-111111111111';
+const TENANT_ID = '22222222-2222-2222-2222-222222222222';
 
 function makeCustomer(phone: string = PHONE): Customer {
   return {
     id: CUSTOMER_ID,
+    tenantId: TENANT_ID,
     phone,
     name: null,
     email: null,
@@ -35,6 +37,7 @@ describe('AuthService', () => {
   let sms: { send: jest.Mock };
   let prisma: {
     customer: { upsert: jest.Mock; findUnique: jest.Mock };
+    tenant: { findUnique: jest.Mock };
   };
   let originalNodeEnv: string | undefined;
 
@@ -47,6 +50,8 @@ describe('AuthService', () => {
         upsert: jest.fn().mockResolvedValue(makeCustomer()),
         findUnique: jest.fn().mockResolvedValue(makeCustomer()),
       },
+      // ADR-1622: the tenant is looked up by code, never by a hardcoded UUID.
+      tenant: { findUnique: jest.fn().mockResolvedValue({ id: TENANT_ID }) },
     };
     service = new AuthService(otpStore, sms as unknown as SmsProvider, jwt, prisma as never);
     originalNodeEnv = process.env.NODE_ENV;
@@ -190,7 +195,8 @@ describe('AuthService', () => {
 
       expect(prisma.customer.upsert).toHaveBeenCalledWith({
         where: { phone: PHONE },
-        create: { phone: PHONE },
+        // ADR-1622: a new customer is attributed to tenant #1 (SHIK ROLL).
+        create: { phone: PHONE, tenantId: TENANT_ID },
         update: {},
       });
       expect(result.tokenType).toBe('Bearer');
