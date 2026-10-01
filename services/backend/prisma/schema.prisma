@@ -558,6 +558,9 @@ model Order {
   @@index([status], map: "idx_orders_status")
   @@index([courierId], map: "idx_orders_courier_id")
   @@index([createdAt], map: "idx_orders_created_at")
+  // Courier history (ADR-1621): WHERE courier_id = ? AND status IN
+  // (COMPLETED, CANCELLED) ORDER BY completed_at DESC.
+  @@index([courierId, completedAt], map: "idx_orders_courier_completed")
   @@map("orders")
 }
 

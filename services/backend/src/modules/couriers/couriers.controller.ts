@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Sse,
   UseGuards,
 } from '@nestjs/common';
@@ -21,6 +22,7 @@ import { CouriersEventsService } from './couriers-events.service';
 import { CourierPinAuthDto } from './dto/courier-auth.dto';
 import { UpdateCourierOrderStatusDto } from './dto/update-courier-order-status.dto';
 import { ReportCourierLocationDto } from './dto/report-courier-location.dto';
+import { CourierHistoryQueryDto } from './dto/courier-history-query.dto';
 import { CourierJwtAuthGuard } from './guards/courier-jwt-auth.guard';
 import { CurrentCourier } from './decorators/current-courier.decorator';
 import { AuthenticatedCourier } from './couriers.types';
@@ -51,6 +53,22 @@ export class CouriersController {
   @ApiUnauthorizedResponse({ description: 'UNAUTHORIZED / TOKEN_INVALID' })
   async getActiveOrders(@CurrentCourier() courier: AuthenticatedCourier) {
     return this.couriersService.getActiveOrders(courier.branchId, courier.id);
+  }
+
+  /**
+   * ADR-1621: the courier's own delivery history (COMPLETED / CANCELLED),
+   * newest first, optional from/to bounds (inclusive). Identity from JWT.
+   */
+  @Get('orders/history')
+  @UseGuards(CourierJwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List completed/cancelled orders of the courier' })
+  @ApiUnauthorizedResponse({ description: 'UNAUTHORIZED / TOKEN_INVALID' })
+  async getHistory(
+    @CurrentCourier() courier: AuthenticatedCourier,
+    @Query() query: CourierHistoryQueryDto,
+  ) {
+    return this.couriersService.getHistory(courier.id, query);
   }
 
   /**

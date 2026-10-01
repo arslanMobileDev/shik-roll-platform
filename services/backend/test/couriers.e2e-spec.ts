@@ -271,4 +271,81 @@ describe('Couriers API (e2e)', () => {
       expect(res.body.code).toBe('INVALID_ORDER_STATUS_TRANSITION');
     });
   });
+
+  describe('GET /couriers/orders/history', () => {
+    it('401 without token', async () => {
+      await http().get('/couriers/orders/history').expect(401);
+    });
+
+    it('returns empty page for a fresh courier', async () => {
+      const res = await http()
+        .get('/couriers/orders/history')
+        .set('Authorization', `Bearer ${courierToken}`)
+        .expect(200);
+      expect(res.body.data).toEqual([]);
+      expect(res.body.meta.total).toBe(0);
+    });
+
+    it('returns own COMPLETED order, excludes active and foreign', async () => {
+      const completed = await createOrderInStatus(OrderStatus.COMPLETED, {
+        courierId: fx.courierId,
+      });
+      await prisma.order.update({
+        where: { id: completed },
+        data: { completedAt: new Date('2026-09-15T12:00:00Z') },
+      });
+
+      await createOrderInStatus(OrderStatus.ON_WAY, { courierId: fx.courierId });
+      await createOrderInStatus(OrderStatus.COMPLETED, { courierId: null });
+
+      const res = await http()
+        .get('/couriers/orders/history')
+        .set('Authorization', `Bearer ${courierToken}`)
+        .expect(200);
+
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0].id).toBe(completed);
+      expect(res.body.meta).toMatchObject({ page: 1, limit: 20, total: 1, totalPages: 1 });
+    });
+
+    it('returns CANCELLED orders as well', async () => {
+      const cancelled = await createOrderInStatus(OrderStatus.CANCELLED, {
+        courierId: fx.courierId,
+      });
+      await prisma.order.update({
+        where: { id: cancelled },
+        data: { cancelledAt: new Date('2026-09-20T10:00:00Z') },
+      });
+
+      const res = await http()
+        .get('/couriers/orders/history')
+        .set('Authorization', `Bearer ${courierToken}`)
+        .expect(200);
+      expect(res.body.data.map((o: any) => o.id)).toEqual([cancelled]);
+    });
+
+    it('honours from/to bounds on completedAt', async () => {
+      const older = await createOrderInStatus(OrderStatus.COMPLETED, {
+        courierId: fx.courierId,
+      });
+      await prisma.order.update({
+        where: { id: older },
+        data: { completedAt: new Date('2026-08-01T10:00:00Z') },
+      });
+      const newer = await createOrderInStatus(OrderStatus.COMPLETED, {
+        courierId: fx.courierId,
+      });
+      await prisma.order.update({
+        where: { id: newer },
+        data: { completedAt: new Date('2026-09-15T10:00:00Z') },
+      });
+
+      const res = await http()
+        .get('/couriers/orders/history?from=2026-09-01T00:00:00Z&to=2026-09-30T23:59:59Z')
+        .set('Authorization', `Bearer ${courierToken}`)
+        .expect(200);
+      expect(res.body.data.map((o: any) => o.id)).toEqual([newer]);
+    });
+  });
+
 });

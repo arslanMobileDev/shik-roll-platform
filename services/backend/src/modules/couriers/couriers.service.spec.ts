@@ -31,7 +31,9 @@ function prismaMock() {
   // Interactive transaction: the callback runs against the same mock, so
   // assertions on tx.order.updateMany / tx.orderStatusHistory.create see
   // the same jest.fn() instances as the outer prisma.
-  mock.$transaction = jest.fn(async (cb: (tx: any) => unknown) => cb(mock));
+  mock.$transaction = jest.fn(async (arg: unknown) =>
+    Array.isArray(arg) ? Promise.all(arg) : (arg as (tx: any) => unknown)(mock),
+  );
   return mock;
 }
 
@@ -641,5 +643,103 @@ describe('CouriersService.reportCourierLocation', () => {
         capturedAt: dto.capturedAt(),
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('CouriersService.getHistory', () => {
+  let prisma: ReturnType<typeof prismaMock>;
+  let service: CouriersService;
+
+  beforeEach(() => {
+    prisma = prismaMock();
+    service = new CouriersService(
+      prisma as any,
+      new JwtService({ secret: SECRET }),
+      eventsMock() as any,
+      loyaltyMock() as any,
+    );
+  });
+
+  it('filters by own courierId, DELIVERY, terminal statuses', async () => {
+    prisma.order.findMany.mockResolvedValue([]);
+    prisma.order.count.mockResolvedValue(0);
+
+    const result = await service.getHistory('courier-1', {});
+
+    expect(prisma.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          type: OrderType.DELIVERY,
+          courierId: 'courier-1',
+          status: {
+            in: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+          },
+        }),
+        skip: 0,
+        take: 20,
+        orderBy: [{ completedAt: 'desc' }, { createdAt: 'desc' }],
+      }),
+    );
+    expect(result).toEqual({
+      data: [],
+      meta: { page: 1, limit: 20, total: 0, totalPages: 0 },
+    });
+  });
+
+  it('applies from/to as inclusive range with cancelled fallback', async () => {
+    prisma.order.findMany.mockResolvedValue([]);
+    prisma.order.count.mockResolvedValue(0);
+
+    await service.getHistory('courier-1', {
+      from: '2026-09-01T00:00:00Z',
+      to: '2026-09-30T23:59:59Z',
+    });
+
+    const where = prisma.order.findMany.mock.calls[0][0].where;
+    expect(where.OR).toEqual([
+      { completedAt: { gte: new Date('2026-09-01T00:00:00Z'), lte: new Date('2026-09-30T23:59:59Z') } },
+      { completedAt: null, cancelledAt: { gte: new Date('2026-09-01T00:00:00Z'), lte: new Date('2026-09-30T23:59:59Z') } },
+    ]);
+  });
+
+  it('does not add OR when no date bounds given', async () => {
+    prisma.order.findMany.mockResolvedValue([]);
+    prisma.order.count.mockResolvedValue(0);
+
+    await service.getHistory('courier-1', {});
+
+    const where = prisma.order.findMany.mock.calls[0][0].where;
+    expect(where.OR).toBeUndefined();
+  });
+
+  it('paginates with skip/take and meta', async () => {
+    prisma.order.findMany.mockResolvedValue([makeOrder({ status: OrderStatus.COMPLETED })]);
+    prisma.order.count.mockResolvedValue(45);
+
+    const result = await service.getHistory('courier-1', { page: 3, limit: 10 });
+
+    expect(prisma.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 20, take: 10 }),
+    );
+    expect(result.meta).toEqual({ page: 3, limit: 10, total: 45, totalPages: 5 });
+    expect(result.data).toHaveLength(1);
+  });
+
+  it('maps records through toCourierOrder (lat/lon exposed)', async () => {
+    prisma.order.findMany.mockResolvedValue([
+      makeOrder({
+        status: OrderStatus.COMPLETED,
+        deliveryLatitude: 55.7893,
+        deliveryLongitude: 49.1221,
+        customer: { phone: '+79171234567' },
+      }),
+    ]);
+    prisma.order.count.mockResolvedValue(1);
+
+    const result = await service.getHistory('courier-1', {});
+
+    expect(result.data[0].address.lat).toBeCloseTo(55.7893);
+    expect(result.data[0].address.lon).toBeCloseTo(49.1221);
+    expect(result.data[0].clientPhone).toBe('+79171234567');
   });
 });

@@ -11,10 +11,18 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Courier, Order, OrderStatus, OrderType, PaymentMethod } from '@prisma/client';
+import {
+  Courier,
+  Order,
+  OrderStatus,
+  OrderType,
+  PaymentMethod,
+  Prisma,
+} from '@prisma/client';
 import { CourierPinAuthDto } from './dto/courier-auth.dto';
 import { UpdateCourierOrderStatusDto } from './dto/update-courier-order-status.dto';
 import { ReportCourierLocationDto } from './dto/report-courier-location.dto';
+import { CourierHistoryQueryDto } from './dto/courier-history-query.dto';
 import {
   COURIER_LOCATION_MAX_CLOCK_SKEW_MS,
   COURIER_LOCATION_MIN_INTERVAL_MS,
@@ -130,6 +138,49 @@ export class CouriersService {
     });
 
     return orders.map((order) => this.toCourierOrder(order));
+  }
+
+  /**
+   * Courier history (ADR-1621): completed and cancelled deliveries owned by
+   * this courier, newest first. Date bounds are inclusive; cancelled orders
+   * fall back to cancelledAt when completedAt is null.
+   */
+  async getHistory(courierId: string, query: CourierHistoryQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const range: { gte?: Date; lte?: Date } = {};
+    if (query.from) range.gte = new Date(query.from);
+    if (query.to) range.lte = new Date(query.to);
+
+    const where: Prisma.OrderWhereInput = {
+      type: OrderType.DELIVERY,
+      courierId,
+      status: { in: [OrderStatus.COMPLETED, OrderStatus.CANCELLED] },
+      ...(Object.keys(range).length > 0
+        ? {
+            OR: [
+              { completedAt: range },
+              { completedAt: null, cancelledAt: range },
+            ],
+          }
+        : {}),
+    };
+
+    const [records, total] = await this.prisma.$transaction([
+      this.prisma.order.findMany({
+        where,
+        include: { customer: true },
+        orderBy: [{ completedAt: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+
+    return {
+      data: records.map((order) => this.toCourierOrder(order)),
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   /**
