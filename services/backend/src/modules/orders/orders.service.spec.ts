@@ -24,6 +24,7 @@ import { OrdersRepository } from './orders.repository';
 import { OrdersService } from './orders.service';
 import { OrdersEventsService } from './orders-events.service';
 import { PaymentsService } from '../payments/payments.service';
+import { GeoService } from '../geo/geo.service';
 
 const D = (value: string | number) => new Prisma.Decimal(value);
 
@@ -54,6 +55,8 @@ function makeOrderRecord(
     courierId: null as string | null,
     tableNumber: '7',
     deliveryAddress: null,
+    deliveryLatitude: null,
+    deliveryLongitude: null,
     comment: null,
     subtotalAmount: D('800.00'),
     bonusDiscountAmount: D('0.00'),
@@ -178,6 +181,10 @@ describe('OrdersService', () => {
         { provide: LoyaltyService, useValue: loyalty },
         { provide: OrdersEventsService, useValue: ordersEvents },
         { provide: PaymentsService, useValue: payments },
+        {
+          provide: GeoService,
+          useValue: { geocode: jest.fn().mockResolvedValue(null) },
+        },
         {
           provide: CouriersEventsService,
           useValue: {

@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 import { concat, Observable, of } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
+import { GeoService } from '../geo/geo.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -45,6 +46,7 @@ export class OrdersService {
     private readonly loyalty: LoyaltyService,
     private readonly ordersEvents: OrdersEventsService,
     private readonly payments: PaymentsService,
+    private readonly geo: GeoService,
     @Optional() private readonly kitchenEvents?: KitchenEventsService,
   ) {}
 
@@ -267,6 +269,27 @@ export class OrdersService {
         ? OrderStatus.PENDING_PAYMENT
         : OrderStatus.NEW;
 
+    // ADR-1621: geocode delivery address so the courier app can drop a
+    // marker on the map. Bias the search towards the branch coordinates:
+    // "ул. Баумана, 58" is ambiguous (Казань vs Екатеринбург) and without
+    // a bias the wrong city can win. Failures are non-fatal — the order
+    // still gets created with NULL coordinates.
+    let geocoded: { latitude: number; longitude: number } | null = null;
+    if (dto.type === 'DELIVERY' && dto.deliveryAddress) {
+      const branch = await this.prisma.branch.findUnique({
+        where: { id: dto.branchId },
+        select: { latitude: true, longitude: true },
+      });
+      const bias =
+        branch?.latitude != null && branch?.longitude != null
+          ? {
+              latitude: Number(branch.latitude),
+              longitude: Number(branch.longitude),
+            }
+          : undefined;
+      geocoded = await this.geo.geocode(dto.deliveryAddress, bias);
+    }
+
     const data: Prisma.OrderCreateInput = {
       orderNumber,
       type: dto.type,
@@ -277,6 +300,8 @@ export class OrdersService {
       ...(customerId ? { customer: { connect: { id: customerId } } } : {}),
       tableNumber: dto.tableNumber ?? null,
       deliveryAddress: dto.deliveryAddress ?? null,
+      deliveryLatitude: geocoded ? new Prisma.Decimal(geocoded.latitude) : null,
+      deliveryLongitude: geocoded ? new Prisma.Decimal(geocoded.longitude) : null,
       comment: dto.comment ?? null,
       subtotalAmount: subtotal,
       bonusDiscountAmount: bonusDiscount,

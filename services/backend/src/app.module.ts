@@ -9,6 +9,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { QueuesModule } from './modules/queues/queues.module';
 import { CouriersModule } from './modules/couriers/couriers.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
+import { GeoModule } from './modules/geo/geo.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { StaffModule } from './modules/staff/staff.module';
@@ -27,6 +28,7 @@ import { RestaurantsController } from './restaurants.controller';
     CouriersModule,
     KitchenModule,
     LoyaltyModule,
+    GeoModule,
     UploadsModule,
     StaffModule,
     AnalyticsModule,

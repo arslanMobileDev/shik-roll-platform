@@ -5,6 +5,7 @@ import { OrdersService } from './orders.service';
 import { OrdersRepository } from './orders.repository';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { CouriersModule } from '../couriers/couriers.module';
+import { GeoModule } from '../geo/geo.module';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { OrdersEventsModule } from './orders-events.module';
@@ -14,6 +15,7 @@ import { StaffModule } from '../staff/staff.module';
 @Module({
   imports: [
     PrismaModule,
+    GeoModule,
     CouriersModule,
     LoyaltyModule,
     KitchenModule,

@@ -511,6 +511,11 @@ model Order {
   customerId      String?     @map("customer_id") @db.Uuid // guest who placed the order (mobile app)
   tableNumber     String?     @map("table_number") // DINE_IN
   deliveryAddress String?     @map("delivery_address") // DELIVERY
+  // Geocoded delivery coordinates (Yandex Geocoder, see GeoService).
+  // Nullable: address may be missing, geocoding may fail, or the order is
+  // not DELIVERY. Courier mobile reads these to place a marker on the map.
+  deliveryLatitude  Decimal?  @map("delivery_latitude")  @db.Decimal(9, 6)
+  deliveryLongitude Decimal?  @map("delivery_longitude") @db.Decimal(9, 6)
   comment         String?
   subtotalAmount  Decimal     @default(0) @map("subtotal_amount") @db.Decimal(10, 2)
   // Loyalty (ADR-1614): bonus discount applied at checkout; total_amount is

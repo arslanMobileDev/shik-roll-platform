@@ -407,6 +407,8 @@ export class CouriersService {
         order.paymentMethod === PaymentMethod.ONLINE ? 'onlinePaid' : 'onDelivery',
       address: {
         street: order.deliveryAddress || 'Адрес не указан',
+        lat: order.deliveryLatitude ? Number(order.deliveryLatitude) : null,
+        lon: order.deliveryLongitude ? Number(order.deliveryLongitude) : null,
       },
       clientPhone: order.customer?.phone || '',
       clientComment: order.comment,
