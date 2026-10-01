@@ -46,10 +46,98 @@ enum ModifierSelectionType {
 // Tenancy: brands and branches (multi-brand support, BrandBranch junction).
 // In the catalog bounded context Brand plays the tenant role; the Restaurant
 // aggregate from DB-606 belongs to the Restaurant bounded context.
+//
+// Tenant (ADR-1622) is the platform-level isolation boundary: one backend
+// instance serves many fastfood tenants, SHIK ROLL being tenant #1. brands is
+// the source of truth for "which tenant owns this row"; branches, orders,
+// couriers, staff, cooks, kitchen terminals, customers and bonus accounts
+// carry a denormalized tenant_id, because they either have no brand_id on
+// their path to a brand or their login key must become tenant-scoped.
 // ---------------------------------------------------------------------------
+
+model Tenant {
+  id           String    @id @default(uuid()) @db.Uuid
+  code         String
+  name         String
+  status       String    @default("ACTIVE")
+  timezone     String    @default("Europe/Moscow")
+  contactEmail String?   @map("contact_email")
+  contactPhone String?   @map("contact_phone")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdBy    String?   @map("created_by") @db.Uuid
+  updatedBy    String?   @map("updated_by") @db.Uuid
+  version      Int       @default(1)
+
+  brands           Brand[]
+  branches         Branch[]
+  orders           Order[]
+  couriers         Courier[]
+  staff            Staff[]
+  cooks            Cook[]
+  kitchenTerminals KitchenTerminal[]
+  customers        Customer[]
+  bonusAccounts    BonusAccount[]
+  apiKeys          TenantApiKey[]
+  invites          CourierInvite[]
+
+  @@unique([code], map: "uq_tenants_code")
+  @@index([status], map: "idx_tenants_status")
+  @@map("tenants")
+}
+
+// Machine-to-machine credential of a tenant (ADR-1622). Only the sha256 of the
+// secret is stored — API keys are high-entropy random strings, so a slow KDF
+// would only add latency to every admin request (unlike 4-digit PINs).
+model TenantApiKey {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  name       String
+  prefix     String
+  secretHash String    @map("secret_hash")
+  scopes     String[]  @default(["read"])
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy  String?   @map("created_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_tenant_api_keys_tenants")
+
+  @@unique([prefix], map: "uq_tenant_api_keys_prefix")
+  @@index([tenantId, revokedAt], map: "idx_tenant_api_keys_tenant_id_revoked_at")
+  @@map("tenant_api_keys")
+}
+
+// Single-use courier self-registration code (ADR-1622). The tenant, brand and
+// branch of the new courier come from this row only — never from the request
+// body — so a leaked code cannot produce a courier in a foreign tenant.
+model CourierInvite {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  brandId         String    @map("brand_id") @db.Uuid
+  branchId        String    @map("branch_id") @db.Uuid
+  codeHash        String    @map("code_hash")
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt          DateTime? @map("used_at") @db.Timestamptz(6)
+  usedByCourierId String?   @map("used_by_courier_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy       String?   @map("created_by") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_courier_invites_tenants")
+  brand  Brand  @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_courier_invites_brands")
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_courier_invites_branches")
+
+  @@unique([codeHash], map: "uq_courier_invites_code_hash")
+  @@index([tenantId, expiresAt], map: "idx_courier_invites_tenant_id_expires_at")
+  @@index([branchId], map: "idx_courier_invites_branch_id")
+  @@map("courier_invites")
+}
 
 model Brand {
   id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String?   @map("tenant_id") @db.Uuid
   code      String    // e.g. SHIK_ROLL
   name      String
   legalName String?   @map("legal_name")
@@ -71,13 +159,18 @@ model Brand {
   promotionCampaigns PromotionCampaign[]
   staff           Staff[]
 
+  tenant         Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_brands_tenants")
+  courierInvites CourierInvite[]
+
   @@unique([code], map: "uq_brands_code")
   @@index([status], map: "idx_brands_status")
+  @@index([tenantId], map: "idx_brands_tenant_id")
   @@map("brands")
 }
 
 model Branch {
   id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String?   @map("tenant_id") @db.Uuid
   code      String // short branch code, unique across the platform
   name      String
   address   String?
@@ -104,8 +197,12 @@ model Branch {
   cooks Cook[]
   cookShifts CookShift[]
 
+  tenant         Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_branches_tenants")
+  courierInvites CourierInvite[]
+
   @@unique([code], map: "uq_branches_code")
   @@index([status], map: "idx_branches_status")
+  @@index([tenantId], map: "idx_branches_tenant_id")
   @@map("branches")
 }
 
@@ -502,6 +599,7 @@ enum PaymentMethod {
 
 model Order {
   id              String      @id @default(uuid()) @db.Uuid
+  tenantId        String?     @map("tenant_id") @db.Uuid
   orderNumber     String      @map("order_number")
   status          OrderStatus @default(NEW)
   paymentMethod   PaymentMethod @default(ON_DELIVERY) @map("payment_method")
@@ -551,6 +649,8 @@ model Order {
   payments Payment[]
   bonusTransactions BonusTransaction[]
 
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_orders_tenants")
+
   @@unique([orderNumber], map: "uq_orders_order_number")
   @@index([brandId], map: "idx_orders_brand_id")
   @@index([branchId], map: "idx_orders_branch_id")
@@ -558,6 +658,7 @@ model Order {
   @@index([status], map: "idx_orders_status")
   @@index([courierId], map: "idx_orders_courier_id")
   @@index([createdAt], map: "idx_orders_created_at")
+  @@index([tenantId], map: "idx_orders_tenant_id")
   // Courier history (ADR-1621): WHERE courier_id = ? AND status IN
   // (COMPLETED, CANCELLED) ORDER BY completed_at DESC.
   @@index([courierId, completedAt], map: "idx_orders_courier_completed")
@@ -595,6 +696,7 @@ enum CustomerRole {
 
 model Customer {
   id        String       @id @default(uuid()) @db.Uuid
+  tenantId  String?      @map("tenant_id") @db.Uuid
   phone     String       // E.164, unique sign-in identifier
   name      String?
   email     String?
@@ -605,7 +707,10 @@ model Customer {
   orders Order[]
   bonusAccount BonusAccount?
 
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_customers_tenants")
+
   @@unique([phone], map: "uq_customers_phone")
+  @@index([tenantId], map: "idx_customers_tenant_id")
   @@map("customers")
 }
 
@@ -721,6 +826,7 @@ model OrderStatusHistory {
 
 model Courier {
   id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String?  @map("tenant_id") @db.Uuid
   name        String
   phone       String   @unique
   pinHash     String   @map("pin_hash")
@@ -733,6 +839,9 @@ model Courier {
 
   orders      Order[]
 
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_couriers_tenants")
+
+  @@index([tenantId], map: "idx_couriers_tenant_id")
   @@map("couriers")
 }
 
@@ -745,6 +854,7 @@ model Courier {
 
 model KitchenTerminal {
   id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String?  @map("tenant_id") @db.Uuid
   code      String   @unique
   name      String
   pinHash   String   @map("pin_hash")
@@ -757,7 +867,10 @@ model KitchenTerminal {
 
   cookShifts CookShift[]
 
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_kitchen_terminals_tenants")
+
   @@index([branchId, isActive], map: "idx_kitchen_terminals_branch_id_is_active")
+  @@index([tenantId], map: "idx_kitchen_terminals_tenant_id")
   @@map("kitchen_terminals")
 }
 
@@ -784,6 +897,7 @@ enum PromotionCampaignStatus {
 
 model BonusAccount {
   id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String?  @map("tenant_id") @db.Uuid
   customerId   String   @unique @map("customer_id") @db.Uuid
   balance      Int      @default(0)
   cashbackRate Decimal  @default(0) @map("cashback_rate") @db.Decimal(5, 2)
@@ -793,6 +907,9 @@ model BonusAccount {
   customer     Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict, map: "fk_bonus_accounts_customers")
   transactions BonusTransaction[]
 
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_bonus_accounts_tenants")
+
+  @@index([tenantId], map: "idx_bonus_accounts_tenant_id")
   @@map("bonus_accounts")
 }
 
@@ -841,6 +958,7 @@ model PromotionCampaign {
 // customer and KDS tokens are rejected.
 model Staff {
   id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String?   @map("tenant_id") @db.Uuid
   name      String
   phone     String    @unique
   pinHash   String    @map("pin_hash")
@@ -852,7 +970,10 @@ model Staff {
 
   brand Brand @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_staff_brands")
 
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_staff_tenants")
+
   @@index([brandId, isActive], map: "idx_staff_brand_active")
+  @@index([tenantId], map: "idx_staff_tenant_id")
   @@map("staff")
 }
 
@@ -864,6 +985,7 @@ enum StaffRole {
 
 model Cook {
   id String @id @default(uuid()) @db.Uuid
+  tenantId String? @map("tenant_id") @db.Uuid
   name String
   phone String @unique
   pinHash String @map("pin_hash")
@@ -872,9 +994,11 @@ model Cook {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_cooks_tenants")
   shifts CookShift[]
   history OrderStatusHistory[]
   @@index([branchId, isActive])
+  @@index([tenantId], map: "idx_cooks_tenant_id")
   @@map("cooks")
 }
 model CookShift {
