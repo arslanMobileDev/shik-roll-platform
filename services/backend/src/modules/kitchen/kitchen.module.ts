@@ -1,7 +1,6 @@
 import { CooksModule } from '../cooks/cooks.module';
 import { Module, OnModuleInit } from '@nestjs/common';
 import { CouriersEventsModule } from '../couriers/couriers-events.module';
-import { OrdersEventsModule } from '../orders/orders-events.module';
 import { KitchenController } from './kitchen.controller';
 import { KitchenService } from './kitchen.service';
 import {
@@ -20,7 +19,7 @@ import { assertKitchenConfig } from './kitchen.config';
  * can publish board changes (order enters NEW/CONFIRMED, leaves the board, ...).
  */
 @Module({
-  imports: [CooksModule, CouriersEventsModule, OrdersEventsModule],
+  imports: [CooksModule, CouriersEventsModule],
   controllers: [KitchenController],
   providers: [KitchenService, KitchenEventsService, kitchenEventBusProvider],
   exports: [KitchenEventsService],

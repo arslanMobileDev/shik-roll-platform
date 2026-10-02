@@ -8,7 +8,6 @@ import { CouriersModule } from '../couriers/couriers.module';
 import { GeoModule } from '../geo/geo.module';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { PaymentsModule } from '../payments/payments.module';
-import { OrdersEventsModule } from './orders-events.module';
 import { KitchenModule } from '../kitchen/kitchen.module';
 import { StaffModule } from '../staff/staff.module';
 
@@ -19,12 +18,11 @@ import { StaffModule } from '../staff/staff.module';
     CouriersModule,
     LoyaltyModule,
     KitchenModule,
-    OrdersEventsModule,
     PaymentsModule,
     StaffModule,
   ],
   controllers: [OrdersController, StaffOrdersController],
   providers: [OrdersService, OrdersRepository],
-  exports: [OrdersService, OrdersRepository, OrdersEventsModule],
+  exports: [OrdersService, OrdersRepository],
 })
 export class OrdersModule {}

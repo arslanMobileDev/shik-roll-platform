@@ -1,6 +1,5 @@
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import request from 'supertest';
-import { PrismaService } from '../../prisma/prisma.service';
 import { INestApplication, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderStatus } from '@prisma/client';
@@ -10,7 +9,6 @@ import {
   JwtAuthGuard,
   OptionalJwtAuthGuard,
 } from '../auth/guards/jwt-auth.guard';
-import { KitchenJwtAuthGuard } from '../kitchen/guards/kitchen-jwt-auth.guard';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 
@@ -34,8 +32,6 @@ describe('OrdersController — tracking stream', () => {
     })
       // Token verification is covered by the auth module specs; here the
       // customer is injected straight into the request context.
-      .overrideGuard(KitchenJwtAuthGuard)
-      .useValue({ canActivate: () => true })
       .overrideGuard(JwtAuthGuard)
       .useValue({ canActivate: () => true })
       .overrideGuard(OptionalJwtAuthGuard)
@@ -88,9 +84,7 @@ describe('OrdersController — operational HTTP access', () => {
     list: jest.fn(),
     getById: jest.fn(),
     updateStatus: jest.fn(),
-    getKdsStream: jest.fn(),
   };
-  const findUnique = jest.fn();
   const terminal = {
     id: 'terminal-id', code: 'KDS', name: 'Kitchen',
     branchId: 'authoritative-branch', isActive: true,
@@ -98,14 +92,11 @@ describe('OrdersController — operational HTTP access', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    findUnique.mockResolvedValue(terminal);
-    service.getKdsStream.mockReturnValue(of({ data: { orderId: ORDER_ID } }));
     const module = await Test.createTestingModule({
       imports: [JwtModule.register({ secret: 'operational-test-secret' })],
       controllers: [OrdersController],
       providers: [
         { provide: OrdersService, useValue: service },
-        { provide: PrismaService, useValue: { kitchenTerminal: { findUnique } } },
       ],
     }).compile();
     app = module.createNestApplication();
@@ -158,41 +149,13 @@ describe('OrdersController — operational HTTP access', () => {
     },
   );
 
-  it.each(['anonymous', 'invalid', 'CUSTOMER', 'COURIER'])(
-    'rejects KDS stream access for %s before opening a stream', async (role) => {
-      const req = request(app.getHttpServer()).get('/orders/kds/stream');
-      if (role !== 'anonymous') {
-        const token = role === 'invalid' ? 'invalid' : jwt.sign({ sub: terminal.id, role, type: 'access' });
-        req.set('Authorization', `Bearer ${token}`);
-      }
-      await req.expect(401);
-      expect(service.getKdsStream).not.toHaveBeenCalled();
-    },
-  );
-
-  it('rejects a deactivated terminal', async () => {
-    findUnique.mockResolvedValue({ ...terminal, isActive: false });
+  // ADR-1620: the legacy KDS stream was superseded by /kitchen/stream and the
+  // route must stay gone — a token does not resurrect it.
+  it('no longer routes the retired KDS stream', async () => {
     const token = jwt.sign({ sub: terminal.id, role: 'KITCHEN', type: 'access' });
-    await request(app.getHttpServer()).get('/orders/kds/stream')
-      .set('Authorization', `Bearer ${token}`).expect(401);
-    expect(service.getKdsStream).not.toHaveBeenCalled();
+    await request(app.getHttpServer())
+      .get('/orders/kds/stream')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
   });
-
-  it.each(['', '?branchId=another-branch'])(
-    'scopes SSE to the database branch regardless of query %s', async (query) => {
-      const token = jwt.sign({ sub: terminal.id, role: 'KITCHEN', type: 'access', branchId: 'stale-claim' });
-      const response = await request(app.getHttpServer()).get(`/orders/kds/stream${query}`)
-        .set('Authorization', `Bearer ${token}`).expect(200);
-      expect(response.headers['content-type']).toContain('text/event-stream');
-      expect(response.text).toContain(ORDER_ID);
-      expect(service.getKdsStream).toHaveBeenCalledWith(terminal.branchId);
-      // ADR-1622 A1-guard: the tenant filter is part of the guard's contract.
-      expect(findUnique).toHaveBeenCalledWith({
-        where: {
-          id: terminal.id,
-          tenant: { status: 'ACTIVE', deletedAt: null },
-        },
-      });
-    },
-  );
 });

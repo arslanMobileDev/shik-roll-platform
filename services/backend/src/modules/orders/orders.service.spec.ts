@@ -22,7 +22,6 @@ import { LoyaltyService } from '../loyalty/loyalty.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
 import { OrdersRepository } from './orders.repository';
 import { OrdersService } from './orders.service';
-import { OrdersEventsService } from './orders-events.service';
 import { PaymentsService } from '../payments/payments.service';
 import { GeoService } from '../geo/geo.service';
 
@@ -130,7 +129,6 @@ describe('OrdersService', () => {
     emitOrderTrackingEvent: jest.Mock;
     getOrderTrackingStream: jest.Mock;
   };
-  let ordersEvents: { emitKdsEvent: jest.Mock; getKdsStream: jest.Mock };
   let payments: { createPayment: jest.Mock };
 
   beforeEach(async () => {
@@ -165,10 +163,6 @@ describe('OrdersService', () => {
       earnCashback: jest.fn().mockResolvedValue(undefined),
       refundOnCancel: jest.fn().mockResolvedValue(undefined),
     };
-    ordersEvents = {
-      emitKdsEvent: jest.fn(),
-      getKdsStream: jest.fn(),
-    };
     payments = {
       createPayment: jest.fn().mockResolvedValue({
         externalPaymentId: 'mock-payment-id',
@@ -183,7 +177,6 @@ describe('OrdersService', () => {
         { provide: OrderQueuesService, useValue: queues },
         { provide: PrismaService, useValue: prisma },
         { provide: LoyaltyService, useValue: loyalty },
-        { provide: OrdersEventsService, useValue: ordersEvents },
         { provide: PaymentsService, useValue: payments },
         {
           provide: GeoService,
@@ -319,13 +312,6 @@ describe('OrdersService', () => {
       expect(createArg.items.create[0].totalAmount.toString()).toBe('900');
       expect(createArg.items.create[0].modifiers.create[0].name).toBe('Икра тобико');
       expect(queues.scheduleOrderProcessing).toHaveBeenCalledWith(ORDER_ID);
-      expect(ordersEvents.emitKdsEvent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: 'ORDER_CREATED',
-          orderId: ORDER_ID,
-          status: OrderStatus.NEW,
-        }),
-      );
       expect(result.id).toBe(ORDER_ID);
     });
 
@@ -345,7 +331,6 @@ describe('OrdersService', () => {
       expect(payments.createPayment).toHaveBeenCalledWith({ orderId: ORDER_ID });
       expect(result.paymentId).toBe('mock-payment-id');
       expect(result.paymentUrl).toBe('https://mock-pay.shik.local/payment');
-      expect(ordersEvents.emitKdsEvent).not.toHaveBeenCalled();
     });
 
     it('prefers the branch price override over base price', async () => {
@@ -569,25 +554,6 @@ describe('OrdersService', () => {
           orderId: ORDER_ID,
           status: OrderStatus.CONFIRMED,
           branchId: BRANCH_ID,
-        }),
-      );
-    });
-
-    it('publishes the first KDS event when a paid order becomes CONFIRMED', async () => {
-      repository.findById.mockResolvedValue(
-        makeOrderRecord(OrderStatus.PENDING_PAYMENT, PaymentMethod.ONLINE),
-      );
-      repository.transitionStatus.mockResolvedValue(
-        makeOrderRecord(OrderStatus.CONFIRMED, PaymentMethod.ONLINE),
-      );
-
-      await service.updateStatus(ORDER_ID, { status: OrderStatus.CONFIRMED });
-
-      expect(ordersEvents.emitKdsEvent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: 'ORDER_CREATED',
-          orderId: ORDER_ID,
-          status: OrderStatus.CONFIRMED,
         }),
       );
     });

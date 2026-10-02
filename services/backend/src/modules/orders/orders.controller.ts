@@ -27,9 +27,6 @@ import { JwtAuthGuard, OptionalJwtAuthGuard } from '../auth/guards/jwt-auth.guar
 import { CreateOrderDto } from './dto/create-order.dto';
 import { MyOrdersQueryDto } from './dto/my-orders-query.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
-import { KitchenJwtAuthGuard } from '../kitchen/guards/kitchen-jwt-auth.guard';
-import { CurrentKitchenTerminal } from '../kitchen/decorators/current-kitchen-terminal.decorator';
-import { AuthenticatedKitchenTerminal } from '../kitchen/kitchen.types';
 import { OrderEntity, OrderPage } from './entities/order.entity';
 import { OrdersService } from './orders.service';
 
@@ -84,20 +81,6 @@ export class OrdersController {
     @CurrentCustomer() customer: AuthenticatedCustomer,
   ): Promise<OrderPage> {
     return this.service.listMine(customer.id, query);
-  }
-
-  /**
-   * KDS live stream (ADR-1620): SSE stream for kitchen orders filtered by branch.
-   */
-  @Sse('kds/stream')
-  @UseGuards(KitchenJwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiUnauthorizedResponse({ description: 'Valid active kitchen terminal required' })
-  @ApiOperation({ summary: 'SSE stream of order events for KDS by branch' })
-  streamKdsOrders(
-    @CurrentKitchenTerminal() terminal: AuthenticatedKitchenTerminal,
-  ): Observable<MessageEvent> {
-    return this.service.getKdsStream(terminal.branchId);
   }
 
   @Get(':id')

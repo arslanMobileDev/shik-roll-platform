@@ -29,7 +29,6 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrderEntity, OrderPage } from './entities/order.entity';
 import { OrderRecord, toOrderEntity } from './mappers/order.mapper';
 import { OrdersRepository } from './orders.repository';
-import { OrdersEventsService } from './orders-events.service';
 import {
   CouriersEventsService,
   OrderTrackingEvent,
@@ -44,7 +43,6 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly couriersEvents: CouriersEventsService,
     private readonly loyalty: LoyaltyService,
-    private readonly ordersEvents: OrdersEventsService,
     private readonly payments: PaymentsService,
     private readonly geo: GeoService,
     @Optional() private readonly kitchenEvents?: KitchenEventsService,
@@ -348,14 +346,6 @@ export class OrdersService {
 
     await this.queues.scheduleOrderProcessing(record.id);
     if (record.status !== OrderStatus.PENDING_PAYMENT) {
-      this.ordersEvents.emitKdsEvent({
-        eventType: 'ORDER_CREATED',
-        orderId: record.id,
-        orderNumber: record.orderNumber,
-        branchId: record.branchId,
-        status: record.status,
-        timestamp: new Date().toISOString(),
-      });
       await this.kitchenEvents?.publishOrderChanged(record.id);
     }
     return toOrderEntity(record, paymentLink);
@@ -408,18 +398,6 @@ export class OrdersService {
       timestamp: new Date().toISOString(),
     });
     this.couriersEvents.emitOrderTrackingEvent(this.toTrackingEvent(updated));
-    this.ordersEvents.emitKdsEvent({
-      eventType:
-        record.status === OrderStatus.PENDING_PAYMENT &&
-        updated.status === OrderStatus.CONFIRMED
-          ? 'ORDER_CREATED'
-          : 'ORDER_STATUS_CHANGED',
-      orderId: updated.id,
-      orderNumber: updated.orderNumber,
-      branchId: updated.branchId,
-      status: updated.status,
-      timestamp: new Date().toISOString(),
-    });
     await this.kitchenEvents?.publishOrderChanged(updated.id);
 
     // Loyalty (ADR-1614): cashback accrues exactly once on the transition to
@@ -475,8 +453,5 @@ export class OrdersService {
     ].join('');
     const branchPrefix = branchId.slice(0, 4).toUpperCase();
     return `${branchPrefix}-${yyyymmdd}-${String(sequence).padStart(4, '0')}`;
-  }
-  getKdsStream(branchId: string): Observable<MessageEvent> {
-    return this.ordersEvents.getKdsStream(branchId);
   }
 }

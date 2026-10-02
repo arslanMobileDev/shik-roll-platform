@@ -7,7 +7,6 @@ jest.mock('bcryptjs', () => {
 
 import { JwtService } from '@nestjs/jwt';
 import { CouriersEventsService } from '../couriers/couriers-events.service';
-import { OrdersEventsService } from '../orders/orders-events.service';
 import { KitchenService } from './kitchen.service';
 import { KitchenEventsService } from './kitchen-events.service';
 
@@ -22,14 +21,12 @@ describe('KitchenService.authenticateByPin timing (C3)', () => {
     };
     const jwt = new JwtService({ secret: 'timing-test' });
     const couriersEvents = {} as CouriersEventsService;
-    const ordersEvents = {} as OrdersEventsService;
     const kitchenEvents = {} as KitchenEventsService;
     const service = new KitchenService(
       prisma,
       jwt,
       kitchenEvents,
       couriersEvents,
-      ordersEvents,
     );
 
     (bcrypt.compare as jest.Mock).mockClear();

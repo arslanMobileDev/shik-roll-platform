@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
-import { OrdersEventsModule } from '../orders/orders-events.module';
 import { paymentsProviderMode } from './payments.config';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
@@ -15,7 +14,7 @@ import { KitchenModule } from '../kitchen/kitchen.module';
  * YOOKASSA_SHOP_ID/YOOKASSA_SECRET_KEY), the dev Mock otherwise.
  */
 @Module({
-  imports: [OrdersEventsModule, LoyaltyModule, KitchenModule],
+  imports: [LoyaltyModule, KitchenModule],
   controllers: [PaymentsController],
   providers: [
     PaymentsService,

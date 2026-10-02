@@ -10,7 +10,6 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
-import { OrdersEventsService } from '../orders/orders-events.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { PaymentsService } from './payments.service';
 import {
@@ -126,7 +125,6 @@ describe('PaymentsService', () => {
     parseWebhookEvent: jest.Mock;
   };
   let queues: { sendToKitchen: jest.Mock; scheduleOrderProcessing: jest.Mock };
-  let ordersEvents: { emitKdsEvent: jest.Mock };
   let loyalty: { refundOnCancel: jest.Mock };
 
   const pendingSession: PaymentSessionResult = {
@@ -170,7 +168,6 @@ describe('PaymentsService', () => {
       sendToKitchen: jest.fn().mockResolvedValue(undefined),
       scheduleOrderProcessing: jest.fn().mockResolvedValue(undefined),
     };
-    ordersEvents = { emitKdsEvent: jest.fn() };
     loyalty = { refundOnCancel: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -179,7 +176,6 @@ describe('PaymentsService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: PAYMENT_PROVIDER_ADAPTER, useValue: adapter },
         { provide: OrderQueuesService, useValue: queues },
-        { provide: OrdersEventsService, useValue: ordersEvents },
         { provide: LoyaltyService, useValue: loyalty },
       ],
     }).compile();
@@ -272,13 +268,6 @@ describe('PaymentsService', () => {
       });
       // Task contract: a successful payment enqueues the kitchen dispatch.
       expect(queues.sendToKitchen).toHaveBeenCalledWith(ORDER_ID);
-      expect(ordersEvents.emitKdsEvent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: 'ORDER_CREATED',
-          orderId: ORDER_ID,
-          status: OrderStatus.CONFIRMED,
-        }),
-      );
     });
 
     it('returns the existing pending attempt on a repeated call (idempotent)', async () => {
@@ -377,13 +366,6 @@ describe('PaymentsService', () => {
         },
       });
       expect(queues.sendToKitchen).toHaveBeenCalledWith(ORDER_ID);
-      expect(ordersEvents.emitKdsEvent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: 'ORDER_CREATED',
-          orderId: ORDER_ID,
-          status: OrderStatus.CONFIRMED,
-        }),
-      );
     });
 
     it('is idempotent on duplicate payment.succeeded delivery', async () => {

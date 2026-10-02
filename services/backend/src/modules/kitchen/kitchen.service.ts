@@ -18,7 +18,6 @@ import { JwtService } from '@nestjs/jwt';
 import { OrderStatus, OrderType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CouriersEventsService } from '../couriers/couriers-events.service';
-import { OrdersEventsService } from '../orders/orders-events.service';
 import { ORDER_INCLUDE } from '../orders/mappers/order.mapper';
 import { KITCHEN_TOKEN_TTL_SECONDS } from './kitchen.config';
 import { toKitchenOrder } from './kitchen.mapper';
@@ -38,7 +37,6 @@ export class KitchenService {
     private readonly jwt: JwtService,
     private readonly events: KitchenEventsService,
     private readonly courierEvents: CouriersEventsService,
-    private readonly orderEvents: OrdersEventsService,
   ) {}
 
   /**
@@ -241,14 +239,6 @@ export class KitchenService {
         timestamp,
       });
     }
-    this.orderEvents.emitKdsEvent({
-      eventType: 'ORDER_STATUS_CHANGED',
-      orderId: updated.id,
-      orderNumber: updated.orderNumber,
-      branchId: updated.branchId,
-      status: updated.status,
-      timestamp,
-    });
     await this.events.publishOrderChanged(updated.id);
     return toKitchenOrder(updated);
   }

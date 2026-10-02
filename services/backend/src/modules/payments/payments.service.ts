@@ -14,7 +14,6 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { OrdersEventsService } from '../orders/orders-events.service';
 import { OrderQueuesService } from '../queues/order-queues.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { KitchenEventsService } from '../kitchen/kitchen-events.service';
@@ -46,7 +45,6 @@ export class PaymentsService {
     @Inject(PAYMENT_PROVIDER_ADAPTER)
     private readonly provider: PaymentProviderAdapter,
     private readonly queues: OrderQueuesService,
-    private readonly ordersEvents: OrdersEventsService,
     private readonly loyalty: LoyaltyService,
     @Optional() private readonly kitchenEvents?: KitchenEventsService,
   ) {}
@@ -346,14 +344,6 @@ export class PaymentsService {
       return payment;
     });
     if (becameVisibleToKitchen) {
-      this.ordersEvents.emitKdsEvent({
-        eventType: 'ORDER_CREATED',
-        orderId: becameVisibleToKitchen.id,
-        orderNumber: becameVisibleToKitchen.orderNumber,
-        branchId: becameVisibleToKitchen.branchId,
-        status: becameVisibleToKitchen.status,
-        timestamp: new Date().toISOString(),
-      });
       await this.kitchenEvents?.publishOrderChanged(becameVisibleToKitchen.id);
     }
     if (dispatchToKitchen) {
