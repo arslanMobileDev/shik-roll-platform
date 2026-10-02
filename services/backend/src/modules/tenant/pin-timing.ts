@@ -1,15 +1,16 @@
 import * as bcrypt from 'bcryptjs';
 
 const DUMMY_ROUNDS = 10;
+const DUMMY_PIN = 'never-matches-any-real-pin';
 
-let dummyHashPromise: Promise<string> | null = null;
-
-function getDummyHash(): Promise<string> {
-  if (!dummyHashPromise) {
-    dummyHashPromise = bcrypt.hash('never-matches-any-real-pin', DUMMY_ROUNDS);
-  }
-  return dummyHashPromise;
-}
+// Eager, not lazy: bcrypt.hash is pure CPU over a constant string, so it has no
+// realistic failure mode, and computing it at module load means the very first
+// null-row login already pays the same single bcrypt.compare as every other
+// branch (audit of 3be4a17, Q1). The catch only exists so a theoretical
+// rejection cannot surface as an unhandledRejection while the promise is still
+// unconsumed; awaiting it below still raises the real error.
+const dummyHashPromise: Promise<string> = bcrypt.hash(DUMMY_PIN, DUMMY_ROUNDS);
+dummyHashPromise.catch(() => undefined);
 
 /**
  * Compare a submitted PIN against a bcrypt hash, always paying the bcrypt
@@ -30,7 +31,7 @@ export async function constantTimePinCheck(
   pin: string,
   pinHash: string | null | undefined,
 ): Promise<boolean> {
-  const hash = pinHash ?? (await getDummyHash());
+  const hash = pinHash ?? (await dummyHashPromise);
   const ok = await bcrypt.compare(pin, hash);
   return ok && pinHash != null;
 }

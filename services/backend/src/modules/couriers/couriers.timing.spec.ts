@@ -10,9 +10,13 @@ import { CouriersService } from './couriers.service';
 import { CouriersEventsService } from './couriers-events.service';
 
 describe('CouriersService.authenticateByPin timing (C3)', () => {
-  it('calls bcrypt.compare even when the courier is unknown', async () => {
+  function makeService(rows: unknown[]) {
     const prisma: any = {
-      courier: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
+      courier: {
+        findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue(rows),
+        update: jest.fn(),
+      },
       branch: { findFirst: jest.fn() },
       brand: { findFirst: jest.fn() },
       order: {
@@ -32,7 +36,11 @@ describe('CouriersService.authenticateByPin timing (C3)', () => {
     const jwt = new JwtService({ secret: 'timing-test' });
     const events = {} as CouriersEventsService;
     const loyalty = {} as never;
-    const service = new CouriersService(prisma, jwt, events, loyalty);
+    return new CouriersService(prisma, jwt, events, loyalty);
+  }
+
+  it('calls bcrypt.compare even when the courier is unknown', async () => {
+    const service = makeService([]);
 
     (bcrypt.compare as jest.Mock).mockClear();
 
@@ -41,5 +49,26 @@ describe('CouriersService.authenticateByPin timing (C3)', () => {
     ).rejects.toThrow();
 
     expect(bcrypt.compare).toHaveBeenCalledTimes(1);
+  });
+
+  it('pays the dummy bcrypt when a legacy plaintext row gets a wrong PIN', async () => {
+    const legacy = {
+      id: 'c1',
+      phone: '+79990000001',
+      pinHash: '1234',
+      isActive: true,
+    };
+    const service = makeService([legacy]);
+
+    (bcrypt.compare as jest.Mock).mockClear();
+
+    await expect(
+      service.authenticateByPin({ phone: legacy.phone, pin: '9999' }),
+    ).rejects.toThrow();
+
+    expect(bcrypt.compare).toHaveBeenCalledTimes(1);
+    const [, hash] = (bcrypt.compare as jest.Mock).mock.calls[0];
+    expect(hash).not.toBe(legacy.pinHash);
+    expect(hash).toMatch(/^\$2[aby]\$/);
   });
 });

@@ -132,6 +132,11 @@ export class CouriersService {
 
     const digest = (value: string) => createHash('sha256').update(value).digest();
     if (!timingSafeEqual(digest(pin), digest(courier.pinHash))) {
+      // A bare `return false` here would answer in microseconds while a missing
+      // row and a bcrypt row both answer in ~100 ms — the same existence channel
+      // C3 closed elsewhere, inverted for legacy rows (audit of 3be4a17, Q4a).
+      // The helper returns false anyway; it is called for the bcrypt cost.
+      await constantTimePinCheck(pin, null);
       return false;
     }
 
