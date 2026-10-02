@@ -28,6 +28,14 @@ interface Bucket {
   windowStart: number;
 }
 
+/**
+ * The four PIN logins. The bucket key carries the contour because the same
+ * phone can be an auth key in more than one of them: without it a successful
+ * courier login reset the staff counter for that phone, so an attacker could
+ * probe four staff PINs, log in once as a courier, and repeat forever.
+ */
+export type AuthContour = 'staff' | 'courier' | 'kitchen' | 'cook';
+
 const buckets = new Map<string, Bucket>();
 
 /**
@@ -48,18 +56,24 @@ export class TooManyAttemptsException extends HttpException {
 }
 
 /**
- * Counts one attempt for (tenant, key) and throws once the budget is gone.
+ * Counts one attempt for (contour, tenant, key) and throws once the budget is
+ * gone.
  *
  * `tenantCode` is the code the client declared, not the tenant id: it is what
  * the middleware validated, and it is stable across databases (the id is minted
  * per database). A caller with no tenant declaration — the legacy header-less
  * clients — shares the `default` bucket for that key, the strictest reading.
+ *
+ * `contour` is the login being attempted. It is part of the bucket, never part
+ * of the response: a limiter that answered differently per contour would be the
+ * enumeration oracle the uniform 401 exists to prevent.
  */
 export function pinRateLimitConsume(
+  contour: AuthContour,
   tenantCode: string | undefined,
   key: string,
 ): void {
-  const id = `${tenantCode ?? 'default'}:${key}`;
+  const id = `${contour}:${tenantCode ?? 'default'}:${key}`;
   const now = Date.now();
   const bucket = buckets.get(id);
 
@@ -79,12 +93,16 @@ export function pinRateLimitConsume(
 /**
  * Clears the key on a successful login. The budget is for guessing, not for
  * ordinary use: someone who signs in every morning must never accumulate.
+ *
+ * It clears one contour's bucket only — a success in one login must not lift
+ * the budget protecting another.
  */
 export function pinRateLimitReset(
+  contour: AuthContour,
   tenantCode: string | undefined,
   key: string,
 ): void {
-  buckets.delete(`${tenantCode ?? 'default'}:${key}`);
+  buckets.delete(`${contour}:${tenantCode ?? 'default'}:${key}`);
 }
 
 /** The Map outlives a spec's beforeEach, unlike the app it guards. */

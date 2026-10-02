@@ -58,7 +58,7 @@ export class CooksService {
         // the limiter keys on a tenant *code*, so terminal.id stands in as the
         // tenant proxy: globally unique, already in hand, no extra query. The
         // bucket is per (terminal, phone) rather than per (tenant, phone).
-        pinRateLimitConsume(terminal.id, dto.phone);
+        pinRateLimitConsume('cook', terminal.id, dto.phone);
         // `phone` is unique per tenant, not globally (ADR-1622 step 4b). The tenant
         // comes from the already-authenticated terminal (KitchenJwtAuthGuard /
         // CookTerminalAuthGuard) — never from a header: this route takes no
@@ -95,7 +95,7 @@ export class CooksService {
         });
         const expiresIn = Math.max(1, Math.floor((shift.startedAt.getTime() + COOK_TTL_MS - Date.now()) / 1000));
         const token = await this.jwt.signAsync({ sub: cook.id, phone: cook.phone, role: 'COOK', type: 'access', branchId: cook.branchId, terminalId: terminal.id, shiftId: shift.id }, { expiresIn });
-        pinRateLimitReset(terminal.id, dto.phone);
+        pinRateLimitReset('cook', terminal.id, dto.phone);
         return { token, shiftId: shift.id, cook: { id: cook.id, name: cook.name, branchId: cook.branchId } };
     }
     async logout(actor: CookActor) { await this.prisma.cookShift.updateMany({ where: { id: actor.shiftId, cookId: actor.id, endedAt: null }, data: { endedAt: new Date(), endedReason: 'logout' } }); return { success: true }; }

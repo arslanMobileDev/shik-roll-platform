@@ -49,7 +49,7 @@ export class KitchenService {
   async authenticateByPin(dto: KitchenPinAuthDto, tenant?: TenantContext) {
     // Counted before the lookup: a 429 for an unknown terminal code is the
     // feature, not a leak (ADR-1622 step 4, C4).
-    pinRateLimitConsume(tenant?.code, dto.terminalCode);
+    pinRateLimitConsume('kitchen', tenant?.code, dto.terminalCode);
     // `code` is unique per tenant, not globally (ADR-1622 step 4b).
     const terminal = await resolveLoginRow(
       tenant,
@@ -98,7 +98,7 @@ export class KitchenService {
     const token = await this.jwt.signAsync(payload, {
       expiresIn: KITCHEN_TOKEN_TTL_SECONDS,
     });
-    pinRateLimitReset(tenant?.code, dto.terminalCode);
+    pinRateLimitReset('kitchen', tenant?.code, dto.terminalCode);
 
     return {
       token,

@@ -52,7 +52,7 @@ export class StaffService {
     // are one account, and a limiter they could sidestep by adding a space
     // would not be a limiter. Counted before the lookup on purpose — a 429 for
     // an unknown phone is the feature (ADR-1622 step 4, C4).
-    pinRateLimitConsume(tenant?.code, phone);
+    pinRateLimitConsume('staff', tenant?.code, phone);
     // `phone` is unique per tenant, not globally (ADR-1622 step 4b).
     const staff = await resolveLoginRow(
       tenant,
@@ -92,7 +92,7 @@ export class StaffService {
     const token = await this.jwt.signAsync(payload, {
       expiresIn: STAFF_TOKEN_TTL_SECONDS,
     });
-    pinRateLimitReset(tenant?.code, phone);
+    pinRateLimitReset('staff', tenant?.code, phone);
 
     return {
       token,
