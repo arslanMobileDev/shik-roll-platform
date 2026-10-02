@@ -37,6 +37,11 @@ async function truncateAll(): Promise<void> {
   await prisma.brandBranch.deleteMany();
   await prisma.branch.deleteMany();
   await prisma.staff.deleteMany();
+  // menu.e2e-spec.ts creates ingredients (rice, salmon) and leaves them behind.
+  // fk_ingredients_brands is ON DELETE RESTRICT, so brand.deleteMany() below
+  // fails whenever this suite runs after menu — Jest's timing cache reorders
+  // suites between runs, which made it look like a flake.
+  await prisma.ingredient.deleteMany();
   await prisma.brand.deleteMany();
 }
 
