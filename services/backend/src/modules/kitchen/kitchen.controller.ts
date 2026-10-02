@@ -5,6 +5,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -39,6 +41,7 @@ export class KitchenController {
 
   /** Public entry point: issues the terminal JWT consumed by the routes below. */
   @Post('auth/pin')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Authenticate a kitchen terminal by code and PIN' })
   async authPin(
     @Body() dto: KitchenPinAuthDto,

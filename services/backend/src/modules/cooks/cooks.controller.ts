@@ -1,5 +1,5 @@
 import { CookRequest } from './cooks.dto';
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CookTerminalAuthGuard, CookStaffAuthGuard } from './cook-endpoint-auth.guards';
 import { CurrentStaff } from '../staff/decorators/current-staff.decorator';
@@ -15,6 +15,7 @@ import { CookBranchDto, CookLoginDto, CookStatsDto, CreateCookDto, UpdateCookDto
 export class CooksController {
     constructor(private readonly cooks: CooksService, private readonly stats: CookStatisticsService) { }
     @Post('auth/pin')
+    @HttpCode(HttpStatus.OK)
     @UseGuards(CookTerminalAuthGuard)
     login(
     @Req()

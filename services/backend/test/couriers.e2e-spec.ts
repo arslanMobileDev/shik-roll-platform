@@ -129,7 +129,7 @@ describe('Couriers API (e2e)', () => {
     const login = await request(app.getHttpServer())
       .post('/couriers/auth/pin')
       .send({ phone: fx.courierPhone, pin: fx.courierPin })
-      .expect(201);
+      .expect(200);
     courierToken = login.body.token;
   });
 

@@ -144,7 +144,7 @@ describe('Kitchen API (e2e)', () => {
     const login = await request(app.getHttpServer())
       .post('/kitchen/auth/pin')
       .send({ terminalCode: fx.terminalCode, pin: fx.terminalPin })
-      .expect(201);
+      .expect(200);
     kitchenToken = login.body.token;
   });
 

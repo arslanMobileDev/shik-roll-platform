@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -39,6 +40,7 @@ export class CouriersController {
 
   /** Public entry point: issues the courier JWT consumed by the routes below. */
   @Post('auth/pin')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Authenticate courier by phone and PIN' })
   async authPin(
     @Body() dto: CourierPinAuthDto,

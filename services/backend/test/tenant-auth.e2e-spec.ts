@@ -348,13 +348,10 @@ describe('tenant-scoped PIN login (ADR-1622 step 4b)', () => {
     });
 
     it('resolves a courier phone that exists in both tenants to the declared one', async () => {
-      // 201, not 200: unlike POST /staff/auth/pin, the courier login carries no
-      // @HttpCode(HttpStatus.OK) and answers the Nest POST default. Pre-existing
-      // contract, kept as-is here — changing it would break shipped clients.
-      const inA = await loginCourier(PHONE_COURIER_SHARED, 'SHIK_ROLL').expect(201);
+      const inA = await loginCourier(PHONE_COURIER_SHARED, 'SHIK_ROLL').expect(200);
       expect(inA.body.courier.id).toBe(fx.courierSharedAId);
 
-      const inB = await loginCourier(PHONE_COURIER_SHARED, TENANT_B).expect(201);
+      const inB = await loginCourier(PHONE_COURIER_SHARED, TENANT_B).expect(200);
       expect(inB.body.courier.id).toBe(fx.courierSharedBId);
     });
 
@@ -425,7 +422,7 @@ describe('tenant-scoped PIN login (ADR-1622 step 4b)', () => {
 
   describe('courier login without a declared tenant', () => {
     it('still logs in when exactly one tenant owns the phone', async () => {
-      const res = await loginCourier(PHONE_COURIER_ONLY_A).expect(201);
+      const res = await loginCourier(PHONE_COURIER_ONLY_A).expect(200);
       expect(res.body.courier.id).toBe(fx.courierOnlyAId);
       expect(res.body.token).toBeTruthy();
     });
@@ -515,7 +512,7 @@ describe('tenant-scoped PIN login (ADR-1622 step 4b)', () => {
     });
 
     it('invalidates a courier token issued before the suspension', async () => {
-      const login = await loginCourier(PHONE_COURIER_SHARED, TENANT_B).expect(201);
+      const login = await loginCourier(PHONE_COURIER_SHARED, TENANT_B).expect(200);
       const token = login.body.token;
 
       await request(app.getHttpServer())
@@ -570,7 +567,7 @@ describe('tenant-scoped PIN login (ADR-1622 step 4b)', () => {
     });
 
     it('invalidates a courier token issued before the deletion', async () => {
-      const login = await loginCourier(PHONE_COURIER_SHARED, TENANT_B).expect(201);
+      const login = await loginCourier(PHONE_COURIER_SHARED, TENANT_B).expect(200);
       const token = login.body.token;
 
       await setTenantB({ deletedAt: new Date() });
