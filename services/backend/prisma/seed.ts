@@ -93,13 +93,13 @@ async function main() {
   }
 
   const brand = await prisma.brand.upsert({
-    where: { code: BRAND.code },
+    where: { tenantId_code: { tenantId: tenant.id, code: BRAND.code } },
     update: { name: BRAND.name },
     create: { code: BRAND.code, name: BRAND.name, tenantId: tenant.id },
   });
 
   const branch = await prisma.branch.upsert({
-    where: { code: DEV_BRANCH.code },
+    where: { tenantId_code: { tenantId: tenant.id, code: DEV_BRANCH.code } },
     update: { name: DEV_BRANCH.name },
     create: { code: DEV_BRANCH.code, name: DEV_BRANCH.name, tenantId: tenant.id },
   });

@@ -162,7 +162,7 @@ model Brand {
   tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_brands_tenants")
   courierInvites CourierInvite[]
 
-  @@unique([code], map: "uq_brands_code")
+  @@unique([tenantId, code], map: "uq_brands_tenant_id_code")
   @@index([status], map: "idx_brands_status")
   @@index([tenantId], map: "idx_brands_tenant_id")
   @@map("brands")
@@ -171,7 +171,7 @@ model Brand {
 model Branch {
   id        String    @id @default(uuid()) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
-  code      String // short branch code, unique across the platform
+  code      String // short branch code, unique within the tenant
   name      String
   address   String?
   phone     String?
@@ -200,7 +200,7 @@ model Branch {
   tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_branches_tenants")
   courierInvites CourierInvite[]
 
-  @@unique([code], map: "uq_branches_code")
+  @@unique([tenantId, code], map: "uq_branches_tenant_id_code")
   @@index([status], map: "idx_branches_status")
   @@index([tenantId], map: "idx_branches_tenant_id")
   @@map("branches")
