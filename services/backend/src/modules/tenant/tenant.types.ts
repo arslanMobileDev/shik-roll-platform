@@ -38,6 +38,12 @@ export const ACTIVE_TENANT_FILTER = { status: 'ACTIVE', deletedAt: null };
  */
 export interface RequestWithTenant {
   headers: Record<string, string | string[] | undefined>;
+  /**
+   * Node's raw header list, as Express exposes it: a flat array of
+   * [name, value, name, value, ...]. Needed to detect a repeated
+   * X-Tenant that Node has already glued into a single "A, B" string.
+   */
+  rawHeaders?: string[];
   query?: Record<string, unknown>;
   tenant?: TenantContext;
 }

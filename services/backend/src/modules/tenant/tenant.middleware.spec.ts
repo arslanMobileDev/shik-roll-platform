@@ -121,6 +121,41 @@ describe('readTenantCode (variant A strictness)', () => {
       });
     }
   });
+
+  it('rejects duplicate X-Tenant seen via rawHeaders — 400 TENANT_INVALID', () => {
+    expect(() =>
+      readTenantCode({
+        headers: { 'x-tenant': 'A, B' },
+        rawHeaders: ['X-Tenant', 'A', 'X-Tenant', 'B'],
+      }),
+    ).toThrow(BadRequestException);
+  });
+
+  it('rejects a comma-glued X-Tenant even without rawHeaders — 400', () => {
+    expect(() =>
+      readTenantCode({ headers: { 'x-tenant': 'A, B' } }),
+    ).toThrow(BadRequestException);
+  });
+
+  it('rejects ?tenant[a]=b (simple parser flattens to key "tenant[a]") — 400', () => {
+    expect(() =>
+      readTenantCode({ headers: {}, query: { 'tenant[a]': 'b' } }),
+    ).toThrow(BadRequestException);
+  });
+
+  it('rejects ?tenant[]=A (bracket-empty form) — 400', () => {
+    expect(() =>
+      readTenantCode({ headers: {}, query: { 'tenant[]': 'A' } }),
+    ).toThrow(BadRequestException);
+  });
+
+  it('does not touch an unrelated query key starting with "tenant" — OK', () => {
+    const code = readTenantCode({
+      headers: { 'x-tenant': 'SHIK_ROLL' },
+      query: { tenantNote: 'x' },
+    });
+    expect(code).toBe('SHIK_ROLL');
+  });
 });
 
 describe('TenantMiddleware', () => {

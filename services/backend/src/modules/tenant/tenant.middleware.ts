@@ -75,14 +75,18 @@ export class TenantMiddleware
  * Strictness policy (ADR-1622 step 4, variant A):
  * - Header present but blank -> 400 TENANT_INVALID, even when ?tenant= would
  *   have been valid. A client that names the tenant must name it correctly.
- * - Duplicate declarations (array header, `?tenant=A&tenant=B`,
- *   `?tenant[a]=b`) -> 400 TENANT_INVALID. Refusing beats picking one.
+ * - Duplicate declarations -> 400 TENANT_INVALID. Node glues repeated
+ *   X-Tenant headers into a single "A, B" string, so the shape is detected
+ *   both from `rawHeaders` (authoritative) and from a comma in the value.
+ * - `?tenant=A&tenant=B` (array) and `?tenant=a[b]` / `?tenant[]=A`
+ *   (bracket forms, which the simple parser flattens into sibling keys
+ *   `tenant[a]` / `tenant[]`) -> 400 TENANT_INVALID.
  * - Header and query that disagree -> 400 TENANT_CONFLICT. Not knowable.
  * - Header absent + valid query -> OK, use the query.
  * - Neither present -> undefined, middleware leaves the request unscoped.
  *
  * Exported for its own unit spec — this is the only place the header's shape
- * (array values, casing, whitespace) is interpreted.
+ * (array values, casing, whitespace, glued values) is interpreted.
  */
 export function readTenantCode(
   request: RequestWithTenant,
@@ -92,9 +96,25 @@ export function readTenantCode(
     TENANT_HEADER,
   );
   const header = request.headers[TENANT_HEADER];
+  const rawHeaders = request.rawHeaders;
   const fromQuery = request.query?.tenant;
 
-  // Duplicate X-Tenant headers arrive as an array — ambiguous, refuse.
+  // 1a. Duplicate X-Tenant, authoritative detection via rawHeaders.
+  if (rawHeaders) {
+    let seen = 0;
+    for (let i = 0; i < rawHeaders.length; i += 2) {
+      if (rawHeaders[i]?.toLowerCase() === TENANT_HEADER) seen += 1;
+    }
+    if (seen > 1) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'TENANT_INVALID',
+        message: 'X-Tenant must be a single value',
+      });
+    }
+  }
+
+  // 1b. Duplicate X-Tenant, defensive detection from the glued value.
   if (Array.isArray(header)) {
     throw new BadRequestException({
       statusCode: 400,
@@ -102,8 +122,30 @@ export function readTenantCode(
       message: 'X-Tenant must be a single value',
     });
   }
+  if (typeof header === 'string' && header.includes(',')) {
+    throw new BadRequestException({
+      statusCode: 400,
+      code: 'TENANT_INVALID',
+      message: 'X-Tenant must be a single value',
+    });
+  }
 
-  // `?tenant=A&tenant=B` or `?tenant[a]=b` — refuse instead of ignoring.
+  // 2. Bracket-form `?tenant[...]` — the simple parser surfaces it as a
+  //    sibling key, so `query.tenant` stays undefined and the strictness
+  //    below would never see it. Refuse any such sibling explicitly.
+  if (request.query) {
+    for (const key of Object.keys(request.query)) {
+      if (key !== 'tenant' && key.startsWith('tenant[')) {
+        throw new BadRequestException({
+          statusCode: 400,
+          code: 'TENANT_INVALID',
+          message: '?tenant must be a single string',
+        });
+      }
+    }
+  }
+
+  // 3. `?tenant=A&tenant=B` — the parser hands back an array.
   if (fromQuery !== undefined && typeof fromQuery !== 'string') {
     throw new BadRequestException({
       statusCode: 400,

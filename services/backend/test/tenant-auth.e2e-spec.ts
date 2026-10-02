@@ -580,3 +580,58 @@ describe('tenant-scoped PIN login (ADR-1622 step 4b)', () => {
     });
   });
 });
+
+describe('TenantMiddleware — transport-level strictness (ADR-1622 C2)', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app?.close();
+  });
+
+  const http = () => request(app.getHttpServer());
+
+  it('rejects a comma-glued X-Tenant (state after Node de-dupe) — 400 TENANT_INVALID', async () => {
+    // Supertest's .set() overwrites same-name headers, so it cannot send two
+    // physical X-Tenant fields. Node would glue those into "A, B" before the
+    // middleware sees them; we emulate that exact state here. The raw-header
+    // detection of the two-field case is covered by the unit spec.
+    const res = await http()
+      .get('/health/live')
+      .set('X-Tenant', 'A, B')
+      .expect(400);
+    expect(res.body.code).toBe('TENANT_INVALID');
+  });
+
+  it('rejects ?tenant[a]=b with 400 TENANT_INVALID', async () => {
+    const res = await http()
+      .get('/health/live?tenant[a]=b')
+      .expect(400);
+    expect(res.body.code).toBe('TENANT_INVALID');
+  });
+
+  it('rejects ?tenant[]=A with 400 TENANT_INVALID', async () => {
+    const res = await http()
+      .get('/health/live?tenant[]=A')
+      .expect(400);
+    expect(res.body.code).toBe('TENANT_INVALID');
+  });
+
+  it('rejects ?tenant=A&tenant=B with 400 TENANT_INVALID', async () => {
+    const res = await http()
+      .get('/health/live?tenant=A&tenant=B')
+      .expect(400);
+    expect(res.body.code).toBe('TENANT_INVALID');
+  });
+
+  it('passes /health/live without any tenant declaration', async () => {
+    await http().get('/health/live').expect(200);
+  });
+});
