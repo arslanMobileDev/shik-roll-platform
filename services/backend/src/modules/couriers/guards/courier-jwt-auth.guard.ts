@@ -69,7 +69,13 @@ export class CourierJwtAuthGuard implements CanActivate {
     // from resolving, so its tokens die with it — and in the same query.
     const courier = await this.prisma.courier.findUnique({
       where: { id: payload.sub, tenant: ACTIVE_TENANT_FILTER },
-      select: { id: true, phone: true, branchId: true, isActive: true },
+      select: {
+        id: true,
+        phone: true,
+        branchId: true,
+        tenantId: true,
+        isActive: true,
+      },
     });
     if (!courier || !courier.isActive) {
       throw new UnauthorizedException({
@@ -82,6 +88,7 @@ export class CourierJwtAuthGuard implements CanActivate {
       id: courier.id,
       phone: courier.phone,
       branchId: courier.branchId,
+      tenantId: courier.tenantId,
       role: 'COURIER',
     };
   }

@@ -104,6 +104,6 @@ export class KitchenController {
   streamOrders(
     @CurrentKitchenTerminal() terminal: AuthenticatedKitchenTerminal,
   ): Observable<MessageEvent> {
-    return this.eventsService.getStream(terminal.branchId);
+    return this.eventsService.getStream(terminal.branchId, terminal.tenantId);
   }
 }

@@ -9,10 +9,11 @@ import {
 import { OrderStatus } from '@prisma/client';
 import Redis from 'ioredis';
 import { interval, merge, Observable, Subject } from 'rxjs';
-import { filter, map } from 'rxjs/operators';
+import { filter, map, takeUntil } from 'rxjs/operators';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ORDER_INCLUDE } from '../orders/mappers/order.mapper';
 import { buildRedisConnection } from '../queues/queues.module';
+import { tenantActiveGuard$ } from '../tenant/tenant-stream-guard';
 import {
   KITCHEN_CHANNEL_PREFIX,
   KITCHEN_SSE_HEARTBEAT_MS,
@@ -202,8 +203,13 @@ export class KitchenEventsService {
    * Branch-scoped SSE stream (ADR-1618): live upsert/remove events plus a
    * heartbeat well under the 20 s contract so proxies keep the connection
    * and clients can detect a silent drop.
+   *
+   * The stream also ends on its own when the owning tenant leaves ACTIVE
+   * (ADR-1622 C5) — the guard re-reads the tenant row on the heartbeat cadence
+   * and completes the flow, so a suspended tenant stops receiving board events
+   * even if no order ever moves.
    */
-  getStream(branchId: string): Observable<MessageEvent> {
+  getStream(branchId: string, tenantId: string): Observable<MessageEvent> {
     const events$ = new Observable<KitchenOrderEventV1>((subscriber) => {
       const unsubscribe = this.bus.subscribe(branchId, (event) =>
         subscriber.next(event),
@@ -227,6 +233,10 @@ export class KitchenEventsService {
           }) as MessageEvent,
       ),
     );
-    return merge(events$, heartbeat$);
+    return merge(events$, heartbeat$).pipe(
+      takeUntil(
+        tenantActiveGuard$(this.prisma, tenantId, KITCHEN_SSE_HEARTBEAT_MS),
+      ),
+    );
   }
 }

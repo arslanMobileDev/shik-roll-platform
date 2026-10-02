@@ -100,7 +100,7 @@ describe('KitchenService', () => {
     };
     jwt = new JwtService({ secret: SECRET });
     events = { publishOrderChanged: jest.fn().mockResolvedValue(undefined) };
-    courierEvents = new CouriersEventsService();
+    courierEvents = new CouriersEventsService(prisma as never);
     orderEvents = new OrdersEventsService();
     service = new KitchenService(
       prisma as never,
@@ -267,10 +267,10 @@ describe('KitchenService', () => {
           courierEvents.getOrderTrackingStream(ORDER_ID).subscribe(e => {
             expect(committed).toBe(true); tracking.push(e);
           }),
-          courierEvents.getOrderStream(TERMINAL.branchId).subscribe(e => courier.push(e)),
+          courierEvents.getOrderStream(TERMINAL.branchId, TERMINAL.tenantId).subscribe(e => courier.push(e)),
           orderEvents.getKdsStream(TERMINAL.branchId).subscribe(e => legacy.push(e)),
           courierEvents.getOrderTrackingStream('other-order').subscribe(e => foreign.push(e)),
-          courierEvents.getOrderStream('other-branch').subscribe(e => foreign.push(e)),
+          courierEvents.getOrderStream('other-branch', TERMINAL.tenantId).subscribe(e => foreign.push(e)),
         ];
         try {
           await service.updateOrderStatus(TERMINAL, ORDER_ID, { status, expectedVersion: 3 });

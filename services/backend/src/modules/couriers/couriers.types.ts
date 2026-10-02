@@ -9,11 +9,17 @@ export interface CourierTokenPayload {
   type: 'access';
 }
 
-/** Courier identity attached to the request by CourierJwtAuthGuard. */
+/**
+ * Courier identity attached to the request by CourierJwtAuthGuard. Like
+ * branchId, `tenantId` comes from the authoritative row, never from the token:
+ * the SSE stream uses it to close itself when the tenant is suspended
+ * (ADR-1622 C5).
+ */
 export interface AuthenticatedCourier {
   id: string;
   phone: string;
   branchId: string;
+  tenantId: string;
   role: 'COURIER';
 }
 

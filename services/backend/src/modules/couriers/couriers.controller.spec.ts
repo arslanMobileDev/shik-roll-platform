@@ -45,6 +45,7 @@ describe('CouriersController auth wiring', () => {
       id: 'courier-1',
       phone: '+79991234567',
       branchId: 'branch-1',
+      tenantId: 'tenant-1',
       role: 'COURIER' as const,
     };
 
@@ -57,7 +58,7 @@ describe('CouriersController auth wiring', () => {
     );
   });
 
-  it('scopes the SSE stream to the JWT branch', () => {
+  it('scopes the SSE stream to the JWT branch and tenant', () => {
     const eventsService = {
       getOrderStream: jest.fn().mockReturnValue('stream'),
     };
@@ -66,12 +67,18 @@ describe('CouriersController auth wiring', () => {
       id: 'courier-1',
       phone: '+79991234567',
       branchId: 'branch-9',
+      tenantId: 'tenant-9',
       role: 'COURIER' as const,
     };
 
     controller.streamOrders(courier);
 
-    expect(eventsService.getOrderStream).toHaveBeenCalledWith('branch-9');
+    // The tenant rides along so the stream can close itself on suspension
+    // (ADR-1622 C5); both values come from the guard-verified row.
+    expect(eventsService.getOrderStream).toHaveBeenCalledWith(
+      'branch-9',
+      'tenant-9',
+    );
   });
 
   it('passes JWT identity and status DTO to the service on transitions', async () => {
@@ -83,6 +90,7 @@ describe('CouriersController auth wiring', () => {
       id: 'courier-1',
       phone: '+79991234567',
       branchId: 'branch-1',
+      tenantId: 'tenant-1',
       role: 'COURIER' as const,
     };
 
@@ -106,6 +114,7 @@ describe('CouriersController auth wiring', () => {
       id: 'courier-1',
       phone: '+79991234567',
       branchId: 'branch-1',
+      tenantId: 'tenant-1',
       role: 'COURIER' as const,
     };
     const dto = {

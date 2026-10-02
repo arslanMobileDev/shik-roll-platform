@@ -50,6 +50,7 @@ describe('CourierJwtAuthGuard', () => {
           id: 'courier-1',
           phone: '+79991234567',
           branchId: 'branch-1',
+          tenantId: 'tenant-1',
           isActive: true,
         }),
       },
@@ -64,6 +65,16 @@ describe('CourierJwtAuthGuard', () => {
         where: {
           id: 'courier-1',
           tenant: { status: 'ACTIVE', deletedAt: null },
+        },
+        // tenantId is on this list on purpose: drop it from the select and the
+        // identity carries `undefined`, which the SSE tenant guard reads as
+        // "no such tenant" and closes every stream the moment it opens.
+        select: {
+          id: true,
+          phone: true,
+          branchId: true,
+          tenantId: true,
+          isActive: true,
         },
       }),
     );
@@ -163,6 +174,7 @@ describe('CourierJwtAuthGuard', () => {
         id: 'courier-1',
         phone: '+79991234567',
         branchId: 'branch-1',
+        tenantId: 'tenant-1',
         isActive: true,
       }),
     );
@@ -174,6 +186,7 @@ describe('CourierJwtAuthGuard', () => {
       id: 'courier-1',
       phone: '+79991234567',
       branchId: 'branch-1',
+      tenantId: 'tenant-1',
       role: 'COURIER',
     });
   });
@@ -186,6 +199,7 @@ describe('CourierJwtAuthGuard', () => {
         id: 'courier-1',
         phone: '+79991234567',
         branchId: 'authoritative-branch',
+        tenantId: 'authoritative-tenant',
         isActive: true,
       }),
     );
@@ -197,5 +211,29 @@ describe('CourierJwtAuthGuard', () => {
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(request.courier?.branchId).toBe('authoritative-branch');
+  });
+
+  it('takes tenantId from the row, never from the token', async () => {
+    // The SSE stream closes on the tenant of this field (ADR-1622 C5), so a
+    // token claiming its own tenant must not be able to keep a stream alive
+    // after the real tenant is suspended.
+    const guard = new CourierJwtAuthGuard(
+      jwt,
+      prismaWithCourier({
+        id: 'courier-1',
+        phone: '+79991234567',
+        branchId: 'branch-1',
+        tenantId: 'authoritative-tenant',
+        isActive: true,
+      }),
+    );
+    const token = await jwt.signAsync(
+      { ...courierPayload, tenantId: 'attacker-tenant' },
+      { expiresIn: 3600 },
+    );
+    const { context, request } = contextFor({ authorization: `Bearer ${token}` });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(request.courier?.tenantId).toBe('authoritative-tenant');
   });
 });

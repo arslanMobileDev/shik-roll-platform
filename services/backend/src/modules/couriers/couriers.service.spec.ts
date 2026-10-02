@@ -72,6 +72,7 @@ const jwtCourier: AuthenticatedCourier = {
   id: 'courier-1',
   phone: '+79991234567',
   branchId: 'branch-1',
+  tenantId: 'tenant-1',
   role: 'COURIER',
 };
 

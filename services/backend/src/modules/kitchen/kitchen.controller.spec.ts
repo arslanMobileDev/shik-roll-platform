@@ -54,13 +54,14 @@ describe('KitchenController auth wiring', () => {
     expect(eventsService.getBoardSnapshot).toHaveBeenCalledWith('branch-1');
   });
 
-  it('scopes the SSE stream to the JWT branch identity', () => {
+  it('scopes the SSE stream to the JWT branch and tenant identity', () => {
     const eventsService = { getStream: jest.fn().mockReturnValue('stream') };
     const controller = new KitchenController({} as never, eventsService as never);
 
     controller.streamOrders(TERMINAL);
 
-    expect(eventsService.getStream).toHaveBeenCalledWith('branch-1');
+    // The tenant rides along so the stream can end when it leaves ACTIVE.
+    expect(eventsService.getStream).toHaveBeenCalledWith('branch-1', 'tenant-1');
   });
 
   it('passes JWT identity and DTO to the service on transitions', async () => {

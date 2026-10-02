@@ -9,7 +9,11 @@ import { KITCHEN_SSE_HEARTBEAT_MS } from './kitchen.config';
 import { KitchenOrderEventV1 } from './kitchen.types';
 
 const BRANCH_ID = 'branch-1';
+const TENANT_ID = 'tenant-1';
 const ORDER_ID = '11111111-1111-1111-1111-111111111111';
+
+/** Active by default: an unconfigured mock would read as "no such tenant". */
+const activeTenant = { status: 'ACTIVE', deletedAt: null };
 
 function orderRecord(status: OrderStatus, overrides: Record<string, unknown> = {}) {
   return {
@@ -62,13 +66,17 @@ class FakeBus implements KitchenEventBus {
 }
 
 describe('KitchenEventsService', () => {
-  let prisma: { order: { findFirst: jest.Mock; findMany: jest.Mock } };
+  let prisma: {
+    order: { findFirst: jest.Mock; findMany: jest.Mock };
+    tenant: { findUnique: jest.Mock };
+  };
   let bus: FakeBus;
   let service: KitchenEventsService;
 
   beforeEach(() => {
     prisma = {
       order: { findFirst: jest.fn(), findMany: jest.fn() },
+      tenant: { findUnique: jest.fn().mockResolvedValue(activeTenant) },
     };
     bus = new FakeBus();
     service = new KitchenEventsService(prisma as never, bus);
@@ -175,7 +183,7 @@ describe('KitchenEventsService', () => {
     it('maps branch events to typed SSE messages', async () => {
       const received: MessageEvent[] = [];
       const sub: Subscription = service
-        .getStream(BRANCH_ID)
+        .getStream(BRANCH_ID, TENANT_ID)
         .subscribe((message) => received.push(message));
 
       bus.emit(BRANCH_ID, event);
@@ -192,7 +200,7 @@ describe('KitchenEventsService', () => {
     it('stops delivering after unsubscribe', () => {
       const received: MessageEvent[] = [];
       const sub = service
-        .getStream(BRANCH_ID)
+        .getStream(BRANCH_ID, TENANT_ID)
         .subscribe((message) => received.push(message));
       sub.unsubscribe();
 
@@ -204,7 +212,7 @@ describe('KitchenEventsService', () => {
       jest.useFakeTimers();
       try {
         const heartbeatPromise = firstValueFrom(
-          service.getStream(BRANCH_ID).pipe(take(1)),
+          service.getStream(BRANCH_ID, TENANT_ID).pipe(take(1)),
         );
         jest.advanceTimersByTime(KITCHEN_SSE_HEARTBEAT_MS);
         const heartbeat = await heartbeatPromise;
@@ -215,6 +223,88 @@ describe('KitchenEventsService', () => {
       } finally {
         jest.useRealTimers();
       }
+    });
+  });
+
+  describe('the stream ends with its tenant (ADR-1622 C5)', () => {
+    let subscription: Subscription | undefined;
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      subscription?.unsubscribe();
+      jest.useRealTimers();
+    });
+
+    /** Opens the stream and returns a probe for "has it completed yet?". */
+    const openStream = (): (() => boolean) => {
+      let completed = false;
+      subscription = service.getStream(BRANCH_ID, TENANT_ID).subscribe({
+        complete: () => {
+          completed = true;
+        },
+      });
+      return () => completed;
+    };
+
+    it('stays open while the tenant is ACTIVE, then closes within one heartbeat of the suspension', async () => {
+      const isCompleted = openStream();
+
+      await jest.advanceTimersByTimeAsync(KITCHEN_SSE_HEARTBEAT_MS);
+      // Silence is not a suspension: an ACTIVE tick must not close the board.
+      expect(isCompleted()).toBe(false);
+      expect(prisma.tenant.findUnique).toHaveBeenCalledWith({
+        where: { id: TENANT_ID },
+        select: { status: true, deletedAt: true },
+      });
+
+      prisma.tenant.findUnique.mockResolvedValue({
+        status: 'SUSPENDED',
+        deletedAt: null,
+      });
+      await jest.advanceTimersByTimeAsync(KITCHEN_SSE_HEARTBEAT_MS);
+
+      expect(isCompleted()).toBe(true);
+    });
+
+    it('closes on a tenant that is ACTIVE but soft-deleted', async () => {
+      const isCompleted = openStream();
+
+      prisma.tenant.findUnique.mockResolvedValue({
+        status: 'ACTIVE',
+        deletedAt: new Date('2026-01-01T00:00:00.000Z'),
+      });
+      await jest.advanceTimersByTimeAsync(KITCHEN_SSE_HEARTBEAT_MS);
+
+      expect(isCompleted()).toBe(true);
+    });
+
+    it('closes when the tenant row is gone entirely', async () => {
+      const isCompleted = openStream();
+
+      prisma.tenant.findUnique.mockResolvedValue(null);
+      await jest.advanceTimersByTimeAsync(KITCHEN_SSE_HEARTBEAT_MS);
+
+      expect(isCompleted()).toBe(true);
+    });
+
+    it('survives a failed tenant read and re-checks on the next tick', async () => {
+      const isCompleted = openStream();
+
+      prisma.tenant.findUnique.mockRejectedValueOnce(new Error('db is down'));
+      await jest.advanceTimersByTimeAsync(KITCHEN_SSE_HEARTBEAT_MS);
+      // A transient blip must not drop a live board.
+      expect(isCompleted()).toBe(false);
+
+      prisma.tenant.findUnique.mockResolvedValue({
+        status: 'SUSPENDED',
+        deletedAt: null,
+      });
+      await jest.advanceTimersByTimeAsync(KITCHEN_SSE_HEARTBEAT_MS);
+
+      expect(isCompleted()).toBe(true);
     });
   });
 });

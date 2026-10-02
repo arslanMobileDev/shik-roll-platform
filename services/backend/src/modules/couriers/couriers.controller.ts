@@ -121,6 +121,6 @@ export class CouriersController {
   streamOrders(
     @CurrentCourier() courier: AuthenticatedCourier,
   ): Observable<MessageEvent> {
-    return this.eventsService.getOrderStream(courier.branchId);
+    return this.eventsService.getOrderStream(courier.branchId, courier.tenantId);
   }
 }

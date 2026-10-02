@@ -9,6 +9,7 @@
 // query-shape assertions in the service/guard specs only show the filter was
 // passed, not that it filters.
 import { execSync } from 'node:child_process';
+import type { AddressInfo } from 'node:net';
 import * as path from 'node:path';
 import {
   BadRequestException,
@@ -20,6 +21,7 @@ import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { KITCHEN_SSE_HEARTBEAT_MS } from '../src/modules/kitchen/kitchen.config';
 import { __pinRateLimitResetForTests } from '../src/modules/tenant/pin-rate-limit';
 
 const TEST_DATABASE_URL =
@@ -313,6 +315,31 @@ const loginCourier = (phone: string, tenantCode?: string, pin: string = PIN) => 
 
 const setTenantB = (data: { status?: string; deletedAt?: Date | null }) =>
   prisma.tenant.update({ where: { id: fx.tenantBId }, data });
+
+/** Rejects instead of hanging the suite when the awaited event never comes. */
+function withDeadline<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
+  return Promise.race([
+    work,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`Timed out after ${ms}ms waiting for ${what}`)),
+        ms,
+      ).unref(),
+    ),
+  ]);
+}
+
+/** Reads the body until the server ends the response. */
+async function drain(reader: {
+  read(): Promise<{ done: boolean }>;
+}): Promise<void> {
+  for (;;) {
+    const { done } = await reader.read();
+    if (done) {
+      return;
+    }
+  }
+}
 
 describe('tenant-scoped PIN login (ADR-1622 step 4b)', () => {
   beforeAll(async () => {
@@ -656,6 +683,68 @@ describe('tenant-scoped PIN login (ADR-1622 step 4b)', () => {
       // four and the second of these would answer 429.
       for (let i = 0; i < 5; i += 1) {
         await loginKitchen(TERMINAL_A_CODE, 'SHIK_ROLL', '0000').expect(401);
+      }
+    });
+  });
+
+  describe('SSE stream ends with its tenant (ADR-1622 C5)', () => {
+    /**
+     * The one thing the service spec cannot show: that ending the Observable
+     * reaches the socket. There, takeUntil proves the guard emits; here a
+     * suspended tenant must actually read EOF instead of a stream that keeps
+     * heartbeating.
+     *
+     * supertest has no SSE mode (its request only settles when the response
+     * ends), so the same server is driven with fetch and the body stream is
+     * read directly.
+     */
+    it('closes the kitchen stream within a tick of the tenant leaving ACTIVE', async () => {
+      const login = await request(app.getHttpServer())
+        .post('/kitchen/auth/pin')
+        .set('X-Tenant', TENANT_B)
+        .send({ terminalCode: TERMINAL_B_CODE, pin: PIN })
+        .expect(200);
+
+      const server = app.getHttpServer();
+      if (!server.listening) {
+        await new Promise<void>((resolve) => server.listen(0, resolve));
+      }
+      const { port } = server.address() as AddressInfo;
+
+      const res = await fetch(`http://127.0.0.1:${port}/kitchen/stream`, {
+        headers: {
+          Authorization: `Bearer ${login.body.token}`,
+          Accept: 'text/event-stream',
+        },
+      });
+      expect(res.status).toBe(200);
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      try {
+        // While ACTIVE the heartbeat arrives on its own cadence, which also
+        // rules out a stream that closes on every request regardless.
+        let received = '';
+        while (!received.includes('heartbeat')) {
+          const chunk = await withDeadline(reader.read(), 5_000, 'a heartbeat');
+          expect(chunk.done).toBe(false);
+          received += decoder.decode(chunk.value, { stream: true });
+        }
+
+        await setTenantB({ status: 'SUSPENDED' });
+
+        // Two guard ticks plus slack: one tick to notice, one for the DB read
+        // and the response teardown. The budget covers the whole wait rather
+        // than each read — heartbeats keep arriving while the stream is open,
+        // so a per-read deadline would never expire.
+        await withDeadline(
+          drain(reader),
+          2 * KITCHEN_SSE_HEARTBEAT_MS + 3_000,
+          'the stream to end',
+        );
+      } finally {
+        // A failed assertion above must not leave a live connection behind.
+        await reader.cancel().catch(() => undefined);
       }
     });
   });

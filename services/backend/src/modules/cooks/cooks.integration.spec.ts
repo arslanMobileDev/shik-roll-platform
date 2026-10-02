@@ -40,7 +40,7 @@ const url = process.env.TEST_COOK_DATABASE_URL;
         expect(first.shiftId).toBe(second.shiftId);
         expect(await db.cookShift.count({ where: { cookId: cook.id, endedAt: null } })).toBe(1);
         const actor = await sessions.verify('Bearer ' + first.token);
-        const courierEvents = new CouriersEventsService();
+        const courierEvents = new CouriersEventsService(db);
         const orderEvents = new OrdersEventsService();
         const board = { publishOrderChanged: jest.fn().mockResolvedValue(undefined) };
         const kitchen = new KitchenService(db, jwt, board as never, courierEvents, orderEvents);
@@ -53,7 +53,7 @@ const url = process.env.TEST_COOK_DATABASE_URL;
         const tracking: string[] = [];
         const feed: string[] = [];
         const kitchenFeed: string[] = [];
-        const subscriptions = [courierEvents.getOrderTrackingStream(order.id).subscribe(e => tracking.push(e.data.status)), courierEvents.getOrderStream(branch.id).subscribe(e => feed.push(e.data.status)), orderEvents.getKdsStream(branch.id).subscribe(e => kitchenFeed.push(e.data.status))];
+        const subscriptions = [courierEvents.getOrderTrackingStream(order.id).subscribe(e => tracking.push(e.data.status)), courierEvents.getOrderStream(branch.id, tenant.id).subscribe(e => feed.push(e.data.status)), orderEvents.getKdsStream(branch.id).subscribe(e => kitchenFeed.push(e.data.status))];
         try {
             await request(app.getHttpServer()).patch('/kitchen/orders/' + order.id + '/status').set('Authorization', 'Bearer ' + terminalToken).set('X-Cook-Authorization', 'Bearer ' + first.token).send({ status: 'COOKING', expectedVersion: 1 }).expect(200);
             await request(app.getHttpServer()).patch('/kitchen/orders/' + order.id + '/status').set('Authorization', 'Bearer ' + terminalToken).set('X-Cook-Authorization', 'Bearer ' + first.token).send({ status: 'READY', expectedVersion: 2 }).expect(200);
