@@ -4,6 +4,7 @@ import * as bcrypt from 'bcryptjs';
 import { StaffRole } from '@prisma/client';
 import { StaffService } from './staff.service';
 import { STAFF_TOKEN_TTL_SECONDS } from './staff.config';
+import { __pinRateLimitResetForTests } from '../tenant/pin-rate-limit';
 
 const SECRET = 'staff-service-test-secret';
 const PHONE = '+79991234567';
@@ -30,6 +31,8 @@ describe('StaffService', () => {
   let service: StaffService;
 
   beforeEach(() => {
+    // The limiter's Map is module state and outlives this spec's instances.
+    __pinRateLimitResetForTests();
     prisma = { staff: { findUnique: jest.fn(), findMany: jest.fn() } };
     jwt = new JwtService({ secret: SECRET });
     service = new StaffService(prisma as never, jwt);
@@ -120,5 +123,41 @@ describe('StaffService', () => {
       brandId: 'brand-1',
       type: 'access',
     });
+  });
+
+  it('answers 429 TOO_MANY_ATTEMPTS on the sixth failed login', async () => {
+    prisma.staff.findMany.mockResolvedValue([]);
+    const attempt = () => service.authenticateByPin({ phone: PHONE, pin: PIN });
+
+    for (let i = 0; i < 5; i += 1) {
+      await expect(attempt()).rejects.toMatchObject({
+        response: { code: 'INVALID_CREDENTIALS' },
+      });
+    }
+
+    const error = await attempt().catch((e: unknown) => e);
+    expect(error).toMatchObject({ response: { code: 'TOO_MANY_ATTEMPTS' } });
+    expect((error as { getStatus(): number }).getStatus()).toBe(429);
+    // The blocked attempt never reached the lookup.
+    expect(prisma.staff.findMany).toHaveBeenCalledTimes(5);
+  });
+
+  it('clears the counter after a successful login', async () => {
+    prisma.staff.findMany.mockResolvedValue([]);
+    for (let i = 0; i < 4; i += 1) {
+      await expect(
+        service.authenticateByPin({ phone: PHONE, pin: PIN }),
+      ).rejects.toMatchObject({ response: { code: 'INVALID_CREDENTIALS' } });
+    }
+
+    prisma.staff.findMany.mockResolvedValue([makeStaff()]);
+    await service.authenticateByPin({ phone: PHONE, pin: PIN });
+
+    // Four failures plus a success: without the reset the next attempt would
+    // already be the sixth of the window and answer 429.
+    prisma.staff.findMany.mockResolvedValue([]);
+    await expect(
+      service.authenticateByPin({ phone: PHONE, pin: PIN }),
+    ).rejects.toMatchObject({ response: { code: 'INVALID_CREDENTIALS' } });
   });
 });

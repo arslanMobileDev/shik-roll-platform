@@ -11,6 +11,7 @@ import { OrderStatus, OrderType, PaymentMethod } from '@prisma/client';
 import { CouriersService } from './couriers.service';
 import { COURIER_TOKEN_TTL_SECONDS } from './couriers.config';
 import { AuthenticatedCourier, CourierTokenPayload } from './couriers.types';
+import { __pinRateLimitResetForTests } from '../tenant/pin-rate-limit';
 
 const SECRET = 'courier-service-test-secret';
 
@@ -101,6 +102,8 @@ describe('CouriersService.authenticateByPin', () => {
   let service: CouriersService;
 
   beforeEach(() => {
+    // The limiter's Map is module state and outlives this spec's instances.
+    __pinRateLimitResetForTests();
     prisma = prismaMock();
     jwt = new JwtService({ secret: SECRET });
     service = new CouriersService(prisma as any, jwt, eventsMock() as any, loyaltyMock() as any);

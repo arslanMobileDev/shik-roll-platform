@@ -2,6 +2,10 @@ import { createHash, timingSafeEqual } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { constantTimePinCheck } from '../tenant/pin-timing';
 import {
+  pinRateLimitConsume,
+  pinRateLimitReset,
+} from '../tenant/pin-rate-limit';
+import {
   ConflictException,
   ForbiddenException,
   HttpException,
@@ -58,6 +62,10 @@ export class CouriersService {
   ) {}
 
   async authenticateByPin(dto: CourierPinAuthDto, tenant?: TenantContext) {
+    // Before the lookup: a 429 for an unknown phone is the feature, not a leak
+    // (ADR-1622 step 4, C4). The raw phone is the key because it is also the
+    // lookup value — a variant that misses the row has no account to guess.
+    pinRateLimitConsume(tenant?.code, dto.phone);
     // `phone` is unique per tenant, not globally (ADR-1622 step 4b).
     const courier = await resolveLoginRow(
       tenant,
@@ -101,6 +109,7 @@ export class CouriersService {
     const token = await this.jwt.signAsync(payload, {
       expiresIn: COURIER_TOKEN_TTL_SECONDS,
     });
+    pinRateLimitReset(tenant?.code, dto.phone);
 
     return {
       token,

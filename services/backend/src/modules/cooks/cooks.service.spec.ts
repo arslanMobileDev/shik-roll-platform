@@ -3,12 +3,15 @@ import * as bcrypt from 'bcryptjs';
 import { CooksService } from './cooks.service';
 import { CookSessionService, COOK_TTL_MS } from './cook-session.service';
 import { CookStatisticsService } from './cook-statistics.service';
+import { __pinRateLimitResetForTests } from '../tenant/pin-rate-limit';
 const staff = { id: 'owner', role: 'OWNER', brandId: 'brand' } as any;
 const terminal = { id: 'terminal', tenantId: 'tenant', branchId: 'branch' } as any;
 const actor = { id: 'cook', shiftId: 'shift', terminalId: 'terminal', branchId: 'branch' };
 describe('Cook identity, shifts and metrics', () => {
     let db: any, jwt: JwtService, service: CooksService, cook: any, shift: any;
     beforeEach(async () => {
+        // The limiter's Map is module state and outlives this spec's instances.
+        __pinRateLimitResetForTests();
         cook = { id: 'cook', name: 'Иван', phone: '+79280000000', pinHash: await bcrypt.hash('1234', 4), isActive: true, branchId: 'branch' };
         shift = { id: 'shift', cookId: 'cook', terminalId: 'terminal', branchId: 'branch', startedAt: new Date(), endedAt: null, cook, terminal: { isActive: true, branchId: 'branch' } };
         db = { branch: { findFirst: jest.fn().mockResolvedValue({ id: 'branch' }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'branch', tenantId: 'tenant' }) }, cook: { findUnique: jest.fn().mockResolvedValue(cook), findUniqueOrThrow: jest.fn().mockResolvedValue(cook), create: jest.fn().mockResolvedValue({ id: 'cook' }), findFirst: jest.fn().mockResolvedValue(cook), update: jest.fn().mockResolvedValue({ id: 'cook' }) }, kitchenTerminal: { findUniqueOrThrow: jest.fn().mockResolvedValue({ isActive: true, branchId: 'branch' }) }, cookShift: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue(shift), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findUnique: jest.fn().mockResolvedValue(shift), findUniqueOrThrow: jest.fn().mockResolvedValue(shift) }, $executeRaw: jest.fn().mockResolvedValue(0), $queryRaw: jest.fn().mockResolvedValue([]) };

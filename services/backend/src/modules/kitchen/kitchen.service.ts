@@ -4,6 +4,10 @@ import { resolveLoginRow } from '../tenant/resolve-login-row';
 import { ACTIVE_TENANT_FILTER, TenantContext } from '../tenant/tenant.types';
 import { constantTimePinCheck } from '../tenant/pin-timing';
 import {
+  pinRateLimitConsume,
+  pinRateLimitReset,
+} from '../tenant/pin-rate-limit';
+import {
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -45,6 +49,9 @@ export class KitchenService {
    * whether the code exists. PIN and token are never logged.
    */
   async authenticateByPin(dto: KitchenPinAuthDto, tenant?: TenantContext) {
+    // Counted before the lookup: a 429 for an unknown terminal code is the
+    // feature, not a leak (ADR-1622 step 4, C4).
+    pinRateLimitConsume(tenant?.code, dto.terminalCode);
     // `code` is unique per tenant, not globally (ADR-1622 step 4b).
     const terminal = await resolveLoginRow(
       tenant,
@@ -93,6 +100,7 @@ export class KitchenService {
     const token = await this.jwt.signAsync(payload, {
       expiresIn: KITCHEN_TOKEN_TTL_SECONDS,
     });
+    pinRateLimitReset(tenant?.code, dto.terminalCode);
 
     return {
       token,

@@ -4,6 +4,10 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { constantTimePinCheck } from '../tenant/pin-timing';
+import {
+  pinRateLimitConsume,
+  pinRateLimitReset,
+} from '../tenant/pin-rate-limit';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveLoginRow } from '../tenant/resolve-login-row';
 import { ACTIVE_TENANT_FILTER, TenantContext } from '../tenant/tenant.types';
@@ -44,6 +48,11 @@ export class StaffService {
     // Accepts +7 928 313-51-91, +7(928)3135191, 89283135191 — all map
     // to the canonical +79283135191 stored in the DB.
     const phone = dto.phone.replace(/[\s\-()]/g, '');
+    // Keyed on the normalised phone, not the raw one: "+7 928…" and "+7928…"
+    // are one account, and a limiter they could sidestep by adding a space
+    // would not be a limiter. Counted before the lookup on purpose — a 429 for
+    // an unknown phone is the feature (ADR-1622 step 4, C4).
+    pinRateLimitConsume(tenant?.code, phone);
     // `phone` is unique per tenant, not globally (ADR-1622 step 4b).
     const staff = await resolveLoginRow(
       tenant,
@@ -83,6 +92,7 @@ export class StaffService {
     const token = await this.jwt.signAsync(payload, {
       expiresIn: STAFF_TOKEN_TTL_SECONDS,
     });
+    pinRateLimitReset(tenant?.code, phone);
 
     return {
       token,

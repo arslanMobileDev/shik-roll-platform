@@ -20,6 +20,7 @@ import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { __pinRateLimitResetForTests } from '../src/modules/tenant/pin-rate-limit';
 
 const TEST_DATABASE_URL =
   process.env.DATABASE_URL_TEST ??
@@ -57,6 +58,10 @@ const PHONE_STAFF_PIN_ISO = '+79995550107';
 const BRAND_A_CODE = 'TA-E2E';
 const BRAND_B_CODE = 'TB-E2E';
 
+/** Kitchen terminals, one per tenant — the C4 cross-tenant case. */
+const TERMINAL_A_CODE = 'TA-E2E-KDS';
+const TERMINAL_B_CODE = 'TB-E2E-KDS';
+
 interface Fixture {
   tenantAId: string;
   tenantBId: string;
@@ -70,6 +75,8 @@ interface Fixture {
   courierOnlyBId: string;
   staffPinIsoAId: string;
   staffPinIsoBId: string;
+  terminalAId: string;
+  terminalBId: string;
 }
 
 let app: INestApplication;
@@ -91,6 +98,10 @@ async function deleteSuiteRows(tenantBId?: string): Promise<void> {
     PHONE_COURIER_ONLY_A,
     PHONE_COURIER_ONLY_B,
   ];
+  // Ahead of brands/branches: a terminal to a deleted branch is an FK error.
+  await prisma.kitchenTerminal.deleteMany({
+    where: { code: { in: [TERMINAL_A_CODE, TERMINAL_B_CODE] } },
+  });
   await prisma.courier.deleteMany({ where: { phone: { in: phones } } });
   await prisma.staff.deleteMany({ where: { phone: { in: phones } } });
   if (tenantBId) {
@@ -247,6 +258,25 @@ async function seedFixtures(): Promise<Fixture> {
     },
   });
 
+  const terminalA = await prisma.kitchenTerminal.create({
+    data: {
+      code: TERMINAL_A_CODE,
+      name: 'Tenant A E2E KDS',
+      pinHash,
+      branchId: branchA.id,
+      tenantId: tenantA.id,
+    },
+  });
+  const terminalB = await prisma.kitchenTerminal.create({
+    data: {
+      code: TERMINAL_B_CODE,
+      name: 'Tenant B E2E KDS',
+      pinHash,
+      branchId: branchB.id,
+      tenantId: tenantB.id,
+    },
+  });
+
   return {
     tenantAId: tenantA.id,
     tenantBId: tenantB.id,
@@ -260,6 +290,8 @@ async function seedFixtures(): Promise<Fixture> {
     courierOnlyBId: courierOnlyB.id,
     staffPinIsoAId: staffPinIsoA.id,
     staffPinIsoBId: staffPinIsoB.id,
+    terminalAId: terminalA.id,
+    terminalBId: terminalB.id,
   };
 }
 
@@ -319,6 +351,9 @@ describe('tenant-scoped PIN login (ADR-1622 step 4b)', () => {
   // Several tests suspend or soft-delete tenant B, or deactivate a courier;
   // none of them should be able to leak that state into the next one.
   afterEach(async () => {
+    // The limiter's Map is module state: without this, the 401s of one test
+    // become the 429 of the next.
+    __pinRateLimitResetForTests();
     await setTenantB({ status: 'ACTIVE', deletedAt: null });
     await prisma.courier.updateMany({
       where: { phone: { in: [PHONE_COURIER_ONLY_A, PHONE_COURIER_SHARED] } },
@@ -577,6 +612,51 @@ describe('tenant-scoped PIN login (ADR-1622 step 4b)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(401);
       expect(blocked.body.code).toBe('TOKEN_INVALID');
+    });
+  });
+
+  describe('Kitchen PIN rate-limit across tenants', () => {
+    const loginKitchen = (
+      terminalCode: string,
+      tenantCode: string,
+      pin: string,
+    ) =>
+      request(app.getHttpServer())
+        .post('/kitchen/auth/pin')
+        .set('X-Tenant', tenantCode)
+        .send({ terminalCode, pin });
+
+    it('locks out the flooded tenant without touching the other', async () => {
+      for (let i = 0; i < 5; i += 1) {
+        await loginKitchen(TERMINAL_A_CODE, 'SHIK_ROLL', '0000').expect(401);
+      }
+
+      // The sixth carries the *correct* PIN: the 429 is answered before the
+      // credential is looked at, which is the whole point of counting every
+      // attempt rather than only the failures.
+      const blocked = await loginKitchen(TERMINAL_A_CODE, 'SHIK_ROLL', PIN).expect(429);
+      expect(blocked.body.code).toBe('TOO_MANY_ATTEMPTS');
+      // The header is the machine-readable half of the answer.
+      expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
+
+      // Tenant B's budget is its own: the same attempt there is a plain 401.
+      const other = await loginKitchen(TERMINAL_B_CODE, TENANT_B, '0000').expect(401);
+      expect(other.body.code).toBe('UNAUTHORIZED');
+    });
+
+    it('clears the counter on a successful login', async () => {
+      for (let i = 0; i < 4; i += 1) {
+        await loginKitchen(TERMINAL_A_CODE, 'SHIK_ROLL', '0000').expect(401);
+      }
+
+      const ok = await loginKitchen(TERMINAL_A_CODE, 'SHIK_ROLL', PIN).expect(200);
+      expect(ok.body.terminal.id).toBe(fx.terminalAId);
+
+      // Five more failures. Without the reset the counter would already be at
+      // four and the second of these would answer 429.
+      for (let i = 0; i < 5; i += 1) {
+        await loginKitchen(TERMINAL_A_CODE, 'SHIK_ROLL', '0000').expect(401);
+      }
     });
   });
 });

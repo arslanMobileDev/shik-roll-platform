@@ -6,6 +6,7 @@ import { OrdersEventsService } from '../orders/orders-events.service';
 import { KitchenService } from './kitchen.service';
 import { KitchenEventsService } from './kitchen-events.service';
 import { AuthenticatedKitchenTerminal } from './kitchen.types';
+import { __pinRateLimitResetForTests } from '../tenant/pin-rate-limit';
 
 const SECRET = 'kitchen-service-test-secret';
 
@@ -80,6 +81,8 @@ describe('KitchenService', () => {
   let orderEvents: OrdersEventsService;
 
   beforeEach(() => {
+    // The limiter's Map is module state and outlives this spec's instances.
+    __pinRateLimitResetForTests();
     prisma = {
       kitchenTerminal: { findUnique: jest.fn(), findMany: jest.fn() },
       branch: { findUnique: jest.fn() },
@@ -113,6 +116,21 @@ describe('KitchenService', () => {
 
     beforeEach(() => {
       prisma.branch.findUnique.mockResolvedValue({ id: TERMINAL.branchId });
+    });
+
+    it('answers 429 TOO_MANY_ATTEMPTS on the sixth failed login', async () => {
+      prisma.kitchenTerminal.findMany.mockResolvedValue([]);
+      const attempt = () => service.authenticateByPin(dto);
+
+      for (let i = 0; i < 5; i += 1) {
+        await expect(attempt()).rejects.toMatchObject({
+          response: { code: 'UNAUTHORIZED' },
+        });
+      }
+
+      const error = await attempt().catch((e: unknown) => e);
+      expect(error).toMatchObject({ response: { code: 'TOO_MANY_ATTEMPTS' } });
+      expect((error as { getStatus(): number }).getStatus()).toBe(429);
     });
 
     it('scopes the legacy lookup to an active owning tenant', async () => {

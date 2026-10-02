@@ -1,8 +1,10 @@
 import { CooksModule } from './modules/cooks/cooks.module';
 import { AnalyticsModule } from './modules/staff-analytics/analytics.module';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
 import { TenantMiddleware } from './modules/tenant/tenant.middleware';
+import { TooManyAttemptsFilter } from './modules/tenant/pin-rate-limit';
 import { AuthModule } from './modules/auth/auth.module';
 import { MenuModule } from './modules/menu/menu.module';
 import { OrdersModule } from './modules/orders/orders.module';
@@ -35,6 +37,10 @@ import { RestaurantsController } from './restaurants.controller';
     AnalyticsModule,
   ],
   controllers: [HealthController, RestaurantsController],
+  // Catches only TooManyAttemptsException, so every other error keeps the
+  // default handling; registered here rather than with useGlobalFilters in
+  // main.ts so the e2e apps (which build from AppModule) get it too.
+  providers: [{ provide: APP_FILTER, useClass: TooManyAttemptsFilter }],
 })
 export class AppModule implements NestModule {
   /**
