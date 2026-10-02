@@ -2,7 +2,7 @@ import { CookActor } from '../cooks/cooks.dto';
 import { COOK_TTL_MS } from '../cooks/cook-session.service';
 import { resolveLoginRow } from '../tenant/resolve-login-row';
 import { ACTIVE_TENANT_FILTER, TenantContext } from '../tenant/tenant.types';
-import * as bcrypt from 'bcryptjs';
+import { constantTimePinCheck } from '../tenant/pin-timing';
 import {
   ConflictException,
   ForbiddenException,
@@ -64,8 +64,7 @@ export class KitchenService {
           },
         }),
     );
-    const pinOk =
-      terminal !== null && (await bcrypt.compare(dto.pin, terminal.pinHash));
+    const pinOk = await constantTimePinCheck(dto.pin, terminal?.pinHash);
     if (!terminal || !terminal.isActive || !pinOk) {
       throw new UnauthorizedException({
         statusCode: 401,

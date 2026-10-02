@@ -3,7 +3,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcryptjs';
+import { constantTimePinCheck } from '../tenant/pin-timing';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveLoginRow } from '../tenant/resolve-login-row';
 import { ACTIVE_TENANT_FILTER, TenantContext } from '../tenant/tenant.types';
@@ -63,7 +63,8 @@ export class StaffService {
           },
         }),
     );
-    if (!staff || !staff.isActive || !(await bcrypt.compare(dto.pin, staff.pinHash))) {
+    const pinOk = await constantTimePinCheck(dto.pin, staff?.pinHash);
+    if (!staff || !staff.isActive || !pinOk) {
       throw new UnauthorizedException({
         statusCode: 401,
         code: 'INVALID_CREDENTIALS',

@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'crypto';
 import * as bcrypt from 'bcryptjs';
+import { constantTimePinCheck } from '../tenant/pin-timing';
 import {
   ConflictException,
   ForbiddenException,
@@ -79,11 +80,10 @@ export class CouriersService {
 
     // isActive is checked here, not only in the guard: a deactivated courier
     // must not receive a token at all (ADR-1622 step 3, blocker A2).
-    if (
-      !courier ||
-      !courier.isActive ||
-      !(await this.verifyPin(courier, dto.pin))
-    ) {
+    // verifyPin runs unconditionally so a missing row pays the bcrypt cost
+    // too (ADR-1622 step 4, C3).
+    const pinOk = await this.verifyPin(courier, dto.pin);
+    if (!courier || !courier.isActive || !pinOk) {
       throw new UnauthorizedException({
         statusCode: 401,
         code: 'INVALID_CREDENTIALS',
@@ -119,9 +119,15 @@ export class CouriersService {
    * hashing landed) are checked constant-time via SHA-256 digests and
    * transparently re-hashed to bcrypt on the first successful login.
    */
-  private async verifyPin(courier: Courier, pin: string): Promise<boolean> {
+  private async verifyPin(
+    courier: Courier | null,
+    pin: string,
+  ): Promise<boolean> {
+    if (!courier || !courier.pinHash) {
+      return constantTimePinCheck(pin, null);
+    }
     if (isBcryptHash(courier.pinHash)) {
-      return bcrypt.compare(pin, courier.pinHash);
+      return constantTimePinCheck(pin, courier.pinHash);
     }
 
     const digest = (value: string) => createHash('sha256').update(value).digest();

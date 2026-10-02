@@ -2,6 +2,7 @@ import { ConflictException, ForbiddenException, Injectable, NotFoundException, U
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { constantTimePinCheck } from '../tenant/pin-timing';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthenticatedStaff } from '../staff/staff.types';
 import { AuthenticatedKitchenTerminal } from '../kitchen/kitchen.types';
@@ -63,7 +64,8 @@ export class CooksService {
                 tenant: ACTIVE_TENANT_FILTER
             }
         });
-        if (!cook || !cook.isActive || !await bcrypt.compare(dto.pin, cook.pinHash))
+        const pinOk = await constantTimePinCheck(dto.pin, cook?.pinHash);
+        if (!cook || !cook.isActive || !pinOk)
             throw new UnauthorizedException('Invalid phone or PIN');
         if (cook.branchId !== terminal.branchId)
             throw new ForbiddenException('Cook belongs to another branch');
