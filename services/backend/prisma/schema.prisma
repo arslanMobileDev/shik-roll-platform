@@ -828,7 +828,7 @@ model Courier {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String  @map("tenant_id") @db.Uuid
   name        String
-  phone       String   @unique
+  phone       String
   pinHash     String   @map("pin_hash")
   brandId     String   @map("brand_id") @db.Uuid
   branchId    String   @map("branch_id") @db.Uuid
@@ -841,6 +841,8 @@ model Courier {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_couriers_tenants")
 
+  @@unique([tenantId, phone], map: "uq_couriers_tenant_id_phone")
+  @@index([phone], map: "idx_couriers_phone")
   @@index([tenantId], map: "idx_couriers_tenant_id")
   @@map("couriers")
 }
@@ -855,7 +857,7 @@ model Courier {
 model KitchenTerminal {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String  @map("tenant_id") @db.Uuid
-  code      String   @unique
+  code      String
   name      String
   pinHash   String   @map("pin_hash")
   branchId  String   @map("branch_id") @db.Uuid
@@ -869,6 +871,8 @@ model KitchenTerminal {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_kitchen_terminals_tenants")
 
+  @@unique([tenantId, code], map: "uq_kitchen_terminals_tenant_id_code")
+  @@index([code], map: "idx_kitchen_terminals_code")
   @@index([branchId, isActive], map: "idx_kitchen_terminals_branch_id_is_active")
   @@index([tenantId], map: "idx_kitchen_terminals_tenant_id")
   @@map("kitchen_terminals")
@@ -960,7 +964,7 @@ model Staff {
   id        String    @id @default(uuid()) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
   name      String
-  phone     String    @unique
+  phone     String
   pinHash   String    @map("pin_hash")
   role      StaffRole @default(MANAGER)
   brandId   String    @map("brand_id") @db.Uuid
@@ -972,6 +976,8 @@ model Staff {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_staff_tenants")
 
+  @@unique([tenantId, phone], map: "uq_staff_tenant_id_phone")
+  @@index([phone], map: "idx_staff_phone")
   @@index([brandId, isActive], map: "idx_staff_brand_active")
   @@index([tenantId], map: "idx_staff_tenant_id")
   @@map("staff")
@@ -987,7 +993,7 @@ model Cook {
   id String @id @default(uuid()) @db.Uuid
   tenantId String @map("tenant_id") @db.Uuid
   name String
-  phone String @unique
+  phone String
   pinHash String @map("pin_hash")
   branchId String @map("branch_id") @db.Uuid
   isActive Boolean @default(true) @map("is_active")
@@ -997,6 +1003,7 @@ model Cook {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_cooks_tenants")
   shifts CookShift[]
   history OrderStatusHistory[]
+  @@unique([tenantId, phone], map: "uq_cooks_tenant_id_phone")
   @@index([branchId, isActive])
   @@index([tenantId], map: "idx_cooks_tenant_id")
   @@map("cooks")
