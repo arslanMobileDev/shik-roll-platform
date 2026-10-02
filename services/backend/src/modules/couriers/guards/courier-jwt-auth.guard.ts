@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { ACTIVE_TENANT_FILTER } from '../../tenant/tenant.types';
 import {
   AuthenticatedCourier,
   CourierTokenPayload,
@@ -64,8 +65,10 @@ export class CourierJwtAuthGuard implements CanActivate {
       });
     }
 
+    // Same as the staff guard: a suspended or soft-deleted tenant stops the row
+    // from resolving, so its tokens die with it — and in the same query.
     const courier = await this.prisma.courier.findUnique({
-      where: { id: payload.sub },
+      where: { id: payload.sub, tenant: ACTIVE_TENANT_FILTER },
       select: { id: true, phone: true, branchId: true, isActive: true },
     });
     if (!courier || !courier.isActive) {

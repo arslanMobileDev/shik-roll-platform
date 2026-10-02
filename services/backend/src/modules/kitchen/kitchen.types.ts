@@ -15,6 +15,8 @@ export interface AuthenticatedKitchenTerminal {
   id: string;
   code: string;
   name: string;
+  /** Owning tenant (ADR-1622 B1) — read from the authoritative row, not the JWT. */
+  tenantId: string;
   branchId: string;
   role: 'KITCHEN';
 }

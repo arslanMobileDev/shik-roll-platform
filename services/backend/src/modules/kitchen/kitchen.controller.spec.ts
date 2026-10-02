@@ -12,6 +12,7 @@ const TERMINAL: AuthenticatedKitchenTerminal = {
   id: 'terminal-1',
   code: 'KDS-01',
   name: 'Kitchen Terminal 1',
+  tenantId: 'tenant-1',
   branchId: 'branch-1',
   role: 'KITCHEN',
 };

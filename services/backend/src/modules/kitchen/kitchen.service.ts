@@ -1,5 +1,7 @@
 import { CookActor } from '../cooks/cooks.dto';
 import { COOK_TTL_MS } from '../cooks/cook-session.service';
+import { resolveLoginRow } from '../tenant/resolve-login-row';
+import { ACTIVE_TENANT_FILTER, TenantContext } from '../tenant/tenant.types';
 import * as bcrypt from 'bcryptjs';
 import {
   ConflictException,
@@ -42,10 +44,26 @@ export class KitchenService {
    * auto-created, and the failure message is uniform so it never leaks
    * whether the code exists. PIN and token are never logged.
    */
-  async authenticateByPin(dto: KitchenPinAuthDto) {
-    const terminal = await this.prisma.kitchenTerminal.findUnique({
-      where: { code: dto.terminalCode },
-    });
+  async authenticateByPin(dto: KitchenPinAuthDto, tenant?: TenantContext) {
+    // `code` is unique per tenant, not globally (ADR-1622 step 4b).
+    const terminal = await resolveLoginRow(
+      tenant,
+      () =>
+        this.prisma.kitchenTerminal.findMany({
+          where: { code: dto.terminalCode, tenant: ACTIVE_TENANT_FILTER },
+          take: 2,
+        }),
+      (tenantId) =>
+        this.prisma.kitchenTerminal.findUnique({
+          // The tenant rides along in the same query as the composite key: the
+          // middleware validated it a moment ago, but a tenant suspended in
+          // between must not mint a token (same bypass the legacy branch closes).
+          where: {
+            tenantId_code: { tenantId, code: dto.terminalCode },
+            tenant: ACTIVE_TENANT_FILTER,
+          },
+        }),
+    );
     const pinOk =
       terminal !== null && (await bcrypt.compare(dto.pin, terminal.pinHash));
     if (!terminal || !terminal.isActive || !pinOk) {

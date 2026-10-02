@@ -13,6 +13,7 @@ const TERMINAL_ROW = {
   id: 'terminal-1',
   code: 'KDS-01',
   name: 'Kitchen Terminal 1',
+  tenantId: 'tenant-1',
   branchId: 'branch-1',
   isActive: true,
 };
@@ -21,6 +22,7 @@ const TERMINAL: AuthenticatedKitchenTerminal = {
   id: TERMINAL_ROW.id,
   code: TERMINAL_ROW.code,
   name: TERMINAL_ROW.name,
+  tenantId: TERMINAL_ROW.tenantId,
   branchId: TERMINAL_ROW.branchId,
   role: 'KITCHEN',
 };
@@ -60,7 +62,7 @@ function boardOrder(overrides: Record<string, unknown> = {}) {
 
 describe('KitchenService', () => {
   let prisma: {
-    kitchenTerminal: { findUnique: jest.Mock };
+    kitchenTerminal: { findUnique: jest.Mock; findMany: jest.Mock };
     branch: { findUnique: jest.Mock };
     order: {
       findFirst: jest.Mock;
@@ -79,7 +81,7 @@ describe('KitchenService', () => {
 
   beforeEach(() => {
     prisma = {
-      kitchenTerminal: { findUnique: jest.fn() },
+      kitchenTerminal: { findUnique: jest.fn(), findMany: jest.fn() },
       branch: { findUnique: jest.fn() },
       order: {
         findFirst: jest.fn(),
@@ -113,39 +115,86 @@ describe('KitchenService', () => {
       prisma.branch.findUnique.mockResolvedValue({ id: TERMINAL.branchId });
     });
 
-    it('rejects an unknown terminal code with a uniform 401', async () => {
+    it('scopes the legacy lookup to an active owning tenant', async () => {
+      prisma.kitchenTerminal.findMany.mockResolvedValue([]);
+      await expect(service.authenticateByPin(dto)).rejects.toMatchObject({
+        response: { code: 'UNAUTHORIZED' },
+      });
+
+      // The database does the filtering, so this asserts the query shape — the
+      // suspended-tenant bypass (ADR-1622 blocker A1) is exactly what breaks if
+      // the `tenant` filter or `take` goes missing.
+      expect(prisma.kitchenTerminal.findMany).toHaveBeenCalledWith({
+        where: {
+          code: dto.terminalCode,
+          tenant: { status: 'ACTIVE', deletedAt: null },
+        },
+        take: 2,
+      });
+    });
+
+    it('scopes the declared-tenant lookup to the composite key and an active tenant', async () => {
       prisma.kitchenTerminal.findUnique.mockResolvedValue(null);
+      await expect(
+        service.authenticateByPin(dto, { id: 'tenant-a', code: 'SHIK_ROLL' }),
+      ).rejects.toMatchObject({
+        response: { code: 'UNAUTHORIZED' },
+      });
+
+      // The middleware validated the declared tenant a moment earlier; the row is
+      // re-checked in this query so a tenant suspended in between cannot mint a
+      // token. Same bypass as the legacy branch, one query later.
+      expect(prisma.kitchenTerminal.findUnique).toHaveBeenCalledWith({
+        where: {
+          tenantId_code: { tenantId: 'tenant-a', code: dto.terminalCode },
+          tenant: { status: 'ACTIVE', deletedAt: null },
+        },
+      });
+    });
+
+    it('answers 409 AMBIGUOUS_TENANT when several tenants own the code', async () => {
+      prisma.kitchenTerminal.findMany.mockResolvedValue([
+        { ...TERMINAL_ROW, id: 'terminal-a' },
+        { ...TERMINAL_ROW, id: 'terminal-b' },
+      ]);
+      await expect(service.authenticateByPin(dto)).rejects.toMatchObject({
+        response: { code: 'AMBIGUOUS_TENANT' },
+      });
+    });
+
+    it('rejects an unknown terminal code with a uniform 401', async () => {
+      prisma.kitchenTerminal.findMany.mockResolvedValue([]);
       await expect(service.authenticateByPin(dto)).rejects.toMatchObject({
         response: { code: 'UNAUTHORIZED', message: 'Invalid terminal code or PIN' },
       });
     });
 
     it('rejects a wrong PIN with the same uniform 401', async () => {
-      prisma.kitchenTerminal.findUnique.mockResolvedValue({
-        ...TERMINAL_ROW,
-        pinHash: bcrypt.hashSync('9999', 4),
-      });
+      prisma.kitchenTerminal.findMany.mockResolvedValue([
+        { ...TERMINAL_ROW, pinHash: bcrypt.hashSync('9999', 4) },
+      ]);
       await expect(service.authenticateByPin(dto)).rejects.toMatchObject({
         response: { code: 'UNAUTHORIZED' },
       });
     });
 
     it('rejects a deactivated terminal even with the right PIN', async () => {
-      prisma.kitchenTerminal.findUnique.mockResolvedValue({
-        ...TERMINAL_ROW,
-        isActive: false,
-        pinHash: bcrypt.hashSync(dto.pin, 4),
-      });
+      prisma.kitchenTerminal.findMany.mockResolvedValue([
+        {
+          ...TERMINAL_ROW,
+          isActive: false,
+          pinHash: bcrypt.hashSync(dto.pin, 4),
+        },
+      ]);
       await expect(service.authenticateByPin(dto)).rejects.toMatchObject({
         response: { code: 'UNAUTHORIZED' },
       });
     });
 
     it('rejects a terminal whose branch is unavailable', async () => {
-      prisma.kitchenTerminal.findUnique.mockResolvedValue({
-        ...TERMINAL_ROW,
-        pinHash: bcrypt.hashSync(dto.pin, 4),
-      });
+      prisma.kitchenTerminal.findMany.mockResolvedValue([
+        { ...TERMINAL_ROW, pinHash: bcrypt.hashSync(dto.pin, 4) },
+      ]);
       prisma.branch.findUnique.mockResolvedValue(null);
       await expect(service.authenticateByPin(dto)).rejects.toMatchObject({
         response: { code: 'TERMINAL_BRANCH_UNAVAILABLE' },
@@ -153,10 +202,9 @@ describe('KitchenService', () => {
     });
 
     it('issues a KITCHEN access token scoped to the terminal branch', async () => {
-      prisma.kitchenTerminal.findUnique.mockResolvedValue({
-        ...TERMINAL_ROW,
-        pinHash: bcrypt.hashSync(dto.pin, 4),
-      });
+      prisma.kitchenTerminal.findMany.mockResolvedValue([
+        { ...TERMINAL_ROW, pinHash: bcrypt.hashSync(dto.pin, 4) },
+      ]);
 
       const result = await service.authenticateByPin(dto);
 

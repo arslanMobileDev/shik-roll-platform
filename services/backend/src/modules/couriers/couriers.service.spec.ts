@@ -16,7 +16,12 @@ const SECRET = 'courier-service-test-secret';
 
 function prismaMock() {
   const mock: any = {
-    courier: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+    courier: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
     branch: { findFirst: jest.fn() },
     brand: { findFirst: jest.fn() },
     order: {
@@ -57,6 +62,7 @@ const existingCourier = {
   brandId: 'brand-1',
   branchId: 'branch-1',
   isAvailable: true,
+  isActive: true,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -102,7 +108,7 @@ describe('CouriersService.authenticateByPin', () => {
 
   it('returns a signed JWT only for an existing courier with a verified PIN', async () => {
     const pinHash = await bcrypt.hash('1234', 4);
-    prisma.courier.findUnique.mockResolvedValue({ ...existingCourier, pinHash });
+    prisma.courier.findMany.mockResolvedValue([{ ...existingCourier, pinHash }]);
 
     const result = await service.authenticateByPin({
       phone: existingCourier.phone,
@@ -131,7 +137,7 @@ describe('CouriersService.authenticateByPin', () => {
 
   it('authenticates an existing courier with the correct PIN', async () => {
     const pinHash = await bcrypt.hash('1234', 4);
-    prisma.courier.findUnique.mockResolvedValue({ ...existingCourier, pinHash });
+    prisma.courier.findMany.mockResolvedValue([{ ...existingCourier, pinHash }]);
 
     const result = await service.authenticateByPin({
       phone: existingCourier.phone,
@@ -144,9 +150,65 @@ describe('CouriersService.authenticateByPin', () => {
     expect(prisma.courier.update).not.toHaveBeenCalled();
   });
 
+  it('scopes the legacy lookup to an active owning tenant', async () => {
+    prisma.courier.findMany.mockResolvedValue([]);
+    await expect(
+      service.authenticateByPin({ phone: existingCourier.phone, pin: '1234' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    // Query-shape assertion: the suspended-tenant bypass (ADR-1622 blocker A1)
+    // reappears the moment this filter or `take` is dropped.
+    expect(prisma.courier.findMany).toHaveBeenCalledWith({
+      where: {
+        phone: existingCourier.phone,
+        tenant: { status: 'ACTIVE', deletedAt: null },
+      },
+      take: 2,
+    });
+  });
+
+  it('scopes the declared-tenant lookup to an active owning tenant', async () => {
+    prisma.courier.findUnique.mockResolvedValue(null);
+    const sign = jest.spyOn(jwt, 'signAsync');
+
+    await expect(
+      service.authenticateByPin(
+        { phone: existingCourier.phone, pin: '1234' },
+        { id: 'tenant-a', code: 'SHIK_ROLL' },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'INVALID_CREDENTIALS' },
+    });
+
+    // Same suspension window as the legacy branch, one query later: the
+    // declared tenant is re-checked in the row lookup itself.
+    expect(prisma.courier.findUnique).toHaveBeenCalledWith({
+      where: {
+        tenantId_phone: { tenantId: 'tenant-a', phone: existingCourier.phone },
+        tenant: { status: 'ACTIVE', deletedAt: null },
+      },
+    });
+    expect(sign).not.toHaveBeenCalled();
+  });
+
+  it('rejects a deactivated courier instead of issuing a token', async () => {
+    const pinHash = await bcrypt.hash('1234', 4);
+    prisma.courier.findMany.mockResolvedValue([
+      { ...existingCourier, pinHash, isActive: false },
+    ]);
+    const sign = jest.spyOn(jwt, 'signAsync');
+
+    await expect(
+      service.authenticateByPin({ phone: existingCourier.phone, pin: '1234' }),
+    ).rejects.toMatchObject({
+      response: { code: 'INVALID_CREDENTIALS' },
+    });
+    expect(sign).not.toHaveBeenCalled();
+  });
+
   it('rejects a wrong PIN with UnauthorizedException', async () => {
     const pinHash = await bcrypt.hash('1234', 4);
-    prisma.courier.findUnique.mockResolvedValue({ ...existingCourier, pinHash });
+    prisma.courier.findMany.mockResolvedValue([{ ...existingCourier, pinHash }]);
 
     await expect(
       service.authenticateByPin({ phone: existingCourier.phone, pin: '9999' }),
@@ -154,7 +216,7 @@ describe('CouriersService.authenticateByPin', () => {
   });
 
   it('migrates a legacy plaintext pinHash to bcrypt on successful login', async () => {
-    prisma.courier.findUnique.mockResolvedValue({ ...existingCourier, pinHash: '1234' });
+    prisma.courier.findMany.mockResolvedValue([{ ...existingCourier, pinHash: '1234' }]);
 
     const result = await service.authenticateByPin({
       phone: existingCourier.phone,
@@ -170,7 +232,7 @@ describe('CouriersService.authenticateByPin', () => {
   });
 
   it('rejects a wrong PIN on a legacy plaintext row without migrating it', async () => {
-    prisma.courier.findUnique.mockResolvedValue({ ...existingCourier, pinHash: '1234' });
+    prisma.courier.findMany.mockResolvedValue([{ ...existingCourier, pinHash: '1234' }]);
 
     await expect(
       service.authenticateByPin({ phone: existingCourier.phone, pin: '9999' }),
@@ -180,10 +242,10 @@ describe('CouriersService.authenticateByPin', () => {
 
   it.each(['unknown phone', 'wrong PIN'])(
     'rejects %s without creating an account or issuing a token', async (scenario) => {
-      prisma.courier.findUnique.mockResolvedValue(
+      prisma.courier.findMany.mockResolvedValue(
         scenario === 'unknown phone'
-          ? null
-          : { ...existingCourier, pinHash: await bcrypt.hash('9999', 4) },
+          ? []
+          : [{ ...existingCourier, pinHash: await bcrypt.hash('9999', 4) }],
       );
       const sign = jest.spyOn(jwt, 'signAsync');
 

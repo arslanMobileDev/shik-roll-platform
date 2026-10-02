@@ -112,7 +112,9 @@ async function main() {
 
   // Kitchen POS terminal (ADR-1618): the KDS app signs in as this terminal.
   await prisma.kitchenTerminal.upsert({
-    where: { code: DEV_KITCHEN_TERMINAL.code },
+    where: {
+      tenantId_code: { tenantId: tenant.id, code: DEV_KITCHEN_TERMINAL.code },
+    },
     update: { name: DEV_KITCHEN_TERMINAL.name, branchId: branch.id, isActive: true },
     create: {
       code: DEV_KITCHEN_TERMINAL.code,

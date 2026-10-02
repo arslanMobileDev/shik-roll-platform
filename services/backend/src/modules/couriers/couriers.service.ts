@@ -11,6 +11,8 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { resolveLoginRow } from '../tenant/resolve-login-row';
+import { ACTIVE_TENANT_FILTER, TenantContext } from '../tenant/tenant.types';
 import {
   Courier,
   Order,
@@ -54,12 +56,34 @@ export class CouriersService {
     @Optional() private readonly kitchenEvents?: KitchenEventsService,
   ) {}
 
-  async authenticateByPin(dto: CourierPinAuthDto) {
-    const courier = await this.prisma.courier.findUnique({
-      where: { phone: dto.phone },
-    });
+  async authenticateByPin(dto: CourierPinAuthDto, tenant?: TenantContext) {
+    // `phone` is unique per tenant, not globally (ADR-1622 step 4b).
+    const courier = await resolveLoginRow(
+      tenant,
+      () =>
+        this.prisma.courier.findMany({
+          where: { phone: dto.phone, tenant: ACTIVE_TENANT_FILTER },
+          take: 2,
+        }),
+      (tenantId) =>
+        this.prisma.courier.findUnique({
+          // Same as the staff lookup: the declared tenant is re-checked in the
+          // query itself, so a tenant suspended between the middleware and here
+          // cannot mint a courier token.
+          where: {
+            tenantId_phone: { tenantId, phone: dto.phone },
+            tenant: ACTIVE_TENANT_FILTER,
+          },
+        }),
+    );
 
-    if (!courier || !(await this.verifyPin(courier, dto.pin))) {
+    // isActive is checked here, not only in the guard: a deactivated courier
+    // must not receive a token at all (ADR-1622 step 3, blocker A2).
+    if (
+      !courier ||
+      !courier.isActive ||
+      !(await this.verifyPin(courier, dto.pin))
+    ) {
       throw new UnauthorizedException({
         statusCode: 401,
         code: 'INVALID_CREDENTIALS',

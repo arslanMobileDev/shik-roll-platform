@@ -19,6 +19,8 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
+import { CurrentTenant } from '../tenant/current-tenant.decorator';
+import { TenantContext } from '../tenant/tenant.types';
 import { KitchenService } from './kitchen.service';
 import { KitchenEventsService } from './kitchen-events.service';
 import { KitchenPinAuthDto } from './dto/kitchen-auth.dto';
@@ -38,8 +40,11 @@ export class KitchenController {
   /** Public entry point: issues the terminal JWT consumed by the routes below. */
   @Post('auth/pin')
   @ApiOperation({ summary: 'Authenticate a kitchen terminal by code and PIN' })
-  async authPin(@Body() dto: KitchenPinAuthDto) {
-    return this.kitchenService.authenticateByPin(dto);
+  async authPin(
+    @Body() dto: KitchenPinAuthDto,
+    @CurrentTenant() tenant: TenantContext | undefined,
+  ) {
+    return this.kitchenService.authenticateByPin(dto, tenant);
   }
 
   /**

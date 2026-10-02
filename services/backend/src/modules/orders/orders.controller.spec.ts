@@ -186,7 +186,13 @@ describe('OrdersController — operational HTTP access', () => {
       expect(response.headers['content-type']).toContain('text/event-stream');
       expect(response.text).toContain(ORDER_ID);
       expect(service.getKdsStream).toHaveBeenCalledWith(terminal.branchId);
-      expect(findUnique).toHaveBeenCalledWith({ where: { id: terminal.id } });
+      // ADR-1622 A1-guard: the tenant filter is part of the guard's contract.
+      expect(findUnique).toHaveBeenCalledWith({
+        where: {
+          id: terminal.id,
+          tenant: { status: 'ACTIVE', deletedAt: null },
+        },
+      });
     },
   );
 });

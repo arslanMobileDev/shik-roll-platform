@@ -17,6 +17,8 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
+import { CurrentTenant } from '../tenant/current-tenant.decorator';
+import { TenantContext } from '../tenant/tenant.types';
 import { CouriersService } from './couriers.service';
 import { CouriersEventsService } from './couriers-events.service';
 import { CourierPinAuthDto } from './dto/courier-auth.dto';
@@ -38,8 +40,11 @@ export class CouriersController {
   /** Public entry point: issues the courier JWT consumed by the routes below. */
   @Post('auth/pin')
   @ApiOperation({ summary: 'Authenticate courier by phone and PIN' })
-  async authPin(@Body() dto: CourierPinAuthDto) {
-    return this.couriersService.authenticateByPin(dto);
+  async authPin(
+    @Body() dto: CourierPinAuthDto,
+    @CurrentTenant() tenant: TenantContext | undefined,
+  ) {
+    return this.couriersService.authenticateByPin(dto, tenant);
   }
 
   /**

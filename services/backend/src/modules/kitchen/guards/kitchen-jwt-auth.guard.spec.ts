@@ -10,6 +10,7 @@ const TERMINAL = {
   id: 'terminal-1',
   code: 'KDS-01',
   name: 'Kitchen Terminal 1',
+  tenantId: 'tenant-1',
   branchId: 'branch-1',
   isActive: true,
 };
@@ -131,13 +132,20 @@ describe('KitchenJwtAuthGuard', () => {
     const { context, request } = contextFor({ authorization: `Bearer ${token}` });
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
+    // ADR-1622 A1-guard: the active-tenant filter is what stops a token minted
+    // before a suspension from still working. Losing it reopens the bypass
+    // silently, so the query shape is asserted here, not just the outcome.
     expect(prisma.kitchenTerminal.findUnique).toHaveBeenCalledWith({
-      where: { id: TERMINAL.id },
+      where: {
+        id: TERMINAL.id,
+        tenant: { status: 'ACTIVE', deletedAt: null },
+      },
     });
     expect(request.kitchenTerminal).toEqual({
       id: TERMINAL.id,
       code: TERMINAL.code,
       name: TERMINAL.name,
+      tenantId: TERMINAL.tenantId,
       branchId: TERMINAL.branchId,
       role: 'KITCHEN',
     });

@@ -7,6 +7,7 @@ import { AuthenticatedStaff } from '../staff/staff.types';
 import { AuthenticatedKitchenTerminal } from '../kitchen/kitchen.types';
 import { CookActor, CookLoginDto, CreateCookDto, UpdateCookDto } from './cooks.dto';
 import { COOK_TTL_MS } from './cook-session.service';
+import { ACTIVE_TENANT_FILTER } from '../tenant/tenant.types';
 const publicCook = { id: true, name: true, phone: true, branchId: true, isActive: true } as const;
 @Injectable()
 export class CooksService {
@@ -49,7 +50,19 @@ export class CooksService {
         });
     }
     async login(terminal: AuthenticatedKitchenTerminal, dto: CookLoginDto) {
-        const cook = await this.prisma.cook.findUnique({ where: { phone: dto.phone } });
+        // `phone` is unique per tenant, not globally (ADR-1622 step 4b). The tenant
+        // comes from the already-authenticated terminal (KitchenJwtAuthGuard /
+        // CookTerminalAuthGuard) — never from a header: this route takes no
+        // X-Tenant, and a cook may only sign in at a terminal of their own tenant.
+        const cook = await this.prisma.cook.findUnique({
+            where: {
+                tenantId_phone: { tenantId: terminal.tenantId, phone: dto.phone },
+                // Same TOCTOU close as the staff/courier declared branch: the guard
+                // validated the terminal's tenant a moment ago, so a tenant
+                // suspended in between must not mint a cook token.
+                tenant: ACTIVE_TENANT_FILTER
+            }
+        });
         if (!cook || !cook.isActive || !await bcrypt.compare(dto.pin, cook.pinHash))
             throw new UnauthorizedException('Invalid phone or PIN');
         if (cook.branchId !== terminal.branchId)

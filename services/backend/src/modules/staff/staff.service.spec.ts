@@ -25,18 +25,18 @@ function makeStaff(overrides: Record<string, unknown> = {}) {
 }
 
 describe('StaffService', () => {
-  let prisma: { staff: { findUnique: jest.Mock } };
+  let prisma: { staff: { findUnique: jest.Mock; findMany: jest.Mock } };
   let jwt: JwtService;
   let service: StaffService;
 
   beforeEach(() => {
-    prisma = { staff: { findUnique: jest.fn() } };
+    prisma = { staff: { findUnique: jest.fn(), findMany: jest.fn() } };
     jwt = new JwtService({ secret: SECRET });
     service = new StaffService(prisma as never, jwt);
   });
 
   it('rejects an unknown phone with INVALID_CREDENTIALS', async () => {
-    prisma.staff.findUnique.mockResolvedValue(null);
+    prisma.staff.findMany.mockResolvedValue([]);
     await expect(
       service.authenticateByPin({ phone: PHONE, pin: PIN }),
     ).rejects.toMatchObject({
@@ -44,8 +44,47 @@ describe('StaffService', () => {
     });
   });
 
+  it('scopes the legacy lookup to an active owning tenant', async () => {
+    prisma.staff.findMany.mockResolvedValue([]);
+    await expect(
+      service.authenticateByPin({ phone: PHONE, pin: PIN }),
+    ).rejects.toMatchObject({
+      response: { code: 'INVALID_CREDENTIALS' },
+    });
+
+    // The database does the filtering, so this asserts the query shape — the
+    // suspended-tenant bypass (ADR-1622 blocker A1) is exactly what breaks if
+    // the `tenant` filter or `take` goes missing.
+    expect(prisma.staff.findMany).toHaveBeenCalledWith({
+      where: { phone: PHONE, tenant: { status: 'ACTIVE', deletedAt: null } },
+      take: 2,
+    });
+  });
+
+  it('scopes the declared-tenant lookup to an active owning tenant', async () => {
+    prisma.staff.findUnique.mockResolvedValue(null);
+    await expect(
+      service.authenticateByPin(
+        { phone: PHONE, pin: PIN },
+        { id: 'tenant-a', code: 'SHIK_ROLL' },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: 'INVALID_CREDENTIALS' },
+    });
+
+    // The middleware validated the declared tenant a moment earlier; the row is
+    // re-checked in this query so a tenant suspended in between cannot mint a
+    // token. Same bypass as the legacy branch, one query later.
+    expect(prisma.staff.findUnique).toHaveBeenCalledWith({
+      where: {
+        tenantId_phone: { tenantId: 'tenant-a', phone: PHONE },
+        tenant: { status: 'ACTIVE', deletedAt: null },
+      },
+    });
+  });
+
   it('rejects a wrong PIN with INVALID_CREDENTIALS', async () => {
-    prisma.staff.findUnique.mockResolvedValue(makeStaff());
+    prisma.staff.findMany.mockResolvedValue([makeStaff()]);
     await expect(
       service.authenticateByPin({ phone: PHONE, pin: '0000' }),
     ).rejects.toMatchObject({
@@ -54,14 +93,14 @@ describe('StaffService', () => {
   });
 
   it('rejects a deactivated staff even with the correct PIN', async () => {
-    prisma.staff.findUnique.mockResolvedValue(makeStaff({ isActive: false }));
+    prisma.staff.findMany.mockResolvedValue([makeStaff({ isActive: false })]);
     await expect(
       service.authenticateByPin({ phone: PHONE, pin: PIN }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('issues a scoped staff JWT on a valid login', async () => {
-    prisma.staff.findUnique.mockResolvedValue(makeStaff());
+    prisma.staff.findMany.mockResolvedValue([makeStaff()]);
     const result = await service.authenticateByPin({ phone: PHONE, pin: PIN });
 
     expect(result.tokenType).toBe('Bearer');

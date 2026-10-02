@@ -4,7 +4,7 @@ import { CooksService } from './cooks.service';
 import { CookSessionService, COOK_TTL_MS } from './cook-session.service';
 import { CookStatisticsService } from './cook-statistics.service';
 const staff = { id: 'owner', role: 'OWNER', brandId: 'brand' } as any;
-const terminal = { id: 'terminal', branchId: 'branch' } as any;
+const terminal = { id: 'terminal', tenantId: 'tenant', branchId: 'branch' } as any;
 const actor = { id: 'cook', shiftId: 'shift', terminalId: 'terminal', branchId: 'branch' };
 describe('Cook identity, shifts and metrics', () => {
     let db: any, jwt: JwtService, service: CooksService, cook: any, shift: any;
@@ -19,11 +19,46 @@ describe('Cook identity, shifts and metrics', () => {
     it('creates cook with bcrypt hash and without exposing hash', async () => { await service.create(staff, { name: 'Иван', phone: cook.phone, pin: '1234', branchId: 'branch' }); const args = db.cook.create.mock.calls[0][0]; expect(args.data.pinHash).not.toBe('1234'); expect(await bcrypt.compare('1234', args.data.pinHash)).toBe(true); expect(args.select.pinHash).toBeUndefined(); });
     it('opens a scoped shift and issues an eight-hour cook JWT', async () => { const result = await service.login(terminal, { phone: cook.phone, pin: '1234' }); expect(jwt.verify(result.token)).toMatchObject({ sub: 'cook', role: 'COOK', shiftId: 'shift', terminalId: 'terminal' }); expect(db.cookShift.create).toHaveBeenCalledTimes(1); });
     it('reuses existing shift on duplicate login', async () => { db.cookShift.findFirst.mockResolvedValue(shift); const result = await service.login(terminal, { phone: cook.phone, pin: '1234' }); expect(result.shiftId).toBe('shift'); expect(db.cookShift.create).not.toHaveBeenCalled(); });
+    it('scopes the cook lookup to the terminal tenant and an active tenant', async () => {
+        await service.login(terminal, { phone: cook.phone, pin: '1234' });
+        // The tenant comes from the authenticated terminal, never a header, so
+        // there is no ambiguity branch here. The active-tenant relation filter is
+        // what stops a tenant suspended mid-request from minting a cook token.
+        expect(db.cook.findUnique).toHaveBeenCalledWith({
+            where: {
+                tenantId_phone: { tenantId: 'tenant', phone: cook.phone },
+                tenant: { status: 'ACTIVE', deletedAt: null }
+            }
+        });
+    });
     it.each(['wrong', 'inactive', 'branch'])('rejects %s login', async (mode) => { if (mode === 'inactive')
         cook.isActive = false; if (mode === 'branch')
         cook.branchId = 'other'; await expect(service.login(terminal, { phone: cook.phone, pin: mode === 'wrong' ? '9999' : '1234' })).rejects.toThrow(); expect(db.cookShift.create).not.toHaveBeenCalled(); });
     it('closes only authenticated shift', async () => { await service.logout(actor); expect(db.cookShift.updateMany).toHaveBeenCalledWith({ where: { id: 'shift', cookId: 'cook', endedAt: null }, data: { endedAt: expect.any(Date), endedReason: 'logout' } }); });
     it('rejects closed, expired and deactivated personal sessions', async () => { const sessions = new CookSessionService(db, jwt); const token = jwt.sign({ sub: 'cook', role: 'COOK', type: 'access', shiftId: 'shift', terminalId: 'terminal', branchId: 'branch' }); await expect(sessions.verify('Bearer ' + token)).resolves.toEqual(actor); shift.endedAt = new Date(); await expect(sessions.verify('Bearer ' + token)).rejects.toThrow(); shift.endedAt = null; shift.startedAt = new Date(Date.now() - COOK_TTL_MS - 1); await expect(sessions.verify('Bearer ' + token)).rejects.toThrow(); shift.startedAt = new Date(); cook.isActive = false; await expect(sessions.verify('Bearer ' + token)).rejects.toThrow(); });
+    it('scopes the session lookup to an active owning tenant', async () => {
+        const sessions = new CookSessionService(db, jwt);
+        const token = jwt.sign({ sub: 'cook', role: 'COOK', type: 'access', shiftId: 'shift', terminalId: 'terminal', branchId: 'branch' });
+        await expect(sessions.verify('Bearer ' + token)).resolves.toEqual(actor);
+        // The filter rides along in the same query as the shift id (no extra round
+        // trip), and this shape is the only thing that makes a suspended tenant
+        // revoke a still-valid cook token — the A1 hole C3/C4 closed elsewhere.
+        expect(db.cookShift.findUnique).toHaveBeenCalledWith({
+            where: { id: 'shift', terminal: { tenant: { status: 'ACTIVE', deletedAt: null } } },
+            include: { cook: true, terminal: true }
+        });
+    });
+    it('rejects a cook token whose tenant was suspended or soft-deleted', async () => {
+        const sessions = new CookSessionService(db, jwt);
+        const token = jwt.sign({ sub: 'cook', role: 'COOK', type: 'access', shiftId: 'shift', terminalId: 'terminal', branchId: 'branch' });
+        // ACTIVE_TENANT_FILTER is a single predicate covering both status
+        // 'SUSPENDED' and a set deletedAt: the database answers null for either,
+        // so both cases are one code path rather than two.
+        db.cookShift.findUnique.mockResolvedValueOnce(null);
+        await expect(sessions.verify('Bearer ' + token)).rejects.toMatchObject({
+            response: { code: 'TOKEN_INVALID' }
+        });
+    });
     it('requires owner scope for management', async () => { await expect(service.list({ ...staff, role: 'MANAGER' }, 'branch')).rejects.toThrow(); db.branch.findFirst.mockResolvedValue(null); await expect(service.list(staff, 'other')).rejects.toThrow(); });
     it('counts started orders and averages only measured COOKING to READY pairs', async () => {
         const start = new Date();

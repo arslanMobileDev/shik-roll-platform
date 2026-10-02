@@ -14,6 +14,8 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { CurrentTenant } from '../tenant/current-tenant.decorator';
+import { TenantContext } from '../tenant/tenant.types';
 import { CurrentStaff } from './decorators/current-staff.decorator';
 import { StaffPinAuthDto } from './dto/staff-auth.dto';
 import { StaffJwtAuthGuard } from './guards/staff-jwt-auth.guard';
@@ -32,8 +34,11 @@ export class StaffController {
   })
   @ApiOkResponse({ description: 'STAFF token plus safe staff projection' })
   @ApiUnauthorizedResponse({ description: 'INVALID_CREDENTIALS' })
-  authByPin(@Body() dto: StaffPinAuthDto): Promise<StaffAuthResponse> {
-    return this.service.authenticateByPin(dto);
+  authByPin(
+    @Body() dto: StaffPinAuthDto,
+    @CurrentTenant() tenant: TenantContext | undefined,
+  ): Promise<StaffAuthResponse> {
+    return this.service.authenticateByPin(dto, tenant);
   }
 
   @Get('me')

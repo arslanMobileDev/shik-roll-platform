@@ -40,6 +40,35 @@ describe('CourierJwtAuthGuard', () => {
     jwt = new JwtService({ secret: SECRET });
   });
 
+  it('filters the courier row by an active owning tenant in the same query', async () => {
+    // Query-shape assertion, deliberately: the database removes the row of a
+    // suspended tenant, so at this level only the arguments are observable.
+    // Behaviour is proven end-to-end in tenant-auth.e2e-spec.
+    const prisma = {
+      courier: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'courier-1',
+          phone: '+79991234567',
+          branchId: 'branch-1',
+          isActive: true,
+        }),
+      },
+    };
+    const guard = new CourierJwtAuthGuard(jwt, prisma as never);
+    const token = await jwt.signAsync(courierPayload, { expiresIn: 3600 });
+
+    await guard.canActivate(contextFor({ authorization: `Bearer ${token}` }).context);
+
+    expect(prisma.courier.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'courier-1',
+          tenant: { status: 'ACTIVE', deletedAt: null },
+        },
+      }),
+    );
+  });
+
   it('rejects a request without an Authorization header (UNAUTHORIZED)', async () => {
     const guard = new CourierJwtAuthGuard(jwt, prismaWithCourier(null));
     const { context } = contextFor({});

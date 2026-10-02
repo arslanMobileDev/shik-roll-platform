@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { ACTIVE_TENANT_FILTER } from '../../tenant/tenant.types';
 import {
   AuthenticatedStaff,
   RequestWithStaff,
@@ -69,8 +70,12 @@ export class StaffJwtAuthGuard implements CanActivate {
       });
     }
 
+    // The tenant filter rides along in the same query (no extra round trip):
+    // when the owning tenant is suspended or soft-deleted the row simply stops
+    // resolving, so a still-valid token dies with the tenant and answers the
+    // same TOKEN_INVALID as a deactivated account.
     const staff = await this.prisma.staff.findUnique({
-      where: { id: payload.sub },
+      where: { id: payload.sub, tenant: ACTIVE_TENANT_FILTER },
       select: { id: true, phone: true, role: true, brandId: true, isActive: true },
     });
     if (!staff || !staff.isActive) {

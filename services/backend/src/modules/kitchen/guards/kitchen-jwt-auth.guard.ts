@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { ACTIVE_TENANT_FILTER } from '../../tenant/tenant.types';
 import {
   AuthenticatedKitchenTerminal,
   KitchenTokenPayload,
@@ -64,7 +65,10 @@ export class KitchenJwtAuthGuard implements CanActivate {
     }
 
     const terminal = await this.prisma.kitchenTerminal.findUnique({
-      where: { id: payload.sub },
+      // ADR-1622 A1-guard: a token minted while the tenant was active must stop
+      // working the moment the tenant is suspended or soft-deleted. Filtering in
+      // the row query makes that read as an ordinary "unknown terminal".
+      where: { id: payload.sub, tenant: ACTIVE_TENANT_FILTER },
     });
     if (!terminal || !terminal.isActive) {
       throw new UnauthorizedException({
@@ -77,6 +81,7 @@ export class KitchenJwtAuthGuard implements CanActivate {
       id: terminal.id,
       code: terminal.code,
       name: terminal.name,
+      tenantId: terminal.tenantId,
       branchId: terminal.branchId,
       role: 'KITCHEN',
     };
