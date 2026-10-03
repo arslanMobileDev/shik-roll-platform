@@ -89,7 +89,12 @@ describe('StaffCouriersController HTTP contract', () => {
   it('DELETE blocks and PATCH unblocks without changing busy state', async () => {
     const response = await request(app.getHttpServer()).delete(`/staff/couriers/${courierId}`).set('Authorization', token()).expect(200);
     expect(response.body).toMatchObject({ isActive: false, isAvailable: false });
-    await request(app.getHttpServer()).patch(`/staff/couriers/${courierId}`).set('Authorization', token()).send({ isActive: true }).expect(200);
+    // Diagnostics for a ~1-in-24 flake: the same PATCH occasionally answers
+    // 401 instead of 200, and .expect(200) reports the status without the body.
+    // Printing the body names the guard branch that fired (UNAUTHORIZED vs
+    // TOKEN_INVALID) the next time it does.
+    const patch = await request(app.getHttpServer()).patch(`/staff/couriers/${courierId}`).set('Authorization', token()).send({ isActive: true });
+    if (patch.status !== 200) throw new Error(`PATCH answered ${patch.status}: ${JSON.stringify(patch.body)}`);
     expect(row.isActive).toBe(true); expect(row.isAvailable).toBe(false);
     expect(db.courier.updateMany.mock.calls[1][0].data).toEqual({ isActive: true });
   });
