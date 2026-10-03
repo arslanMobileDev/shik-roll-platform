@@ -44,4 +44,34 @@ describe('constantTimePinCheck', () => {
     expect(typeof hashArg).toBe('string');
     expect((hashArg as string).startsWith('$2')).toBe(true);
   });
+
+  it('answers a missing row at the cost of the costliest real hash', async () => {
+    await constantTimePinCheck('1234', null);
+    const [, hashArg] = (bcrypt.compare as jest.Mock).mock.calls[0];
+
+    // 12 is what cooks.service.ts and the back-office courier create/update
+    // write. At 10 the dummy answered in 69 ms while those rows took 281 ms —
+    // a 4x gap that tells an attacker which phones exist (review of 3be4a17).
+    expect(bcrypt.getRounds(hashArg as string)).toBe(12);
+  });
+
+  it('compares a real cost-10 hash against itself, at its own cost', async () => {
+    const hash = await bcrypt.hash('1234', 10);
+    await constantTimePinCheck('1234', hash);
+    const [, hashArg] = (bcrypt.compare as jest.Mock).mock.calls[0];
+
+    // The present-hash branch is untouched: an old row keeps its cost, so the
+    // fix never makes a real login slower than it already was.
+    expect(hashArg).toBe(hash);
+    expect(bcrypt.getRounds(hashArg as string)).toBe(10);
+  });
+
+  it('compares a real cost-12 hash against itself, at its own cost', async () => {
+    const hash = await bcrypt.hash('1234', 12);
+    await constantTimePinCheck('1234', hash);
+    const [, hashArg] = (bcrypt.compare as jest.Mock).mock.calls[0];
+
+    expect(hashArg).toBe(hash);
+    expect(bcrypt.getRounds(hashArg as string)).toBe(12);
+  });
 });
