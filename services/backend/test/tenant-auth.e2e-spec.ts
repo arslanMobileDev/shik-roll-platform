@@ -8,6 +8,9 @@
 // It also carries the behavioural proof for the suspended-tenant fixes: the
 // query-shape assertions in the service/guard specs only show the filter was
 // passed, not that it filters.
+//
+// Since ADR-1622 step 5 it owns one more two-tenant job: proving the composite
+// FK that makes a cross-tenant (brand, branch) pair impossible to store.
 import { execSync } from 'node:child_process';
 import type { AddressInfo } from 'node:net';
 import * as path from 'node:path';
@@ -17,7 +20,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
@@ -69,6 +72,8 @@ interface Fixture {
   tenantBId: string;
   brandAId: string;
   brandBId: string;
+  branchAId: string;
+  branchBId: string;
   staffSharedAId: string;
   staffSharedBId: string;
   courierSharedAId: string;
@@ -151,8 +156,8 @@ async function seedFixtures(): Promise<Fixture> {
   });
   await prisma.brandBranch.createMany({
     data: [
-      { brandId: brandA.id, branchId: branchA.id },
-      { brandId: brandB.id, branchId: branchB.id },
+      { tenantId: tenantA.id, brandId: brandA.id, branchId: branchA.id },
+      { tenantId: tenantB.id, brandId: brandB.id, branchId: branchB.id },
     ],
   });
 
@@ -284,6 +289,8 @@ async function seedFixtures(): Promise<Fixture> {
     tenantBId: tenantB.id,
     brandAId: brandA.id,
     brandBId: brandB.id,
+    branchAId: branchA.id,
+    branchBId: branchB.id,
     staffSharedAId: staffSharedA.id,
     staffSharedBId: staffSharedB.id,
     courierSharedAId: courierSharedA.id,
@@ -639,6 +646,72 @@ describe('tenant-scoped PIN login (ADR-1622 step 4b)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(401);
       expect(blocked.body.code).toBe('TOKEN_INVALID');
+    });
+  });
+
+  // ADR-1622 step 5. The pair (brand, branch) used to be three independently
+  // valid ids: orders had single-column FKs, couriers had none, and nothing
+  // forced brand and branch into one tenant. These two tests are the DB-level
+  // contract — a direct write, not HTTP, because the constraint has to hold for
+  // every writer, including the ones that skip the service layer.
+  describe('cross-tenant brand/branch pair', () => {
+    /**
+     * Runs the insert inside a transaction that always rolls back, so neither
+     * test leaves a row behind for the next suite (Pitfall-021 class: a leaked
+     * order blocks brand_branches/branch deletes in afterAll). The sentinel
+     * error means "the insert was accepted"; a constraint violation surfaces as
+     * P2003 instead and never reaches the sentinel.
+     */
+    const insertThenRollBack = (insert: (tx: Prisma.TransactionClient) => Promise<unknown>) =>
+      prisma.$transaction(async (tx) => {
+        await insert(tx);
+        throw new Error('ROLLBACK_PROBE');
+      });
+
+    const order = (brandId: string, branchId: string) => (tx: Prisma.TransactionClient) =>
+      tx.order.create({
+        data: {
+          orderNumber: 'XTEN-1',
+          type: 'TAKEAWAY',
+          tenantId: fx.tenantAId,
+          brandId,
+          branchId,
+        },
+      });
+
+    const courier = (brandId: string, branchId: string) => (tx: Prisma.TransactionClient) =>
+      tx.courier.create({
+        data: {
+          tenantId: fx.tenantAId,
+          name: 'Cross probe',
+          phone: '+79995550199',
+          pinHash: 'probe',
+          brandId,
+          branchId,
+        },
+      });
+
+    it('accepts the pair within one tenant (control for the two tests below)', async () => {
+      // Without this, a fixture that linked no pair at all would make the
+      // rejections below pass for the wrong reason.
+      await expect(insertThenRollBack(order(fx.brandAId, fx.branchAId))).rejects.toThrow(
+        'ROLLBACK_PROBE',
+      );
+      await expect(insertThenRollBack(courier(fx.brandAId, fx.branchAId))).rejects.toThrow(
+        'ROLLBACK_PROBE',
+      );
+    });
+
+    it('rejects an order whose brand is tenant A and branch is tenant B', async () => {
+      await expect(insertThenRollBack(order(fx.brandAId, fx.branchBId))).rejects.toMatchObject({
+        code: 'P2003',
+      });
+    });
+
+    it('rejects a courier whose brand is tenant A and branch is tenant B', async () => {
+      await expect(insertThenRollBack(courier(fx.brandAId, fx.branchBId))).rejects.toMatchObject({
+        code: 'P2003',
+      });
     });
   });
 

@@ -25,7 +25,7 @@ const url = process.env.TEST_COOK_DATABASE_URL;
         const tenant = await db.tenant.findUniqueOrThrow({ where: { code: 'SHIK_ROLL' } });
         const brand = await db.brand.create({ data: { code: suffix, name: 'Test brand', tenantId: tenant.id } });
         const branch = await db.branch.create({ data: { code: suffix, name: 'Test branch', tenantId: tenant.id } });
-        await db.brandBranch.create({ data: { brandId: brand.id, branchId: branch.id } });
+        await db.brandBranch.create({ data: { tenantId: tenant.id, brandId: brand.id, branchId: branch.id } });
         const station = await db.kitchenTerminal.create({ data: { code: suffix, name: 'Test KDS', pinHash: 'unused', branchId: branch.id, tenantId: tenant.id } });
         const terminal = { ...station, role: 'KITCHEN' as const };
         const staff = { id: randomUUID(), phone: '+70000000000', role: 'OWNER' as const, brandId: brand.id };

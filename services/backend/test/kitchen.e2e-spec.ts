@@ -34,6 +34,9 @@ async function truncateAll(): Promise<void> {
   await prisma.category.deleteMany();
   await prisma.menu.deleteMany();
   await prisma.orderSequence.deleteMany();
+  // couriers -> brand_branches is ON DELETE RESTRICT (ADR-1622 step 5): a
+  // courier left behind by couriers.e2e-spec.ts blocks this delete.
+  await prisma.courier.deleteMany();
   await prisma.brandBranch.deleteMany();
   await prisma.branch.deleteMany();
   await prisma.staff.deleteMany();
@@ -64,7 +67,7 @@ async function seedFixtures(): Promise<Fixture> {
     data: { code: 'K-E2E-01', name: 'Kitchen E2E Branch', tenantId: tenant.id },
   });
   await prisma.brandBranch.create({
-    data: { brandId: brand.id, branchId: branch.id },
+    data: { tenantId: tenant.id, brandId: brand.id, branchId: branch.id },
   });
 
   const menu = await prisma.menu.create({

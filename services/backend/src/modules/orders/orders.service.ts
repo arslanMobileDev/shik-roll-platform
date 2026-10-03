@@ -304,6 +304,19 @@ export class OrdersService {
       brand: { connect: { id: dto.brandId } },
       tenant: { connect: { id: brand.tenantId } },
       branch: { connect: { id: dto.branchId } },
+      // ADR-1622 step 5: (tenant_id, brand_id, branch_id) is a composite FK into
+      // brand_branches, so the link has to be named here. It also means a
+      // brand/branch pair that is not a real link is rejected before insert
+      // instead of landing as a cross-tenant row.
+      brandBranch: {
+        connect: {
+          tenantId_brandId_branchId: {
+            tenantId: brand.tenantId,
+            brandId: dto.brandId,
+            branchId: dto.branchId,
+          },
+        },
+      },
       ...(customerId ? { customer: { connect: { id: customerId } } } : {}),
       tableNumber: dto.tableNumber ?? null,
       deliveryAddress: dto.deliveryAddress ?? null,

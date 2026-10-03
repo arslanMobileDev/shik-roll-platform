@@ -65,7 +65,7 @@ async function seedFixtures(): Promise<Fixture> {
     data: { code: 'C-E2E-01', name: 'Courier E2E Branch', tenantId: tenant.id },
   });
   await prisma.brandBranch.create({
-    data: { brandId: brand.id, branchId: branch.id },
+    data: { tenantId: tenant.id, brandId: brand.id, branchId: branch.id },
   });
 
   const courierPhone = '+79995550001';

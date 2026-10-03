@@ -105,9 +105,11 @@ async function main() {
   });
 
   await prisma.brandBranch.upsert({
-    where: { brandId_branchId: { brandId: brand.id, branchId: branch.id } },
+    where: {
+      tenantId_brandId_branchId: { tenantId: tenant.id, brandId: brand.id, branchId: branch.id },
+    },
     update: {},
-    create: { brandId: brand.id, branchId: branch.id },
+    create: { tenantId: tenant.id, brandId: brand.id, branchId: branch.id },
   });
 
   // Kitchen POS terminal (ADR-1618): the KDS app signs in as this terminal.

@@ -53,6 +53,9 @@ async function truncateAll(): Promise<void> {
   await prisma.menuItem.deleteMany();
   await prisma.category.deleteMany();
   await prisma.menu.deleteMany();
+  // couriers -> brand_branches is ON DELETE RESTRICT (ADR-1622 step 5): a
+  // courier left behind by couriers.e2e-spec.ts blocks this delete.
+  await prisma.courier.deleteMany();
   await prisma.brandBranch.deleteMany();
   // order_sequences.branch_id is ON DELETE RESTRICT (WI-1): counter rows must
   // be deleted before the branch they belong to.
@@ -97,9 +100,9 @@ async function seedFixtures(): Promise<Fixture> {
 
   await prisma.brandBranch.createMany({
     data: [
-      { brandId: brandA.id, branchId: branchA1.id },
-      { brandId: brandA.id, branchId: branchA2.id },
-      { brandId: brandB.id, branchId: branchB1.id },
+      { tenantId: tenant.id, brandId: brandA.id, branchId: branchA1.id },
+      { tenantId: tenant.id, brandId: brandA.id, branchId: branchA2.id },
+      { tenantId: tenant.id, brandId: brandB.id, branchId: branchB1.id },
     ],
   });
 
@@ -459,7 +462,7 @@ describe('Orders API (e2e)', () => {
   describe('order number allocation (WI-5)', () => {
     const createBranch = async (code: string): Promise<string> => {
       const branch = await prisma.branch.create({ data: { code, name: `Branch ${code}`, tenantId: fx.tenantId } });
-      await prisma.brandBranch.create({ data: { brandId: fx.brandA, branchId: branch.id } });
+      await prisma.brandBranch.create({ data: { tenantId: fx.tenantId, brandId: fx.brandA, branchId: branch.id } });
       return branch.id;
     };
 

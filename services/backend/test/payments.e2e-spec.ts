@@ -33,6 +33,9 @@ async function truncateAll(): Promise<void> {
   await prisma.menuItem.deleteMany();
   await prisma.category.deleteMany();
   await prisma.menu.deleteMany();
+  // couriers -> brand_branches is ON DELETE RESTRICT (ADR-1622 step 5): a
+  // courier left behind by couriers.e2e-spec.ts blocks this delete.
+  await prisma.courier.deleteMany();
   await prisma.brandBranch.deleteMany();
   // order_sequences.branch_id is ON DELETE RESTRICT (WI-1): this spec creates
   // an order (POST /orders), so its counter rows must go before the branch.
@@ -69,7 +72,7 @@ describe('Payments API (e2e)', () => {
     tenantId = tenant.id;
     const brand = await prisma.brand.create({ data: { code: 'SHIK_ROLL', name: 'SHIK ROLL', tenantId } });
     const branch = await prisma.branch.create({ data: { code: 'A-01', name: 'Branch A1', tenantId } });
-    await prisma.brandBranch.create({ data: { brandId: brand.id, branchId: branch.id } });
+    await prisma.brandBranch.create({ data: { tenantId, brandId: brand.id, branchId: branch.id } });
     const menu = await prisma.menu.create({
       data: { brandId: brand.id, name: 'Main Menu', status: 'PUBLISHED', publishedAt: new Date() },
     });

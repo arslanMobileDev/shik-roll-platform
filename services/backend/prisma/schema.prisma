@@ -163,6 +163,9 @@ model Brand {
   courierInvites CourierInvite[]
 
   @@unique([tenantId, code], map: "uq_brands_tenant_id_code")
+  // Composite FK target for BrandBranch (ADR-1622 step 5): a brand_branch row
+  // may only link a brand of its own tenant.
+  @@unique([tenantId, id], map: "uq_brands_tenant_id_id")
   @@index([status], map: "idx_brands_status")
   @@index([tenantId], map: "idx_brands_tenant_id")
   @@map("brands")
@@ -201,23 +204,31 @@ model Branch {
   courierInvites CourierInvite[]
 
   @@unique([tenantId, code], map: "uq_branches_tenant_id_code")
+  // See Brand: composite FK target for BrandBranch (ADR-1622 step 5).
+  @@unique([tenantId, id], map: "uq_branches_tenant_id_id")
   @@index([status], map: "idx_branches_status")
   @@index([tenantId], map: "idx_branches_tenant_id")
   @@map("branches")
 }
 
 // Which brands operate at which branches.
+// ADR-1622 step 5: the tenant is denormalized here so that the link itself is
+// tenant-consistent (composite FKs to brands/branches), and order/courier rows
+// can prove their whole (tenant, brand, branch) triple with one FK.
 model BrandBranch {
   id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
   brandId   String   @map("brand_id") @db.Uuid
   branchId  String   @map("branch_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  brand  Brand  @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_brand_branches_brands")
-  branch Branch @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_brand_branches_branches")
+  brand  Brand  @relation(fields: [tenantId, brandId], references: [tenantId, id], onDelete: Restrict, map: "fk_brand_branches_brands")
+  branch Branch @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict, map: "fk_brand_branches_branches")
+  orders   Order[]
+  couriers Courier[]
 
-  @@unique([brandId, branchId], map: "uq_brand_branches_brand_id_branch_id")
+  @@unique([tenantId, brandId, branchId], map: "uq_brand_branches_tenant_brand_branch")
   @@index([branchId], map: "idx_brand_branches_branch_id")
   @@map("brand_branches")
 }
@@ -639,6 +650,9 @@ model Order {
   updatedBy       String?     @map("updated_by") @db.Uuid
   version         Int         @default(1)
 
+  // ADR-1622 step 5: proves (tenant_id, brand_id, branch_id) is a real
+  // brand↔branch link of this tenant, not just three independently valid ids.
+  brandBranch BrandBranch @relation(fields: [tenantId, brandId, branchId], references: [tenantId, brandId, branchId], onDelete: Restrict, map: "fk_orders_brand_branches")
   brand    Brand                @relation(fields: [brandId], references: [id], onDelete: Restrict, map: "fk_orders_brands")
   branch   Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict, map: "fk_orders_branches")
   customer Customer?            @relation(fields: [customerId], references: [id], onDelete: Restrict, map: "fk_orders_customers")
@@ -840,6 +854,9 @@ model Courier {
   orders      Order[]
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "fk_couriers_tenants")
+  // ADR-1622 step 5: brand_id/branch_id had no FK at all before this, which is
+  // how orphan courier rows appeared in the e2e database.
+  brandBranch BrandBranch @relation(fields: [tenantId, brandId, branchId], references: [tenantId, brandId, branchId], onDelete: Restrict, map: "fk_couriers_brand_branches")
 
   @@unique([tenantId, phone], map: "uq_couriers_tenant_id_phone")
   @@index([phone], map: "idx_couriers_phone")
