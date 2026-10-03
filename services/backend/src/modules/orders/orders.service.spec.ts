@@ -115,7 +115,7 @@ describe('OrdersService', () => {
   let prisma: {
     menuItem: { findMany: jest.Mock };
     modifierItem: { findMany: jest.Mock };
-    brand: { findUniqueOrThrow: jest.Mock };
+    brandBranch: { findFirst: jest.Mock };
     $transaction: jest.Mock;
   };
   let loyalty: {
@@ -149,8 +149,10 @@ describe('OrdersService', () => {
     prisma = {
       menuItem: { findMany: jest.fn() },
       modifierItem: { findMany: jest.fn() },
-      // ADR-1622: orders.tenant_id is derived from the brand.
-      brand: { findUniqueOrThrow: jest.fn().mockResolvedValue({ tenantId: TENANT_ID }) },
+      // ADR-1622: the brand/branch link resolves the order's tenant and is the
+      // pair check itself; a found link is the default so only the tests about
+      // a missing pair override it.
+      brandBranch: { findFirst: jest.fn().mockResolvedValue({ tenantId: TENANT_ID }) },
       // Interactive transactions hand the callback a bare client stub; the
       // repository is mocked, so the client itself is never exercised.
       $transaction: jest.fn((callback: (client: unknown) => unknown) =>
@@ -375,6 +377,68 @@ describe('OrdersService', () => {
       const createArg = repository.create.mock.calls[0][0];
       expect(createArg.appliedBonusPoints).toBe(0);
       expect(createArg.bonusDiscountAmount.toString()).toBe('0');
+    });
+
+    // ADR-1622 step 5 follow-up: the pair used to reach Prisma, whose nested
+    // connect answered P2025 — an unhandled 500, and one thrown only after the
+    // order number and the geocoder had already run.
+    describe('brand/branch pair', () => {
+      it('rejects a pair with no brand_branches row before allocating anything', async () => {
+        prisma.brandBranch.findFirst.mockResolvedValue(null);
+
+        await expect(service.create(dto)).rejects.toMatchObject({
+          response: { code: 'INVALID_BRAND_BRANCH_PAIR' },
+        });
+        expect(repository.create).not.toHaveBeenCalled();
+        // The check runs first on purpose: no sequence is burned and no
+        // external geocode call is made for a request that cannot succeed.
+        expect(repository.nextOrderSequence).not.toHaveBeenCalled();
+      });
+
+      it('takes the order tenant from the link, not from a second lookup', async () => {
+        await service.create(dto);
+
+        const createArg = repository.create.mock.calls[0][0];
+        expect(createArg.tenant.connect.id).toBe(TENANT_ID);
+        expect(createArg.brandBranch.connect.tenantId_brandId_branchId).toEqual({
+          tenantId: TENANT_ID,
+          brandId: BRAND_ID,
+          branchId: BRANCH_ID,
+        });
+      });
+
+      it('rethrows P2025 when the pair is still there (some other connect failed)', async () => {
+        // Two calls: the pre-check finds the link, the re-check in the catch
+        // does too, so the P2025 belongs to a different relation.
+        prisma.brandBranch.findFirst
+          .mockResolvedValueOnce({ tenantId: TENANT_ID })
+          .mockResolvedValueOnce({ id: 'link-1' });
+        const p2025 = new Prisma.PrismaClientKnownRequestError(
+          'No Customer record was found for a nested connect',
+          { code: 'P2025', clientVersion: 'test' },
+        );
+        repository.create.mockRejectedValue(p2025);
+
+        await expect(service.create(dto, CUSTOMER_ID)).rejects.toBe(p2025);
+        expect(prisma.brandBranch.findFirst).toHaveBeenCalledTimes(2);
+      });
+
+      it('translates P2025 to 400 when the link vanished between check and insert', async () => {
+        prisma.brandBranch.findFirst
+          .mockResolvedValueOnce({ tenantId: TENANT_ID })
+          .mockResolvedValueOnce(null);
+        repository.create.mockRejectedValue(
+          new Prisma.PrismaClientKnownRequestError(
+            "No 'BrandBranch' record was found for a nested connect",
+            { code: 'P2025', clientVersion: 'test' },
+          ),
+        );
+
+        await expect(service.create(dto)).rejects.toMatchObject({
+          response: { code: 'INVALID_BRAND_BRANCH_PAIR' },
+        });
+        expect(queues.scheduleOrderProcessing).not.toHaveBeenCalled();
+      });
     });
   });
 

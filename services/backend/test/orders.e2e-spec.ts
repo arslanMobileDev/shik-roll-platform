@@ -347,6 +347,43 @@ describe('Orders API (e2e)', () => {
         .expect(400);
       expect(res.body.code).toBe('VALIDATION_ERROR');
     });
+
+    // ADR-1622 step 5 follow-up. brandB+branchA1 and brandA+branchB1 are pairs
+    // of ids that each exist, but no brand_branches row links them — the same
+    // shape a cross-tenant pair has. Before this, the nested connect answered
+    // P2025 and the client saw a 500.
+    it('rejects a brand/branch pair that is not linked, in either direction', async () => {
+      const cases = [
+        { brandId: fx.brandB, branchId: fx.branchA1, menuItemId: fx.itemBrandB },
+        { brandId: fx.brandA, branchId: fx.branchB1, menuItemId: fx.itemPhiladelphia },
+      ];
+
+      for (const one of cases) {
+        const res = await http()
+          .post('/orders')
+          .send({
+            type: 'TAKEAWAY',
+            brandId: one.brandId,
+            branchId: one.branchId,
+            // A perfectly orderable item, so the pair is the only defect.
+            items: [{ menuItemId: one.menuItemId, quantity: 1 }],
+          })
+          .expect(400);
+        expect(res.body.code).toBe('INVALID_BRAND_BRANCH_PAIR');
+      }
+
+      // Nothing was written on the way to the 400.
+      expect(
+        await prisma.order.count({
+          where: {
+            OR: [
+              { brandId: fx.brandB, branchId: fx.branchA1 },
+              { brandId: fx.brandA, branchId: fx.branchB1 },
+            ],
+          },
+        }),
+      ).toBe(0);
+    });
   });
 
   describe('GET /orders', () => {

@@ -150,6 +150,26 @@ export class OrdersService {
    * processing is scheduled on the 'order-processing' BullMQ queue.
    */
   async create(dto: CreateOrderDto, customerId?: string): Promise<OrderEntity> {
+    const invalidPair = (): BadRequestException =>
+      new BadRequestException({
+        statusCode: 400,
+        code: 'INVALID_BRAND_BRANCH_PAIR',
+        message: `Brand ${dto.brandId} and branch ${dto.branchId} are not linked`,
+      });
+
+    // ADR-1622 step 5: (brand, branch) must be a row in brand_branches, and
+    // such a row is tenant-consistent by construction. Checked before anything
+    // else so a bad pair costs no order number and no geocoder call, and the
+    // link's tenant_id is the order's tenant — one query for both, where
+    // tenant resolution used to be a separate brand.findUniqueOrThrow.
+    const brandBranch = await this.prisma.brandBranch.findFirst({
+      where: { brandId: dto.brandId, branchId: dto.branchId },
+      select: { tenantId: true },
+    });
+    if (!brandBranch) {
+      throw invalidPair();
+    }
+
     const menuItemIds = dto.items.map((item) => item.menuItemId);
     const modifierIds = dto.items.flatMap(
       (item) => item.modifiers?.map((modifier) => modifier.modifierItemId) ?? [],
@@ -289,20 +309,16 @@ export class OrdersService {
     }
 
     // ADR-1622: tenant_id is denormalized onto orders and derived from the
-    // brand. The object below is the checked OrderCreateInput (nested
-    // connects), so the tenant joins as a relation, not as a scalar.
-    const brand = await this.prisma.brand.findUniqueOrThrow({
-      where: { id: dto.brandId },
-      select: { tenantId: true },
-    });
-
+    // brand_branches link (see the pair check at the top of this method). The
+    // object below is the checked OrderCreateInput (nested connects), so the
+    // tenant joins as a relation, not as a scalar.
     const data: Prisma.OrderCreateInput = {
       orderNumber,
       type: dto.type,
       status: initialStatus,
       paymentMethod,
       brand: { connect: { id: dto.brandId } },
-      tenant: { connect: { id: brand.tenantId } },
+      tenant: { connect: { id: brandBranch.tenantId } },
       branch: { connect: { id: dto.branchId } },
       // ADR-1622 step 5: (tenant_id, brand_id, branch_id) is a composite FK into
       // brand_branches, so the link has to be named here. It also means a
@@ -311,7 +327,7 @@ export class OrdersService {
       brandBranch: {
         connect: {
           tenantId_brandId_branchId: {
-            tenantId: brand.tenantId,
+            tenantId: brandBranch.tenantId,
             brandId: dto.brandId,
             branchId: dto.branchId,
           },
@@ -333,18 +349,40 @@ export class OrdersService {
     // Order creation, the conditional balance decrement and the SPEND ledger
     // entry commit in one transaction (ADR-1614): a lost balance race rolls
     // the order back with 409 INSUFFICIENT_BONUS_BALANCE.
-    const record =
-      useBonusPoints > 0
-        ? await this.prisma.$transaction(async (tx) => {
-            const created = await this.repository.create(data, tx);
-            await this.loyalty.spendWithinTransaction(tx, {
-              customerId: customerId!,
-              orderId: created.id,
-              points: useBonusPoints,
-            });
-            return created;
-          })
-        : await this.repository.create(data);
+    let record: OrderRecord;
+    try {
+      record =
+        useBonusPoints > 0
+          ? await this.prisma.$transaction(async (tx) => {
+              const created = await this.repository.create(data, tx);
+              await this.loyalty.spendWithinTransaction(tx, {
+                customerId: customerId!,
+                orderId: created.id,
+                points: useBonusPoints,
+              });
+              return created;
+            })
+          : await this.repository.create(data);
+    } catch (error) {
+      // The pair was checked above, but the link can be deleted in between.
+      // P2025 means some nested connect found no row, and the order input has
+      // several of them (menu item, customer, brand, branch, tenant), so the
+      // code alone does not name the missing one: re-ask about brand_branches
+      // and translate only when that link is the one that is gone.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        const stillLinked = await this.prisma.brandBranch.findFirst({
+          where: { brandId: dto.brandId, branchId: dto.branchId },
+          select: { id: true },
+        });
+        if (!stillLinked) {
+          throw invalidPair();
+        }
+      }
+      throw error;
+    }
 
     let paymentLink:
       | { paymentId: string | null; paymentUrl: string | null }
