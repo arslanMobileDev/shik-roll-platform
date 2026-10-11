@@ -1,20 +1,34 @@
 import 'package:back_office/core/utils/money.dart';
+import 'package:back_office/features/menu/data/models/menu_category_ref.dart';
 import 'package:back_office/features/menu/data/models/menu_item.dart';
 import 'package:back_office/features/menu/view/widgets/menu_item_form_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+const _categories = [
+  MenuCategoryRef(id: 'cat-roll', name: 'Роллы', menuId: 'menu-1'),
+  MenuCategoryRef(id: 'cat-set', name: 'Сеты', menuId: 'menu-1'),
+];
+
 const _existing = MenuItem(
   id: 'r1',
   name: 'Филадельфия',
   description: 'Лосось, сыр',
-  category: MenuCategory.rolls,
+  categoryId: 'cat-roll',
+  categoryName: 'Роллы',
   price: Money(44900),
   isHalal: true,
   isAvailable: true,
   imageUrl: 'https://example.test/photo.webp',
   allergens: 'Соя',
 );
+
+Future<void> pickCategory(WidgetTester tester, String name) async {
+  await tester.tap(find.byKey(const ValueKey('menuItemForm.category')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(name).last);
+  await tester.pumpAndSettle();
+}
 
 void main() {
   Future<void> openDialog(
@@ -33,7 +47,11 @@ void main() {
             body: TextButton(
               onPressed: () async {
                 onResult(
-                  await MenuItemFormDialog.show(context, initial: initial),
+                  await MenuItemFormDialog.show(
+                    context,
+                    initial: initial,
+                    categories: _categories,
+                  ),
                 );
               },
               child: const Text('open'),
@@ -96,10 +114,7 @@ void main() {
       find.byKey(const ValueKey('menuItemForm.allergens')),
       'Глютен',
     );
-    await tester.tap(find.byKey(const ValueKey('menuItemForm.category')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(MenuCategory.sets.label).last);
-    await tester.pumpAndSettle();
+    await pickCategory(tester, 'Сеты');
 
     await tester.tap(find.byKey(const ValueKey('menuItemForm.save')));
     await tester.pumpAndSettle();
@@ -107,7 +122,7 @@ void main() {
     expect(result, isNotNull);
     expect(result!.name, 'Сет «Тестовый»');
     expect(result!.price, const Money(34990));
-    expect(result!.category, MenuCategory.sets);
+    expect(result!.categoryId, 'cat-set');
     expect(result!.isHalal, isTrue);
     expect(result!.imageUrl, isNull);
     expect(result!.allergens, 'Глютен');
@@ -126,6 +141,7 @@ void main() {
       find.byKey(const ValueKey('menuItemForm.price')),
       '100',
     );
+    await pickCategory(tester, 'Роллы');
     await tester.tap(find.byKey(const ValueKey('menuItemForm.halal')));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('menuItemForm.save')));

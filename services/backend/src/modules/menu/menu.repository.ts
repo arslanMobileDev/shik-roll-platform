@@ -200,8 +200,9 @@ export class MenuRepository {
     return row as CategoryRecord;
   }
 
+  /** `sku` is required here: the service mints one when the caller omits it. */
   createMenuItem(
-    dto: CreateMenuItemDto,
+    dto: CreateMenuItemDto & { sku: string },
     ctx: { brandId: string; menuId: string },
     slug: string,
   ) {
@@ -281,6 +282,17 @@ export class MenuRepository {
         ...(dto.isFeatured !== undefined ? { isFeatured: dto.isFeatured } : {}),
         version: { increment: 1 },
       },
+    });
+  }
+
+  /**
+   * Every SKU a brand already holds under `prefix`, archived rows included:
+   * the auto-SKU sequence must never hand out a number that was used before.
+   */
+  listAutoSkus(brandId: string, prefix: string) {
+    return this.prisma.menuItem.findMany({
+      where: { brandId, sku: { startsWith: prefix } },
+      select: { sku: true },
     });
   }
 

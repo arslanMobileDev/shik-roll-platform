@@ -336,7 +336,9 @@ void main() {
       );
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: MenuItemFormDialog(uploadCubit: cubit)),
+          home: Scaffold(
+            body: MenuItemFormDialog(uploadCubit: cubit, categories: const []),
+          ),
         ),
       );
       await tester.tap(find.byKey(const ValueKey('menuImage.pick')));

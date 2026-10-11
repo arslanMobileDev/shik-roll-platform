@@ -52,11 +52,15 @@ export class CreateMenuItemDto {
   @IsUUID()
   categoryId!: string;
 
-  @ApiProperty({ description: 'SKU, unique within the brand' })
+  @ApiPropertyOptional({
+    description:
+      'SKU, unique within the brand; minted by the API as AUTO-<CATEGORY>-<NNN> when omitted',
+  })
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(64)
-  sku!: string;
+  sku?: string;
 
   @ApiProperty()
   @IsString()

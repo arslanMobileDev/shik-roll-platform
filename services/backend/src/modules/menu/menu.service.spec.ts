@@ -233,6 +233,7 @@ describe('MenuService', () => {
             createCategory: jest.fn(),
             updateCategory: jest.fn(),
             createMenuItem: jest.fn(),
+            listAutoSkus: jest.fn(),
             updateMenuItem: jest.fn(),
             updateItemStatus: jest.fn(),
             updateMerchandising: jest.fn(),
@@ -347,6 +348,60 @@ describe('MenuService', () => {
       { brandId: 'brand-A', menuId: 'menu-1' },
       'roll',
     );
+  });
+
+  it('mints the next AUTO SKU when the caller omits sku', async () => {
+    repository.findCategoryById.mockResolvedValue({ id: 'c1', brandId: 'brand-A', menuId: 'menu-1', name: 'Роллы' } as never);
+    repository.listAutoSkus.mockResolvedValue([{ sku: 'AUTO-ROLLY-001' }, { sku: 'AUTO-ROLLY-003' }]);
+    repository.createMenuItem.mockResolvedValue({ id: 'i1' } as never);
+    repository.findItemById.mockResolvedValue(makeRecord());
+
+    await service.createMenuItem({ categoryId: 'c1', name: 'Ролл', basePrice: 100 });
+
+    expect(repository.listAutoSkus).toHaveBeenCalledWith('brand-A', 'AUTO-ROLLY-');
+    expect(repository.createMenuItem).toHaveBeenCalledWith(
+      expect.objectContaining({ sku: 'AUTO-ROLLY-004' }),
+      { brandId: 'brand-A', menuId: 'menu-1' },
+      'roll',
+    );
+  });
+
+  it('retries with the next AUTO SKU when a concurrent create wins the race', async () => {
+    repository.findCategoryById.mockResolvedValue({ id: 'c1', brandId: 'brand-A', menuId: 'menu-1', name: 'Роллы' } as never);
+    repository.listAutoSkus
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ sku: 'AUTO-ROLLY-001' }]);
+    repository.createMenuItem
+      .mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+          meta: { target: ['brand_id', 'sku'] },
+        }),
+      )
+      .mockResolvedValueOnce({ id: 'i1' } as never);
+    repository.findItemById.mockResolvedValue(makeRecord());
+
+    await service.createMenuItem({ categoryId: 'c1', name: 'Ролл', basePrice: 100 });
+
+    expect(repository.createMenuItem).toHaveBeenCalledTimes(2);
+    expect(repository.createMenuItem.mock.calls[1][0]).toMatchObject({ sku: 'AUTO-ROLLY-002' });
+  });
+
+  it('surfaces a duplicate sku the caller supplied instead of retrying', async () => {
+    repository.findCategoryById.mockResolvedValue({ id: 'c1', brandId: 'brand-A', menuId: 'menu-1', name: 'Роллы' } as never);
+    repository.createMenuItem.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'test',
+        meta: { target: ['brand_id', 'sku'] },
+      }),
+    );
+
+    await expect(
+      service.createMenuItem({ categoryId: 'c1', sku: 'ROLL-001', name: 'Ролл', basePrice: 100 }),
+    ).rejects.toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+    expect(repository.createMenuItem).toHaveBeenCalledTimes(1);
   });
 
   it('regenerates the slug from a new name on PATCH', async () => {

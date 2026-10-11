@@ -7,26 +7,38 @@ import 'menu_image_upload_field.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/money.dart';
+import '../../data/models/menu_category_ref.dart';
 import '../../data/models/menu_item.dart';
 
 /// Modal create/edit form for a catalog position.
 ///
 /// Pops with a [MenuItemDraft] on successful validation, `null` on cancel.
 class MenuItemFormDialog extends StatefulWidget {
-  const MenuItemFormDialog({super.key, this.initial, this.uploadCubit});
+  const MenuItemFormDialog({
+    super.key,
+    required this.categories,
+    this.initial,
+    this.uploadCubit,
+  });
 
   /// When non-null the dialog edits this item instead of creating one.
   final MenuItem? initial;
+
+  /// Categories of the active menu: the dropdown's options and the source of
+  /// the `categoryId` the API expects.
+  final List<MenuCategoryRef> categories;
   final MenuImageUploadCubit? uploadCubit;
 
   static Future<MenuItemDraft?> show(
     BuildContext context, {
+    required List<MenuCategoryRef> categories,
     MenuItem? initial,
   }) {
     return showDialog<MenuItemDraft>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => MenuItemFormDialog(initial: initial),
+      builder: (_) =>
+          MenuItemFormDialog(initial: initial, categories: categories),
     );
   }
 
@@ -43,10 +55,28 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
   late final TextEditingController _imageUrlController;
   late final TextEditingController _allergensController;
   late final MenuImageUploadCubit _uploadCubit;
-  late MenuCategory _category;
+  String? _categoryId;
   late bool _isHalal;
 
   bool get _isEditing => widget.initial != null;
+
+  /// Menu categories, plus the edited item's own category when it is not part
+  /// of the active menu — otherwise the dropdown would have no matching option
+  /// and silently reassign the dish on the next save.
+  List<({String id, String name})> get _categoryOptions {
+    final options = [
+      for (final category in widget.categories)
+        (id: category.id, name: category.name),
+    ];
+    final currentId = widget.initial?.categoryId;
+    if (currentId != null && !options.any((option) => option.id == currentId)) {
+      options.insert(
+        0,
+        (id: currentId, name: widget.initial!.categoryName),
+      );
+    }
+    return options;
+  }
 
   @override
   void initState() {
@@ -66,7 +96,7 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
     _uploadCubit =
         widget.uploadCubit ??
         MenuImageUploadCubit(initialUrl: initial?.imageUrl);
-    _category = initial?.category ?? MenuCategory.rolls;
+    _categoryId = initial?.categoryId;
     _isHalal = initial?.isHalal ?? true;
   }
 
@@ -89,7 +119,7 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
       MenuItemDraft(
         name: _nameController.text.trim(),
         description: _descriptionController.text.trim(),
-        category: _category,
+        categoryId: _categoryId!,
         price: Money.parse(_priceController.text),
         imageUrl: imageUrl.isEmpty ? null : imageUrl,
         allergens: _allergensController.text.trim().isEmpty
@@ -178,24 +208,23 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: DropdownButtonFormField<MenuCategory>(
+                        child: DropdownButtonFormField<String>(
                           key: const ValueKey('menuItemForm.category'),
-                          initialValue: _category,
+                          initialValue: _categoryId,
                           decoration: const InputDecoration(
                             labelText: 'Категория',
                           ),
                           items: [
-                            for (final category in MenuCategory.values)
+                            for (final option in _categoryOptions)
                               DropdownMenuItem(
-                                value: category,
-                                child: Text(category.label),
+                                value: option.id,
+                                child: Text(option.name),
                               ),
                           ],
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() => _category = value);
-                            }
-                          },
+                          validator: (value) =>
+                              value == null ? 'Выберите категорию' : null,
+                          onChanged: (value) =>
+                              setState(() => _categoryId = value),
                         ),
                       ),
                       const SizedBox(width: 12),

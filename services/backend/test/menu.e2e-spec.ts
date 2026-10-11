@@ -682,4 +682,26 @@ describe('Menu & Product API (e2e)', () => {
     const items = await get(`/menu-items?brandId=${fx.brandA}&categoryId=${fx.categoryRolls}`).expect(200);
     expect(items.body.data[0].id).toBe(fx.itemHalalPriced);
   });
+
+  // The back-office dish form has no SKU field, so the API must mint one.
+  it('auto-generates a readable SKU when the client omits it', async () => {
+    const created = await request(app.getHttpServer()).post('/menu-items')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ categoryId: fx.categorySets, name: 'Авто-артикул', basePrice: 250 })
+      .expect(201);
+    expect(created.body.sku).toBe('AUTO-SETY-001');
+
+    const second = await request(app.getHttpServer()).post('/menu-items')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ categoryId: fx.categorySets, name: 'Авто-артикул 2', basePrice: 250 })
+      .expect(201);
+    expect(second.body.sku).toBe('AUTO-SETY-002');
+
+    // An explicit SKU still wins over the generator.
+    const explicit = await request(app.getHttpServer()).post('/menu-items')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ categoryId: fx.categorySets, sku: 'MANUAL-1', name: 'Ручной артикул', basePrice: 250 })
+      .expect(201);
+    expect(explicit.body.sku).toBe('MANUAL-1');
+  });
 });

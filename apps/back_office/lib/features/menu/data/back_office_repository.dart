@@ -13,8 +13,12 @@ abstract interface class BackOfficeRepository {
   /// POST /menu-items
   Future<MenuItem> createMenuItem(MenuItemDraft draft);
 
-  /// PATCH /menu-items/{id}
-  Future<MenuItem> updateMenuItem(MenuItem item);
+  /// PATCH /menu-items/{id} — [draft] carries every editable field, so callers
+  /// cannot accidentally re-save a stale one.
+  Future<MenuItem> updateMenuItem({
+    required String id,
+    required MenuItemDraft draft,
+  });
 
   /// POST /menu-items/{id}/stop-list — adds/removes the item from the
   /// branch stop-list.

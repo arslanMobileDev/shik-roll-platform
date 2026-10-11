@@ -2,52 +2,29 @@ import 'package:equatable/equatable.dart';
 
 import '../../../../core/utils/money.dart';
 
-/// Menu catalog categories (DB-607).
-enum MenuCategory {
-  rolls('Роллы'),
-  sets('Сеты'),
-  fastfood('Фастфуд'),
-  burgers('Бургеры'),
-  drinks('Напитки');
-
-  const MenuCategory(this.label);
-
-  final String label;
-
-  static MenuCategory fromJson(dynamic value) {
-    final String raw = switch (value) {
-      final String str => str,
-      final Map<String, dynamic> map => map['name'] as String? ?? map['slug'] as String? ?? '',
-      _ => '',
-    }.toLowerCase().trim();
-
-    return MenuCategory.values.firstWhere(
-      (c) => c.name.toLowerCase() == raw || c.label.toLowerCase() == raw,
-      orElse: () => MenuCategory.rolls,
-    );
-  }
-}
-
 /// A single catalog position.
 final class MenuItem extends Equatable {
   const MenuItem({
     required this.id,
     required this.name,
     required this.description,
-    required this.category,
+    required this.categoryName,
     required this.price,
     required this.isHalal,
     required this.isAvailable,
+    this.categoryId,
     this.imageUrl,
     this.allergens,
-    this.categoryId,
   });
 
   final String id;
   final String? categoryId;
+
+  /// Category name as the API reports it. Categories are brand data, not a
+  /// closed set, so there is no local enum to fall back to.
+  final String categoryName;
   final String name;
   final String description;
-  final MenuCategory category;
   final Money price;
   final String? imageUrl;
   final String? allergens;
@@ -58,9 +35,9 @@ final class MenuItem extends Equatable {
 
   MenuItem copyWith({
     String? categoryId,
+    String? categoryName,
     String? name,
     String? description,
-    MenuCategory? category,
     Money? price,
     String? imageUrl,
     String? allergens,
@@ -72,9 +49,9 @@ final class MenuItem extends Equatable {
     return MenuItem(
       id: id,
       categoryId: categoryId ?? this.categoryId,
+      categoryName: categoryName ?? this.categoryName,
       name: name ?? this.name,
       description: description ?? this.description,
-      category: category ?? this.category,
       price: price ?? this.price,
       imageUrl: clearImageUrl ? null : imageUrl ?? this.imageUrl,
       allergens: clearAllergens ? null : allergens ?? this.allergens,
@@ -108,12 +85,18 @@ final class MenuItem extends Equatable {
       _ => json['available'] as bool? ?? !(stopped ?? false),
     };
 
+    final dynamic rawCategory = json['category'];
+
     return MenuItem(
       id: json['id'] as String,
-      categoryId: json['category'] is Map ? (json['category'] as Map)['id'] as String? : null,
+      categoryId: rawCategory is Map ? rawCategory['id'] as String? : null,
+      categoryName: switch (rawCategory) {
+        final Map<String, dynamic> map => map['name'] as String? ?? '',
+        final String name => name,
+        _ => '',
+      },
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
-      category: MenuCategory.fromJson(json['category']),
       price: price,
       imageUrl: json['imageUrl'] as String?,
       allergens: json['allergens'] as String?,
@@ -122,23 +105,13 @@ final class MenuItem extends Equatable {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'description': description,
-    'category': category.name,
-    'price': price.toJson(),
-    'imageUrl': imageUrl,
-    'allergens': allergens,
-    'isHalal': isHalal,
-  };
-
   @override
   List<Object?> get props => [
     id,
     categoryId,
+    categoryName,
     name,
     description,
-    category,
     price,
     imageUrl,
     allergens,
@@ -147,33 +120,41 @@ final class MenuItem extends Equatable {
   ];
 }
 
-/// Payload for creating a new catalog position.
+/// Payload for creating or editing a catalog position.
+///
+/// Field names mirror the API (API-706): `categoryId` (UUID) and `basePrice`.
+/// Anything else is dropped by the Nest whitelist without an error.
 final class MenuItemDraft extends Equatable {
   const MenuItemDraft({
     required this.name,
     required this.description,
-    required this.category,
+    required this.categoryId,
     required this.price,
-    required this.isHalal,
     this.imageUrl,
     this.allergens,
+    this.isHalal = true,
   });
 
   final String name;
   final String description;
-  final MenuCategory category;
+  final String categoryId;
   final Money price;
   final String? imageUrl;
   final String? allergens;
+
   final bool isHalal;
 
   Map<String, dynamic> toJson() => {
     'name': name,
     'description': description,
-    'category': category.name,
-    'price': price.toJson(),
+    'categoryId': categoryId,
+    'basePrice': price.toJson(),
     'imageUrl': imageUrl,
     'allergens': allergens,
+    // ponytail: the API drops this — halal is written through
+    // `certificationTagIds`, which needs a certification-tags reference the
+    // client does not fetch yet. Kept so the payload shape does not change in
+    // a commit that is about the category.
     'isHalal': isHalal,
   };
 
@@ -181,7 +162,7 @@ final class MenuItemDraft extends Equatable {
   List<Object?> get props => [
     name,
     description,
-    category,
+    categoryId,
     price,
     imageUrl,
     allergens,

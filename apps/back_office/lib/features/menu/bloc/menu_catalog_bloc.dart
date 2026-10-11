@@ -2,7 +2,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/auth/auth_storage.dart';
 
 import '../data/back_office_repository.dart';
-import '../data/models/menu_item.dart';
 import 'menu_catalog_event.dart';
 import 'menu_catalog_state.dart';
 
@@ -166,20 +165,11 @@ final class MenuCatalogBloc extends Bloc<MenuCatalogEvent, MenuCatalogState> {
           ),
         );
       } else {
-        final existing = state.items.firstWhere((e) => e.id == editingId);
+        // The draft carries every editable field, so nothing has to be
+        // reassembled here — that is how the old category used to get saved.
         final updated = await _repository.updateMenuItem(
-          MenuItem(
-            id: existing.id,
-            categoryId: existing.categoryId,
-            name: event.draft.name,
-            description: event.draft.description,
-            category: event.draft.category,
-            price: event.draft.price,
-            imageUrl: event.draft.imageUrl,
-            allergens: event.draft.allergens,
-            isHalal: event.draft.isHalal,
-            isAvailable: existing.isAvailable,
-          ),
+          id: editingId,
+          draft: event.draft,
         );
         final items = [
           for (final item in state.items)
