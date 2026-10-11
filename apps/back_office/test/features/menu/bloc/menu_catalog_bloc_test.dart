@@ -51,6 +51,7 @@ void main() {
       ),
     );
     registerFallbackValue(_roll);
+    registerFallbackValue(const CategoryDraft(name: ''));
   });
 
   setUp(() {
@@ -452,6 +453,140 @@ void main() {
         ),
       ],
     );
+  });
+
+  group('MenuCategorySubmitted', () {
+    blocTest<MenuCatalogBloc, MenuCatalogState>(
+      'create appends after the last category and activates it',
+      setUp: () => when(
+        () => repository.createCategory(
+          menuId: any(named: 'menuId'),
+          draft: any(named: 'draft'),
+          sortOrder: any(named: 'sortOrder'),
+        ),
+      ).thenAnswer(
+        (_) async => const MenuCategoryRef(
+          id: 'cat-new',
+          name: 'Завтраки',
+          menuId: 'menu',
+          sortOrder: 8,
+        ),
+      ),
+      build: buildBloc,
+      seed: () => const MenuCatalogState(
+        status: MenuCatalogStatus.ready,
+        selectedMenuId: 'menu',
+        categories: [
+          MenuCategoryRef(
+            id: 'cat-roll',
+            name: 'Роллы',
+            menuId: 'menu',
+            sortOrder: 3,
+          ),
+          MenuCategoryRef(
+            id: 'cat-set',
+            name: 'Сеты',
+            menuId: 'menu',
+            sortOrder: 7,
+          ),
+        ],
+      ),
+      act: (bloc) => bloc.add(
+        MenuCategorySubmitted(draft: const CategoryDraft(name: 'Завтраки')),
+      ),
+      expect: () => [
+        isA<MenuCatalogState>()
+            .having((s) => s.categories.length, 'categories', 3)
+            .having((s) => s.notice, 'notice', contains('создана')),
+      ],
+      verify: (bloc) {
+        // 7 is the highest sortOrder in the menu, so the new one is 8.
+        verify(
+          () => repository.createCategory(
+            menuId: 'menu',
+            draft: const CategoryDraft(name: 'Завтраки'),
+            sortOrder: 8,
+          ),
+        ).called(1);
+        expect(bloc.state.categories.last.isActive, isTrue);
+      },
+    );
+
+    blocTest<MenuCatalogBloc, MenuCatalogState>(
+      'edit keeps a hidden category in the list and says so',
+      setUp: () => when(
+        () => repository.updateCategory(
+          id: any(named: 'id'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer(
+        (_) async => const MenuCategoryRef(
+          id: 'cat-roll',
+          name: 'Роллы и суши',
+          menuId: 'menu',
+          isActive: false,
+        ),
+      ),
+      build: buildBloc,
+      seed: () => const MenuCatalogState(
+        status: MenuCatalogStatus.ready,
+        selectedMenuId: 'menu',
+        categories: [
+          MenuCategoryRef(id: 'cat-roll', name: 'Роллы', menuId: 'menu'),
+        ],
+      ),
+      act: (bloc) => bloc.add(
+        MenuCategorySubmitted(
+          draft: const CategoryDraft(name: 'Роллы и суши', isActive: false),
+          editingId: 'cat-roll',
+        ),
+      ),
+      expect: () => [
+        isA<MenuCatalogState>()
+            .having((s) => s.categories.length, 'categories', 1)
+            .having((s) => s.categories.single.name, 'name', 'Роллы и суши')
+            .having((s) => s.categories.single.isActive, 'isActive', isFalse)
+            .having((s) => s.notice, 'notice', contains('скрыта')),
+      ],
+    );
+
+    test('a failed save reaches the dialog instead of a notice', () async {
+      when(
+        () => repository.updateCategory(
+          id: any(named: 'id'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenThrow(const BackOfficeApiException('boom'));
+      final bloc = buildBloc();
+      final event = MenuCategorySubmitted(
+        draft: const CategoryDraft(name: 'Роллы'),
+        editingId: 'cat-roll',
+      );
+
+      bloc.add(event);
+
+      await expectLater(
+        event.result.future,
+        throwsA(isA<BackOfficeApiException>()),
+      );
+      expect(bloc.state.notice, isNull);
+      await bloc.close();
+    });
+
+    test('creating without a loaded menu fails the caller', () async {
+      final bloc = buildBloc();
+      final event = MenuCategorySubmitted(
+        draft: const CategoryDraft(name: 'Завтраки'),
+      );
+
+      bloc.add(event);
+
+      await expectLater(
+        event.result.future,
+        throwsA(isA<BackOfficeApiException>()),
+      );
+      await bloc.close();
+    });
   });
 
   group('MenuCatalogNoticeConsumed', () {

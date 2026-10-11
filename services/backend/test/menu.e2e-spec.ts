@@ -581,6 +581,28 @@ describe('Menu & Product API (e2e)', () => {
     expect(updated.body.sortOrder).toBe(5);
   });
 
+  it('hidden categories reach the back-office only with includeInactive', async () => {
+    const menus = await get(`/menus?brandId=${fx.brandA}`).expect(200);
+    const menuId = menus.body.data[0].id;
+
+    const created = await request(app.getHttpServer())
+      .post('/categories')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ menuId, name: 'Скрытая категория', sortOrder: 40, isActive: true })
+      .expect(201);
+    await request(app.getHttpServer())
+      .patch(`/categories/${created.body.id}`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ isActive: false })
+      .expect(200);
+
+    const publicList = await get(`/categories?menuId=${menuId}`).expect(200);
+    expect(publicList.body.data.map((c: { id: string }) => c.id)).not.toContain(created.body.id);
+
+    const adminList = await get(`/categories?menuId=${menuId}&includeInactive=true`).expect(200);
+    expect(adminList.body.data.map((c: { id: string }) => c.id)).toContain(created.body.id);
+  });
+
   it('admin: PATCH /categories rejects a parent cycle', async () => {
     const res = await request(app.getHttpServer())
       .patch(`/categories/${fx.categoryRolls}`)

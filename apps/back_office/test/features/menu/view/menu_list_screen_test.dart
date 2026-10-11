@@ -8,6 +8,7 @@ import 'package:back_office/features/menu/bloc/menu_catalog_bloc.dart';
 import 'package:back_office/features/menu/bloc/menu_catalog_event.dart';
 import 'package:back_office/features/menu/data/fake_back_office_repository.dart';
 import 'package:back_office/features/menu/view/menu_list_screen.dart';
+import 'package:back_office/features/menu/view/widgets/category_form_dialog.dart';
 import 'package:back_office/features/menu/view/widgets/menu_item_form_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -176,6 +177,125 @@ void main() {
     expect(
       find.widgetWithText(TextFormField, 'Филадельфия классик'),
       findsOneWidget,
+    );
+  });
+
+  testWidgets('creates a category from the filters row', (tester) async {
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const ValueKey('menuList.addCategory')));
+    await tester.pumpAndSettle();
+    expect(find.byType(CategoryFormDialog), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('categoryForm.name')),
+      'Авторские роллы',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('categoryForm.description')),
+      'Только для постоянных гостей',
+    );
+    await tester.tap(find.byKey(const ValueKey('categoryForm.save')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CategoryFormDialog), findsNothing);
+    expect(find.widgetWithText(ChoiceChip, 'Авторские роллы'), findsOneWidget);
+    expect(bloc.state.categories.last.name, 'Авторские роллы');
+    expect(bloc.state.categories.last.isActive, isTrue);
+    expect(find.textContaining('создана'), findsOneWidget);
+  });
+
+  testWidgets('pencil renames a category and hides it from the menu', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    final rollsId = FakeBackOfficeRepository.categoryRolls.id;
+
+    await tester.tap(find.byKey(ValueKey('categoryEdit.$rollsId')));
+    await tester.pumpAndSettle();
+    expect(find.text('Редактировать категорию'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'Роллы'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('categoryForm.name')),
+      'Роллы и суши',
+    );
+    await tester.tap(find.byKey(const ValueKey('categoryForm.active')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('categoryForm.save')));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(ChoiceChip, 'Роллы и суши'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Роллы'), findsNothing);
+    // Hidden, not deleted: the chip stays so it can be switched back on.
+    expect(
+      bloc.state.categories.firstWhere((e) => e.id == rollsId).isActive,
+      isFalse,
+    );
+    expect(find.textContaining('скрыта'), findsOneWidget);
+  });
+
+  testWidgets('dish form creates a category from the dropdown and selects it', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const ValueKey('menuList.addItem')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('menuItemForm.category')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('+ Создать новую категорию').last);
+    await tester.pumpAndSettle();
+    expect(find.byType(CategoryFormDialog), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('categoryForm.name')),
+      'Завтраки',
+    );
+    await tester.tap(find.byKey(const ValueKey('categoryForm.save')));
+    await tester.pumpAndSettle();
+
+    // The dish form survived the detour and points at the new category.
+    expect(find.byType(MenuItemFormDialog), findsOneWidget);
+    expect(bloc.state.categories.last.name, 'Завтраки');
+    expect(
+      tester
+          .state<FormFieldState<String>>(
+            find.byKey(const ValueKey('menuItemForm.category')),
+          )
+          .value,
+      bloc.state.categories.last.id,
+    );
+  });
+
+  testWidgets('cancelling category creation leaves the dish selection alone', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+
+    await tester.tap(find.byKey(const ValueKey('menuList.addItem')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('menuItemForm.category')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Сеты').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('menuItemForm.category')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('+ Создать новую категорию').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Отмена').last);
+    await tester.pumpAndSettle();
+
+    // The "+ create" entry must not stay behind as the selected option.
+    expect(
+      tester
+          .state<FormFieldState<String>>(
+            find.byKey(const ValueKey('menuItemForm.category')),
+          )
+          .value,
+      FakeBackOfficeRepository.categorySets.id,
     );
   });
 }

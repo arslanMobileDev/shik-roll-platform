@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsUUID } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsOptional, IsUUID } from 'class-validator';
 import { PaginationQueryDto } from './pagination-query.dto';
 
 export class CategoryQueryDto extends PaginationQueryDto {
@@ -12,4 +13,14 @@ export class CategoryQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsUUID()
   brandId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Include deactivated categories — the back-office needs them to reactivate; ' +
+      'the public catalog must not set this.',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  includeInactive?: boolean;
 }

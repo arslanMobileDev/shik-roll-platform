@@ -36,6 +36,7 @@ final class RemoteBackOfficeRepository implements BackOfficeRepository {
     try {
       return (await _fetchReferences('/categories', {
         'menuId': menuId,
+        'includeInactive': 'true',
       })).map(MenuCategoryRef.fromJson).toList(growable: false);
     } on DioException catch (e) {
       throw BackOfficeApiException(
@@ -46,6 +47,60 @@ final class RemoteBackOfficeRepository implements BackOfficeRepository {
         'Некорректный ответ справочника категорий',
       );
     }
+  }
+
+  @override
+  Future<MenuCategoryRef> createCategory({
+    required String menuId,
+    required CategoryDraft draft,
+    required int sortOrder,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/categories',
+        data: {'menuId': menuId, 'sortOrder': sortOrder, ...draft.toJson()},
+      );
+      return MenuCategoryRef.fromJson(_unwrap(response.data));
+    } on DioException catch (e) {
+      throw BackOfficeApiException(
+        'Не удалось создать категорию: ${_describe(e)}',
+      );
+    } on Object {
+      throw const BackOfficeApiException(
+        'Некорректный ответ при создании категории',
+      );
+    }
+  }
+
+  @override
+  Future<MenuCategoryRef> updateCategory({
+    required String id,
+    required CategoryDraft draft,
+  }) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/categories/$id',
+        data: draft.toJson(),
+      );
+      return MenuCategoryRef.fromJson(_unwrap(response.data));
+    } on DioException catch (e) {
+      throw BackOfficeApiException(
+        'Не удалось сохранить категорию: ${_describe(e)}',
+      );
+    } on Object {
+      throw const BackOfficeApiException(
+        'Некорректный ответ при сохранении категории',
+      );
+    }
+  }
+
+  /// API-706 wraps single resources in `{data: {...}}` on some routes and
+  /// returns them bare on others; both shapes land here.
+  Map<String, dynamic> _unwrap(Map<String, dynamic>? body) {
+    final data = body ?? const <String, dynamic>{};
+    return data['data'] is Map<String, dynamic>
+        ? data['data'] as Map<String, dynamic>
+        : data;
   }
 
   Future<List<Map<String, dynamic>>> _fetchReferences(
@@ -107,12 +162,7 @@ final class RemoteBackOfficeRepository implements BackOfficeRepository {
         '/menu-items',
         data: draft.toJson(),
       );
-      final data = response.data ?? const <String, dynamic>{};
-      final itemMap =
-          data.containsKey('data') && data['data'] is Map<String, dynamic>
-          ? data['data'] as Map<String, dynamic>
-          : data;
-      return MenuItem.fromJson(itemMap);
+      return MenuItem.fromJson(_unwrap(response.data));
     } on DioException catch (e) {
       throw BackOfficeApiException(_describe(e));
     }
@@ -128,12 +178,7 @@ final class RemoteBackOfficeRepository implements BackOfficeRepository {
         '/menu-items/$id',
         data: draft.toJson(),
       );
-      final data = response.data ?? const <String, dynamic>{};
-      final itemMap =
-          data.containsKey('data') && data['data'] is Map<String, dynamic>
-          ? data['data'] as Map<String, dynamic>
-          : data;
-      return MenuItem.fromJson(itemMap);
+      return MenuItem.fromJson(_unwrap(response.data));
     } on DioException catch (e) {
       throw BackOfficeApiException(_describe(e));
     }

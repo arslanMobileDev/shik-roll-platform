@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -10,6 +12,10 @@ import '../../../../core/utils/money.dart';
 import '../../data/models/menu_category_ref.dart';
 import '../../data/models/menu_item.dart';
 
+/// Opens the category dialog from inside this form; returns the saved category,
+/// or `null` when the manager backs out.
+typedef CreateCategoryCallback = Future<MenuCategoryRef?> Function();
+
 /// Modal create/edit form for a catalog position.
 ///
 /// Pops with a [MenuItemDraft] on successful validation, `null` on cancel.
@@ -19,6 +25,7 @@ class MenuItemFormDialog extends StatefulWidget {
     required this.categories,
     this.initial,
     this.uploadCubit,
+    this.onCreateCategory,
   });
 
   /// When non-null the dialog edits this item instead of creating one.
@@ -29,16 +36,25 @@ class MenuItemFormDialog extends StatefulWidget {
   final List<MenuCategoryRef> categories;
   final MenuImageUploadCubit? uploadCubit;
 
+  /// Backs the trailing "+ Создать новую категорию" entry. The caller supplies
+  /// it because the dialog route sits above the bloc provider and cannot reach
+  /// it itself; without it the entry is not offered.
+  final CreateCategoryCallback? onCreateCategory;
+
   static Future<MenuItemDraft?> show(
     BuildContext context, {
     required List<MenuCategoryRef> categories,
     MenuItem? initial,
+    CreateCategoryCallback? onCreateCategory,
   }) {
     return showDialog<MenuItemDraft>(
       context: context,
       barrierDismissible: false,
-      builder: (_) =>
-          MenuItemFormDialog(initial: initial, categories: categories),
+      builder: (_) => MenuItemFormDialog(
+        initial: initial,
+        categories: categories,
+        onCreateCategory: onCreateCategory,
+      ),
     );
   }
 
@@ -47,6 +63,10 @@ class MenuItemFormDialog extends StatefulWidget {
 }
 
 class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
+  /// Dropdown value of the "+ Создать новую категорию" entry. Never reaches
+  /// [_categoryId], so it cannot end up in the payload.
+  static const _createCategoryValue = '__create_category__';
+
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _nameController;
@@ -55,17 +75,25 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
   late final TextEditingController _imageUrlController;
   late final TextEditingController _allergensController;
   late final MenuImageUploadCubit _uploadCubit;
+  late final List<MenuCategoryRef> _categories;
   String? _categoryId;
   late bool _isHalal;
 
+  /// Bumped whenever the dropdown's selection is set from code. The underlying
+  /// `FormField` never re-reads `initialValue` on rebuild (flutter's
+  /// `FormFieldState.didUpdateWidget` ignores it), so without a fresh key the
+  /// "+ Создать новую категорию" entry would stay on screen as the selection.
+  int _categoryFieldEpoch = 0;
+
   bool get _isEditing => widget.initial != null;
 
-  /// Menu categories, plus the edited item's own category when it is not part
-  /// of the active menu — otherwise the dropdown would have no matching option
-  /// and silently reassign the dish on the next save.
+  /// Menu categories (including ones created from this dialog), plus the edited
+  /// item's own category when it is not part of the active menu — otherwise the
+  /// dropdown would have no matching option and silently reassign the dish on
+  /// the next save.
   List<({String id, String name})> get _categoryOptions {
     final options = [
-      for (final category in widget.categories)
+      for (final category in _categories)
         (id: category.id, name: category.name),
     ];
     final currentId = widget.initial?.categoryId;
@@ -81,6 +109,7 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
   @override
   void initState() {
     super.initState();
+    _categories = [...widget.categories];
     final initial = widget.initial;
     _nameController = TextEditingController(text: initial?.name ?? '');
     _descriptionController = TextEditingController(
@@ -128,6 +157,23 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
         isHalal: _isHalal,
       ),
     );
+  }
+
+  /// Delegates to the caller's category dialog and adopts the result, so the
+  /// dish ends up in the category the manager just created. A cancelled dialog
+  /// leaves the previous selection alone.
+  Future<void> _createCategory() async {
+    final create = widget.onCreateCategory;
+    if (create == null) return;
+    final created = await create();
+    if (!mounted) return;
+    setState(() {
+      if (created != null) {
+        _categories.add(created);
+        _categoryId = created.id;
+      }
+      _categoryFieldEpoch++;
+    });
   }
 
   void _previewImage() {
@@ -208,23 +254,47 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: DropdownButtonFormField<String>(
-                          key: const ValueKey('menuItemForm.category'),
-                          initialValue: _categoryId,
-                          decoration: const InputDecoration(
-                            labelText: 'Категория',
+                        child: KeyedSubtree(
+                          key: ValueKey('menuItemForm.category.$_categoryFieldEpoch'),
+                          child: DropdownButtonFormField<String>(
+                            key: const ValueKey('menuItemForm.category'),
+                            initialValue: _categoryId,
+                            // The trailing "create" entry is wider than the
+                            // field; without this the row overflows.
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Категория',
+                            ),
+                            items: [
+                              for (final option in _categoryOptions)
+                                DropdownMenuItem(
+                                  value: option.id,
+                                  child: Text(
+                                    option.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              if (widget.onCreateCategory != null)
+                                const DropdownMenuItem(
+                                  value: _createCategoryValue,
+                                  child: Text(
+                                    '+ Создать новую категорию',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
+                            validator: (value) =>
+                                value == null || value == _createCategoryValue
+                                ? 'Выберите категорию'
+                                : null,
+                            onChanged: (value) {
+                              if (value == _createCategoryValue) {
+                                unawaited(_createCategory());
+                                return;
+                              }
+                              setState(() => _categoryId = value);
+                            },
                           ),
-                          items: [
-                            for (final option in _categoryOptions)
-                              DropdownMenuItem(
-                                value: option.id,
-                                child: Text(option.name),
-                              ),
-                          ],
-                          validator: (value) =>
-                              value == null ? 'Выберите категорию' : null,
-                          onChanged: (value) =>
-                              setState(() => _categoryId = value),
                         ),
                       ),
                       const SizedBox(width: 12),

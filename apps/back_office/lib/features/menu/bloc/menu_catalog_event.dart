@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:equatable/equatable.dart';
 
+import '../data/models/menu_category_ref.dart';
 import '../data/models/menu_item.dart';
 
 sealed class MenuCatalogEvent extends Equatable {
@@ -51,6 +54,23 @@ final class MenuItemSubmitted extends MenuCatalogEvent {
 
   final MenuItemDraft draft;
   final String? editingId;
+
+  @override
+  List<Object?> get props => [draft, editingId];
+}
+
+/// Create ([editingId] == null) or update a menu category.
+///
+/// [result] carries the saved category back to the dialog that asked for it —
+/// and its error, when the API refuses. It stays out of [props]: two identical
+/// submissions are the same event, only their waiters differ.
+final class MenuCategorySubmitted extends MenuCatalogEvent {
+  MenuCategorySubmitted({required this.draft, this.editingId})
+    : result = Completer<MenuCategoryRef>();
+
+  final CategoryDraft draft;
+  final String? editingId;
+  final Completer<MenuCategoryRef> result;
 
   @override
   List<Object?> get props => [draft, editingId];
