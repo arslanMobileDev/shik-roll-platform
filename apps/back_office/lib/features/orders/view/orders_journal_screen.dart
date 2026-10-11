@@ -116,6 +116,7 @@ class _DateFilters extends StatelessWidget {
       initialDate: bloc.state.customDay ?? now,
       firstDate: DateTime(now.year - 2),
       lastDate: now,
+      initialDatePickerMode: DatePickerMode.year,
     );
     if (picked != null) {
       bloc.add(
