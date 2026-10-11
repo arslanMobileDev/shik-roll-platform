@@ -170,6 +170,14 @@ export class CreateMenuItemDto {
   modifierGroupIds?: string[];
 
   @ApiPropertyOptional({
+    description:
+      'HALAL certification on/off, resolved to the HALAL tag by code; the alternative to naming the tag UUID in certificationTagIds',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isHalal?: boolean;
+
+  @ApiPropertyOptional({
     type: [String],
     description: 'Certification tag UUIDs (e.g. HALAL) attached to the item',
   })
