@@ -16,29 +16,39 @@ class DashboardScreen extends StatelessWidget {
   ).format(value);
   String _date(DateTime value) => DateFormat('dd.MM.yyyy', 'ru').format(value);
 
-  Future<void> _choose(BuildContext context, DashboardState state) async {
+   Future<void> _choose(BuildContext context, DashboardState state) async {
     final cubit = context.read<DashboardCubit>();
     final now = DateTime.now().toUtc().add(const Duration(hours: 3));
-    final range = await showDateRangePicker(
+
+    final start = await showDatePicker(
       context: context,
+      initialDate: state.dateFrom ?? now,
       firstDate: DateTime(2000),
       lastDate: DateTime(now.year + 1, 12, 31),
-      initialDateRange: state.dateFrom != null && state.dateTo != null
-          ? DateTimeRange(start: state.dateFrom!, end: state.dateTo!)
-          : null,
-      helpText: 'Период выручки · Москва',
-      saveText: 'Применить',
+      initialDatePickerMode: DatePickerMode.year,
+      helpText: 'Начало периода',
       cancelText: 'Отмена',
-      fieldStartLabelText: 'Начало',
-      fieldEndLabelText: 'Конец',
+      confirmText: 'Далее',
     );
-    if (range != null && context.mounted) {
-      await cubit.select(
-        DashboardPeriod.custom,
-        from: range.start,
-        to: range.end,
-      );
-    }
+    if (start == null || !context.mounted) return;
+
+    final end = await showDatePicker(
+      context: context,
+      initialDate: state.dateTo ?? start,
+      firstDate: start,
+      lastDate: DateTime(now.year + 1, 12, 31),
+      initialDatePickerMode: DatePickerMode.year,
+      helpText: 'Конец периода',
+      cancelText: 'Отмена',
+      confirmText: 'Применить',
+    );
+    if (end == null) return;
+
+    await cubit.select(
+      DashboardPeriod.custom,
+      from: start,
+      to: end,
+    );
   }
 
   @override
@@ -90,7 +100,7 @@ class DashboardScreen extends StatelessWidget {
               ],
             ),
             const Text(
-              'Завершённые заказы · Московское время',
+              'Завершённые заказы',
               style: TextStyle(color: AppColors.inkMuted),
             ),
             const SizedBox(height: 20),
@@ -138,7 +148,7 @@ class DashboardScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              '${_date(revenue.from.toUtc().add(const Duration(hours: 3)))} — ${_date(revenue.to.toUtc().add(const Duration(hours: 3)))} · МСК',
+              '${_date(revenue.from.toUtc().add(const Duration(hours: 3)))} — ${_date(revenue.to.toUtc().add(const Duration(hours: 3)))}',
             ),
             if (revenue.summary.ordersCount == 0)
               const Padding(
