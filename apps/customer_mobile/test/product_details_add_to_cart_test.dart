@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'menu_item_json_fixture.dart';
+
 /// Plain dish without modifier groups: the add button must be enabled by
 /// default (no required unselected modifiers) and the default quantity is 1.
 final _item = MenuItem(
@@ -31,8 +33,9 @@ Finder _addButton() => find.byKey(const ValueKey('add-to-cart-button'));
 /// opened via [showProductDetails] as a modal route on top of it.
 Future<void> _pumpMenuWithCart(
   WidgetTester tester,
-  CustomerCartBloc cartBloc,
-) async {
+  CustomerCartBloc cartBloc, {
+  MenuItem? item,
+}) async {
   await tester.pumpWidget(
     MaterialApp(
       home: BlocProvider<CustomerCartBloc>.value(
@@ -41,7 +44,7 @@ Future<void> _pumpMenuWithCart(
           body: Builder(
             builder: (context) => Center(
               child: TextButton(
-                onPressed: () => showProductDetails(context, _item),
+                onPressed: () => showProductDetails(context, item ?? _item),
                 child: const Text('open-details'),
               ),
             ),
@@ -90,4 +93,23 @@ void main() {
       expect(cart.total, _item.price);
     },
   );
+
+  testWidgets('карточка товара показывает фото, когда задан imageUrl', (
+    tester,
+  ) async {
+    const photoUrl = 'https://api.shik-roll.ru/uploads/menu/roll.webp';
+    final cartBloc = CustomerCartBloc();
+    addTearDown(cartBloc.close);
+
+    await _pumpMenuWithCart(
+      tester,
+      cartBloc,
+      item: MenuItem.fromJson(menuItemJson(imageUrl: photoUrl)),
+    );
+    await tester.tap(find.text('open-details'));
+    await tester.pumpAndSettle();
+
+    final image = tester.widget<Image>(find.byType(Image));
+    expect((image.image as NetworkImage).url, photoUrl);
+  });
 }
