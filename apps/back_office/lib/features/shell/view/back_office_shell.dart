@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/auth/auth_storage.dart';
+import '../../../core/auth/session_events.dart';
 import '../../../core/widgets/halal_badge.dart';
 import '../../../core/widgets/shik_roll_logo.dart';
 import '../bloc/branch_cubit.dart';
@@ -93,6 +95,8 @@ class BackOfficeTopBar extends StatelessWidget {
           const BranchSelector(),
           const SizedBox(width: 12),
           const HalalBadge(),
+          const SizedBox(width: 8),
+          const _LogoutButton(),
         ],
       ),
     );
@@ -234,5 +238,24 @@ class _SidebarItem extends StatelessWidget {
     );
     if (expanded) return tile;
     return Tooltip(message: section.label, child: tile);
+  }
+}
+/// Top-bar logout: clears the stored JWT and signals AuthGate to return
+/// to the login form. Same mechanism as a 401 — no navigation stack needed.
+class _LogoutButton extends StatelessWidget {
+  const _LogoutButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      key: const ValueKey('topbar.logout'),
+      icon: const Icon(Icons.logout_rounded, size: 20),
+      tooltip: 'Выйти',
+      color: const Color(0xFF8A7D76),
+      onPressed: () async {
+        await AuthStorage.clear();
+        SessionEvents.fireLogout();
+      },
+    );
   }
 }

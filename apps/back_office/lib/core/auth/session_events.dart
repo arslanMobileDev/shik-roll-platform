@@ -14,4 +14,7 @@ class SessionEvents {
   static void fireUnauthorized() {
     if (!_controller.isClosed) _controller.add(null);
   }
+  /// Called by the explicit logout button — same effect as a 401:
+  /// AuthGate drops the session and shows the login form.
+  static void fireLogout() => fireUnauthorized();
 }
