@@ -118,11 +118,14 @@ class _MenuContent extends StatelessWidget {
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
             sliver: SliverGrid(
+              // The card's photo is square (1:1), so the cell has to be taller
+              // than the old 16:9 ratio left room for: 0.62 clipped the price
+              // row on ≤390dp phones.
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: AppSpacing.s12,
                 mainAxisSpacing: AppSpacing.s12,
-                childAspectRatio: 0.62,
+                childAspectRatio: 0.55,
               ),
               delegate: SliverChildBuilderDelegate((context, index) {
                 final item = items[index];

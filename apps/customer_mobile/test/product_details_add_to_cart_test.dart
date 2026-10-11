@@ -111,5 +111,13 @@ void main() {
 
     final image = tester.widget<Image>(find.byType(Image));
     expect((image.image as NetworkImage).url, photoUrl);
+
+    final ratio = tester.widget<AspectRatio>(
+      find.descendant(
+        of: find.byType(ProductDetailsView),
+        matching: find.byType(AspectRatio),
+      ),
+    );
+    expect(ratio.aspectRatio, 1.0);
   });
 }

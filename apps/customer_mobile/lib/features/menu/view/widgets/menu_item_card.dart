@@ -36,7 +36,7 @@ class MenuItemCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AspectRatio(
-                aspectRatio: 16 / 9,
+                aspectRatio: 1,
                 child: MenuItemPhoto(imageUrl: item.imageUrl),
               ),
               const SizedBox(height: AppSpacing.s8),

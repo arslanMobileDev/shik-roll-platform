@@ -30,6 +30,8 @@ MenuItem _item({
   );
 }
 
+/// Mirrors the real grid cell (2 columns on a 390dp phone): square photo plus
+/// the text block under it.
 Future<void> _pumpCard(
   WidgetTester tester,
   MenuItem item, {
@@ -41,7 +43,7 @@ Future<void> _pumpCard(
       home: Scaffold(
         body: SizedBox(
           width: 220,
-          height: 320,
+          height: 400,
           child: MenuItemCard(
             item: item,
             onAddToCart: onAddToCart ?? () {},
@@ -79,6 +81,18 @@ void main() {
     final image = tester.widget<Image>(find.byType(Image));
     expect((image.image as NetworkImage).url, _photoUrl);
     expect(image.fit, BoxFit.cover);
+  });
+
+  testWidgets('photo window is square (1:1), matching the 1000×1000 upload', (
+    tester,
+  ) async {
+    await _pumpCard(
+      tester,
+      MenuItem.fromJson(menuItemJson(imageUrl: _photoUrl)),
+    );
+
+    final ratio = tester.widget<AspectRatio>(find.byType(AspectRatio));
+    expect(ratio.aspectRatio, 1.0);
   });
 
   testWidgets('falls back to the placeholder icon without imageUrl', (

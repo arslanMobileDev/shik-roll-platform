@@ -82,8 +82,8 @@ class _ProductDetailsContent extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: AppSpacing.s12),
-                      SizedBox(
-                        height: 180,
+                      AspectRatio(
+                        aspectRatio: 1,
                         child: MenuItemPhoto(
                           imageUrl: item.imageUrl,
                           iconSize: 48,
