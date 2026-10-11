@@ -230,6 +230,8 @@ describe('MenuService', () => {
             findCategoryById: jest.fn(),
             findBranchById: jest.fn(),
             findMenuItemById: jest.fn(),
+            findCertificationTagByCode: jest.fn(),
+            findExistingCertificationTagIds: jest.fn(),
             createCategory: jest.fn(),
             updateCategory: jest.fn(),
             createMenuItem: jest.fn(),
@@ -414,7 +416,35 @@ describe('MenuService', () => {
       'i1',
       expect.objectContaining({ name: 'Калифорния' }),
       'kaliforniya',
+      undefined,
     );
+  });
+
+  it('resolves isHalal to the HALAL tag id so the client never names a UUID', async () => {
+    repository.findMenuItemById.mockResolvedValue({ id: 'i1', sku: 'R-1' } as never);
+    repository.updateMenuItem.mockResolvedValue({} as never);
+    repository.findItemById.mockResolvedValue(makeRecord());
+    repository.findCertificationTagByCode.mockResolvedValue({ id: 'tag-halal' } as never);
+
+    await service.updateMenuItem('i1', { isHalal: true });
+
+    expect(repository.findCertificationTagByCode).toHaveBeenCalledWith('HALAL');
+    expect(repository.updateMenuItem).toHaveBeenCalledWith(
+      'i1',
+      expect.objectContaining({ isHalal: true }),
+      undefined,
+      'tag-halal',
+    );
+  });
+
+  it('rejects an unknown certification tag id instead of letting the FK fail', async () => {
+    repository.findMenuItemById.mockResolvedValue({ id: 'i1', sku: 'R-1' } as never);
+    repository.findExistingCertificationTagIds.mockResolvedValue([] as never);
+
+    await expect(
+      service.updateMenuItem('i1', { certificationTagIds: ['00000000-0000-4000-8000-000000000000'] }),
+    ).rejects.toMatchObject({ response: { code: 'CERTIFICATION_TAG_NOT_FOUND' } });
+    expect(repository.updateMenuItem).not.toHaveBeenCalled();
   });
 
   it('does not regenerate the slug when the name is unchanged', async () => {
@@ -426,6 +456,7 @@ describe('MenuService', () => {
     expect(repository.updateMenuItem).toHaveBeenCalledWith(
       'i1',
       expect.objectContaining({ description: 'новое описание' }),
+      undefined,
       undefined,
     );
   });

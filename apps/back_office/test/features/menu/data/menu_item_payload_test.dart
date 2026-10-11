@@ -23,6 +23,11 @@ void main() {
       expect(json['basePrice'], 349.0);
       expect(json.containsKey('category'), isFalse, reason: 'the API ignores it');
       expect(json.containsKey('price'), isFalse, reason: 'the API ignores it');
+      // The PATCH DTO accepts isHalal (it resolves the HALAL tag server-side);
+      // a client that sends a raw certificationTagIds UUID would be tied to one
+      // database, so the payload keeps the boolean.
+      expect(json['isHalal'], isTrue);
+      expect(json.containsKey('certificationTagIds'), isFalse);
     });
   });
 

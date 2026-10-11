@@ -151,10 +151,8 @@ final class MenuItemDraft extends Equatable {
     'basePrice': price.toJson(),
     'imageUrl': imageUrl,
     'allergens': allergens,
-    // ponytail: the API drops this — halal is written through
-    // `certificationTagIds`, which needs a certification-tags reference the
-    // client does not fetch yet. Kept so the payload shape does not change in
-    // a commit that is about the category.
+    // The API resolves this to the HALAL certification tag by code, so the
+    // client never has to know a per-environment tag UUID.
     'isHalal': isHalal,
   };
 

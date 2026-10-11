@@ -20,7 +20,7 @@ import { PageMeta } from './entities/pagination.entity';
 import { MenuRepository } from './menu.repository';
 import { toCategoryEntity } from './mappers/category.mapper';
 import { toMenuEntity } from './mappers/menu.mapper';
-import { slugify, toMenuItemEntity } from './mappers/menu-item.mapper';
+import { HALAL_CODE, slugify, toMenuItemEntity } from './mappers/menu-item.mapper';
 
 /** API-706 error codes. */
 function notFound(code: string, message: string): NotFoundException {
@@ -124,6 +124,11 @@ export class MenuService {
       throw notFound('CATEGORY_NOT_FOUND', `Category ${dto.categoryId} not found`);
     }
 
+    const halalTagId = await this.resolveHalalTagId(dto);
+    const certificationTagIds =
+      dto.certificationTagIds ??
+      (halalTagId === undefined ? undefined : dto.isHalal ? [halalTagId] : []);
+
     // The back-office dish form carries no SKU, so the API mints one. Two
     // managers saving at the same moment can compute the same number — the
     // (brand_id, sku) unique index arbitrates and we retry with the next one.
@@ -134,7 +139,7 @@ export class MenuService {
       const slug = dto.slug ?? slugify(dto.name, sku.toLowerCase());
       try {
         const created = await this.repository.createMenuItem(
-          { ...dto, sku },
+          { ...dto, sku, certificationTagIds },
           { brandId: category.brandId, menuId: category.menuId },
           slug,
         );
@@ -166,12 +171,13 @@ export class MenuService {
     if (dto.categoryId) {
       await this.assertCategoryExists(dto.categoryId);
     }
+    const halalTagId = await this.resolveHalalTagId(dto);
     let slug = dto.slug;
     if (slug === undefined && dto.name !== undefined && dto.slug === undefined) {
       // Regenerate the slug only when the name changes and no slug was supplied.
       slug = slugify(dto.name, (dto.sku ?? item.sku).toLowerCase());
     }
-    await this.repository.updateMenuItem(id, dto, slug);
+    await this.repository.updateMenuItem(id, dto, slug, halalTagId);
     return this.getItemById(id);
   }
 
@@ -283,6 +289,50 @@ export class MenuService {
     }
     const results = await this.repository.reorderCategoryProducts(categoryId, category.menuId, dto.ids);
     return { updated: results.reduce((sum, r) => sum + r.count, 0) };
+  }
+
+  /**
+   * `isHalal` is sugar for the HALAL certification tag (DB-607). It exists
+   * because the certification UUID is per-environment: a client that hardcoded
+   * one would fail the whole save in every other database. The tag id comes
+   * back only when the field was sent, so an ordinary save costs no extra query.
+   */
+  private async resolveHalalTagId(dto: {
+    certificationTagIds?: string[];
+    isHalal?: boolean;
+  }): Promise<string | undefined> {
+    if (dto.certificationTagIds !== undefined) {
+      if (dto.isHalal !== undefined) {
+        throw badRequest(
+          'VALIDATION_ERROR',
+          'send either certificationTagIds or isHalal, not both',
+        );
+      }
+      await this.assertCertificationTagsExist(dto.certificationTagIds);
+      return undefined;
+    }
+    if (dto.isHalal === undefined) {
+      return undefined;
+    }
+    const tag = await this.repository.findCertificationTagByCode(HALAL_CODE);
+    if (!tag) {
+      throw badRequest(
+        'CERTIFICATION_TAG_NOT_FOUND',
+        `${HALAL_CODE} certification tag is not configured`,
+      );
+    }
+    return tag.id;
+  }
+
+  private async assertCertificationTagsExist(ids: string[]): Promise<void> {
+    const existing = await this.repository.findExistingCertificationTagIds(ids);
+    const missing = ids.filter((id) => !existing.includes(id));
+    if (missing.length > 0) {
+      throw badRequest(
+        'CERTIFICATION_TAG_NOT_FOUND',
+        `Unknown certification tag(s): ${missing.join(', ')}`,
+      );
+    }
   }
 
   private async assertCategoryExists(id: string): Promise<void> {

@@ -31,6 +31,40 @@ const ACTIVE_HALAL_FILTER: Prisma.MenuItemWhereInput = {
 };
 
 /**
+ * Certifications are a set: keep the links that stay, add the missing ones,
+ * drop the rest. `isHalal` is the HALAL-only case of the same edit and is
+ * written as a targeted connect/delete so it cannot touch other tags.
+ */
+function certificationWrite(
+  menuItemId: string,
+  dto: Pick<UpdateMenuItemDto, 'certificationTagIds' | 'isHalal'>,
+  halalTagId?: string,
+): { certifications?: Prisma.MenuItemUpdateInput['certifications'] } {
+  const link = (tagId: string) => ({
+    where: { menuItemId_tagId: { menuItemId, tagId } },
+    create: { tagId },
+  });
+
+  if (dto.certificationTagIds !== undefined) {
+    const ids = dto.certificationTagIds;
+    return {
+      certifications: {
+        // `notIn: []` is not a filter Prisma can express; an empty list means "drop them all".
+        deleteMany: ids.length ? { tagId: { notIn: ids } } : {},
+        connectOrCreate: ids.map(link),
+      },
+    };
+  }
+  if (dto.isHalal === true && halalTagId) {
+    return { certifications: { connectOrCreate: [link(halalTagId)] } };
+  }
+  if (dto.isHalal === false && halalTagId) {
+    return { certifications: { deleteMany: { tagId: halalTagId } } };
+  }
+  return {};
+}
+
+/**
  * Repository pattern (ADR-1607): every catalog query goes through Prisma
  * here; the service layer contains no data-access code.
  */
@@ -166,6 +200,19 @@ export class MenuRepository {
     return this.prisma.menuItem.findFirst({ where: { id, deletedAt: null } });
   }
 
+  findCertificationTagByCode(code: string) {
+    return this.prisma.certificationTag.findFirst({ where: { code, deletedAt: null } });
+  }
+
+  /** Which of `ids` exist as live certification tags. */
+  async findExistingCertificationTagIds(ids: string[]): Promise<string[]> {
+    const rows = await this.prisma.certificationTag.findMany({
+      where: { id: { in: ids }, deletedAt: null },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
   async createCategory(dto: CreateCategoryDto, brandId: string): Promise<CategoryRecord> {
     const row = await this.prisma.category.create({
       data: {
@@ -260,10 +307,11 @@ export class MenuRepository {
     });
   }
 
-  updateMenuItem(id: string, dto: UpdateMenuItemDto, slug?: string) {
+  updateMenuItem(id: string, dto: UpdateMenuItemDto, slug?: string, halalTagId?: string) {
     return this.prisma.menuItem.update({
       where: { id },
       data: {
+        ...certificationWrite(id, dto, halalTagId),
         ...(dto.categoryId !== undefined ? { categoryId: dto.categoryId } : {}),
         ...(dto.sku !== undefined ? { sku: dto.sku } : {}),
         ...(dto.name !== undefined ? { name: dto.name } : {}),

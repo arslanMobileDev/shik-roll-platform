@@ -87,6 +87,8 @@ interface Fixture {
   itemUnavailable: string; // halal, availability=false @ branchA1
   itemDraft: string; // DRAFT — not in the public catalog
   itemBrandB: string;
+  halalTagId: string;
+  veganTagId: string; // second tag, so HALAL-only edits are provable
 }
 
 async function seedFixtures(): Promise<Fixture> {
@@ -111,6 +113,10 @@ async function seedFixtures(): Promise<Fixture> {
 
   const halal = await prisma.certificationTag.create({
     data: { code: 'HALAL', name: 'Halal' },
+  });
+  // A second tag proves the HALAL toggle edits only its own link.
+  const vegan = await prisma.certificationTag.create({
+    data: { code: 'VEGAN', name: 'Vegan' },
   });
 
   const menuA = await prisma.menu.create({
@@ -266,6 +272,8 @@ async function seedFixtures(): Promise<Fixture> {
     itemUnavailable: itemUnavailable.id,
     itemDraft: itemDraft.id,
     itemBrandB: itemBrandB.id,
+    halalTagId: halal.id,
+    veganTagId: vegan.id,
   };
 }
 
@@ -320,6 +328,93 @@ describe('Menu & Product API (e2e)', () => {
   });
 
   const get = (url: string) => request(app.getHttpServer()).get(url);
+  const patch = (id: string, body: Record<string, unknown>) =>
+    request(app.getHttpServer())
+      .patch(`/menu-items/${id}`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send(body);
+
+  it('writes and clears certifications through isHalal and certificationTagIds', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/menu-items')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        categoryId: fx.categorySets,
+        sku: 'CERT-001',
+        name: 'Сертификация',
+        basePrice: 100,
+        isHalal: true,
+      })
+      .expect(201);
+    expect(created.body.isHalal).toBe(true);
+    expect(created.body.certifications).toEqual([
+      expect.objectContaining({ code: 'HALAL' }),
+    ]);
+
+    const plain = await request(app.getHttpServer())
+      .post('/menu-items')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        categoryId: fx.categorySets,
+        sku: 'CERT-002',
+        name: 'Без сертификации',
+        basePrice: 100,
+      })
+      .expect(201);
+    expect(plain.body.isHalal).toBe(false);
+
+    // A HALAL link carries certificate metadata: re-sending the toggle must keep
+    // the row, not delete and recreate it (a wipe would silently drop the number).
+    await prisma.menuItemCertification.update({
+      where: { menuItemId_tagId: { menuItemId: created.body.id, tagId: fx.halalTagId } },
+      data: { certificateNumber: 'HAL-2026-1' },
+    });
+    await prisma.menuItemCertification.create({
+      data: { menuItemId: created.body.id, tagId: fx.veganTagId },
+    });
+
+    const again = await patch(created.body.id, { isHalal: true }).expect(200);
+    expect(again.body.certifications).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'HALAL', certificateNumber: 'HAL-2026-1' }),
+        expect.objectContaining({ code: 'VEGAN' }),
+      ]),
+    );
+
+    // A scalar-only PATCH leaves certifications alone.
+    const scalar = await patch(created.body.id, { name: 'Переименовано' }).expect(200);
+    expect(scalar.body.certifications).toHaveLength(2);
+
+    const off = await patch(created.body.id, { isHalal: false }).expect(200);
+    expect(off.body.isHalal).toBe(false);
+    expect(off.body.certifications).toEqual([
+      expect.objectContaining({ code: 'VEGAN' }),
+    ]);
+
+    // The explicit tag list replaces the whole set.
+    const on = await patch(created.body.id, {
+      certificationTagIds: [fx.halalTagId],
+    }).expect(200);
+    expect(on.body.isHalal).toBe(true);
+    expect(on.body.certifications).toEqual([
+      expect.objectContaining({ code: 'HALAL' }),
+    ]);
+
+    const none = await patch(created.body.id, { certificationTagIds: [] }).expect(200);
+    expect(none.body.certifications).toEqual([]);
+    expect(none.body.isHalal).toBe(false);
+
+    const unknown = await patch(created.body.id, {
+      certificationTagIds: ['00000000-0000-4000-8000-000000000000'],
+    }).expect(400);
+    expect(unknown.body.code).toBe('CERTIFICATION_TAG_NOT_FOUND');
+
+    const both = await patch(created.body.id, {
+      isHalal: true,
+      certificationTagIds: [fx.halalTagId],
+    }).expect(400);
+    expect(both.body.code).toBe('VALIDATION_ERROR');
+  });
 
   it('persists image and allergens through create, independent PATCH and GET', async () => {
     const created = await request(app.getHttpServer()).post('/menu-items').set('Authorization', `Bearer ${staffToken}`).send({
