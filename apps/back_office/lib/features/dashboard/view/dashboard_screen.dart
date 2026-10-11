@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/shik_date_picker.dart';
 import '../bloc/dashboard_cubit.dart';
 import '../bloc/dashboard_state.dart';
 import '../data/models/revenue_summary.dart';
@@ -20,34 +21,19 @@ class DashboardScreen extends StatelessWidget {
     final cubit = context.read<DashboardCubit>();
     final now = DateTime.now().toUtc().add(const Duration(hours: 3));
 
-    final start = await showDatePicker(
-      context: context,
-      initialDate: state.dateFrom ?? now,
+    final range = await showShikDateRangePicker(
+      context,
       firstDate: DateTime(2000),
       lastDate: DateTime(now.year + 1, 12, 31),
-      initialDatePickerMode: DatePickerMode.year,
-      helpText: 'Начало периода',
-      cancelText: 'Отмена',
-      confirmText: 'Далее',
+      initialFrom: state.dateFrom,
+      initialTo: state.dateTo,
     );
-    if (start == null || !context.mounted) return;
-
-    final end = await showDatePicker(
-      context: context,
-      initialDate: state.dateTo ?? start,
-      firstDate: start,
-      lastDate: DateTime(now.year + 1, 12, 31),
-      initialDatePickerMode: DatePickerMode.year,
-      helpText: 'Конец периода',
-      cancelText: 'Отмена',
-      confirmText: 'Применить',
-    );
-    if (end == null) return;
+    if (range == null || !context.mounted) return;
 
     await cubit.select(
       DashboardPeriod.custom,
-      from: start,
-      to: end,
+      from: range.start,
+      to: range.end,
     );
   }
 

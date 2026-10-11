@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/shik_date_picker.dart';
 import '../bloc/orders_journal_bloc.dart';
 import '../bloc/orders_journal_event.dart';
 import '../bloc/orders_journal_state.dart';
@@ -111,12 +112,11 @@ class _DateFilters extends StatelessWidget {
   Future<void> _pickDay(BuildContext context) async {
     final bloc = context.read<OrdersJournalBloc>();
     final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await showShikDatePicker(
+      context,
       initialDate: bloc.state.customDay ?? now,
       firstDate: DateTime(now.year - 2),
       lastDate: now,
-      initialDatePickerMode: DatePickerMode.year,
     );
     if (picked != null) {
       bloc.add(
