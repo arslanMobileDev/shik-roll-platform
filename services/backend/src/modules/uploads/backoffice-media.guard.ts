@@ -3,9 +3,19 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+
+/**
+ * Staff roles allowed to write menu media. Mirrors the roles issued by
+ * POST /staff/auth/pin (see StaffJwtAuthGuard); guest, kitchen and courier
+ * tokens carry other roles. JWT_SECRET is shared by every bounded context,
+ * so the role is what keeps a foreign token with a colliding `sub` out —
+ * the allowlist alone does not separate contexts.
+ */
+const MEDIA_UPLOAD_ROLES = ['OWNER', 'DEVELOPER', 'MANAGER'];
 
 /** Expected payload shape of a backoffice staff access token. */
 export interface BackofficeTokenPayload {
@@ -24,16 +34,19 @@ export interface RequestWithBackofficeStaff {
  * Authorizes backoffice staff for menu media uploads (ADR-008).
  *
  * There is no staff persistence in the schema yet, so the trusted provider
- * is the BACKOFFICE_STAFF_IDS env allowlist (comma-separated staff UUIDs).
- * The token signature and expiry are always verified first; the subject must
+ * is the BACKOFFICE_STAFF_IDS env allowlist (comma-separated staff UUIDs):
+ * it is the sole source of truth for who may write media. The token
+ * signature and expiry are always verified first; the token must be an
+ * access token of a staff role (MEDIA_UPLOAD_ROLES), and its subject must
  * then be present in the allowlist. When the allowlist is unset or empty no
  * trusted provider is configured and every request is denied — the endpoint
- * is never public. Guest (CUSTOMER), kitchen and courier tokens carry other
- * roles and are rejected as TOKEN_INVALID. When a DB-backed staff provider
- * lands, only this class changes.
+ * is never public. Guest (CUSTOMER), kitchen and courier tokens carry roles
+ * outside MEDIA_UPLOAD_ROLES and are rejected as TOKEN_INVALID. When a
+ * DB-backed staff provider lands, only this class changes.
  */
 @Injectable()
 export class BackofficeMediaGuard implements CanActivate {
+  private readonly logger = new Logger(BackofficeMediaGuard.name);
   private readonly staffIds: Set<string>;
 
   constructor(private readonly jwt: JwtService) {
@@ -60,6 +73,9 @@ export class BackofficeMediaGuard implements CanActivate {
     }
     const staffId = await this.verify(token);
     if (!this.staffIds.has(staffId)) {
+      this.logger.debug(
+        `BackofficeMediaGuard: staff ${staffId} not in BACKOFFICE_STAFF_IDS whitelist (size=${this.staffIds.size})`,
+      );
       throw new ForbiddenException({
         statusCode: 403,
         code: 'BACKOFFICE_FORBIDDEN',
@@ -82,7 +98,7 @@ export class BackofficeMediaGuard implements CanActivate {
       const payload = await this.jwt.verifyAsync<BackofficeTokenPayload>(token);
       if (
         payload.type !== 'access' ||
-        payload.role !== 'BACKOFFICE' ||
+        !MEDIA_UPLOAD_ROLES.includes(payload.role) ||
         !payload.sub
       ) {
         throw new Error('Not a backoffice access token');

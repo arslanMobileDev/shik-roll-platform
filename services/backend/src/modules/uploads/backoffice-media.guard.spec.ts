@@ -52,7 +52,7 @@ describe('BackofficeMediaGuard (ADR-008)', () => {
 
   it('rejects an expired token (TOKEN_INVALID)', async () => {
     const token = await jwt.signAsync(
-      { sub: STAFF_ID, role: 'BACKOFFICE', type: 'access' },
+      { sub: STAFF_ID, role: 'OWNER', type: 'access' },
       { expiresIn: -10 },
     );
     const { context } = contextFor({ authorization: `Bearer ${token}` });
@@ -72,10 +72,25 @@ describe('BackofficeMediaGuard (ADR-008)', () => {
     },
   );
 
+  it('rejects a foreign role even when its subject is allowlisted (TOKEN_INVALID)', async () => {
+    // JWT_SECRET is shared across bounded contexts, so the allowlist alone
+    // does not separate them: a courier token with a colliding `sub` must
+    // still be turned away by the role check.
+    const token = await jwt.signAsync({
+      sub: STAFF_ID,
+      role: 'COURIER',
+      type: 'access',
+    });
+    const { context } = contextFor({ authorization: `Bearer ${token}` });
+    await expect(guardWith(STAFF_ID).canActivate(context)).rejects.toMatchObject({
+      response: { code: 'TOKEN_INVALID' },
+    });
+  });
+
   it('rejects a refresh-type backoffice token (TOKEN_INVALID)', async () => {
     const token = await jwt.signAsync({
       sub: STAFF_ID,
-      role: 'BACKOFFICE',
+      role: 'OWNER',
       type: 'refresh',
     });
     const { context } = contextFor({ authorization: `Bearer ${token}` });
@@ -87,7 +102,7 @@ describe('BackofficeMediaGuard (ADR-008)', () => {
   it('denies a valid backoffice token when no provider is configured (403)', async () => {
     const token = await jwt.signAsync({
       sub: STAFF_ID,
-      role: 'BACKOFFICE',
+      role: 'OWNER',
       type: 'access',
     });
     const { context } = contextFor({ authorization: `Bearer ${token}` });
@@ -99,10 +114,10 @@ describe('BackofficeMediaGuard (ADR-008)', () => {
     });
   });
 
-  it('denies a backoffice subject outside the allowlist (403)', async () => {
+  it('denies a staff subject outside the allowlist (403)', async () => {
     const token = await jwt.signAsync({
       sub: 'someone-else',
-      role: 'BACKOFFICE',
+      role: 'OWNER',
       type: 'access',
     });
     const { context } = contextFor({ authorization: `Bearer ${token}` });
@@ -111,16 +126,17 @@ describe('BackofficeMediaGuard (ADR-008)', () => {
     });
   });
 
-  it('admits an allowlisted backoffice subject and attaches the identity', async () => {
-    const token = await jwt.signAsync({
-      sub: STAFF_ID,
-      role: 'BACKOFFICE',
-      type: 'access',
-    });
-    const { context, request } = contextFor({ authorization: `Bearer ${token}` });
-    await expect(
-      guardWith(`other-id, ${STAFF_ID} ,third-id`).canActivate(context),
-    ).resolves.toBe(true);
-    expect(request.backofficeStaff).toEqual({ id: STAFF_ID });
-  });
+  it.each(['OWNER', 'DEVELOPER', 'MANAGER'])(
+    'admits an allowlisted %s staff token and attaches the identity',
+    async (role) => {
+      const token = await jwt.signAsync({ sub: STAFF_ID, role, type: 'access' });
+      const { context, request } = contextFor({
+        authorization: `Bearer ${token}`,
+      });
+      await expect(
+        guardWith(`other-id, ${STAFF_ID} ,third-id`).canActivate(context),
+      ).resolves.toBe(true);
+      expect(request.backofficeStaff).toEqual({ id: STAFF_ID });
+    },
+  );
 });

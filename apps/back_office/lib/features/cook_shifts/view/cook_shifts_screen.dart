@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import '../../../core/widgets/shik_date_picker.dart';
 import '../bloc/cook_shifts_cubit.dart';
 
 class CookShiftsScreen extends StatelessWidget {
@@ -37,8 +38,8 @@ class CookShiftsScreen extends StatelessWidget {
                   onSelected: (_) async {
                     if (p.key == 'custom') {
                       final now = DateTime.now();
-                      final range = await showDateRangePicker(
-                        context: context,
+                      final range = await showShikDateRangePicker(
+                        context,
                         firstDate: DateTime(2000),
                         lastDate: DateTime(now.year + 1),
                       );

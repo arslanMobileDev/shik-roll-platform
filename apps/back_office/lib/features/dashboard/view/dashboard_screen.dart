@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/shik_date_picker.dart';
 import '../bloc/dashboard_cubit.dart';
 import '../bloc/dashboard_state.dart';
 import '../data/models/revenue_summary.dart';
@@ -16,29 +17,24 @@ class DashboardScreen extends StatelessWidget {
   ).format(value);
   String _date(DateTime value) => DateFormat('dd.MM.yyyy', 'ru').format(value);
 
-  Future<void> _choose(BuildContext context, DashboardState state) async {
+   Future<void> _choose(BuildContext context, DashboardState state) async {
     final cubit = context.read<DashboardCubit>();
     final now = DateTime.now().toUtc().add(const Duration(hours: 3));
-    final range = await showDateRangePicker(
-      context: context,
+
+    final range = await showShikDateRangePicker(
+      context,
       firstDate: DateTime(2000),
       lastDate: DateTime(now.year + 1, 12, 31),
-      initialDateRange: state.dateFrom != null && state.dateTo != null
-          ? DateTimeRange(start: state.dateFrom!, end: state.dateTo!)
-          : null,
-      helpText: 'Период выручки · Москва',
-      saveText: 'Применить',
-      cancelText: 'Отмена',
-      fieldStartLabelText: 'Начало',
-      fieldEndLabelText: 'Конец',
+      initialFrom: state.dateFrom,
+      initialTo: state.dateTo,
     );
-    if (range != null && context.mounted) {
-      await cubit.select(
-        DashboardPeriod.custom,
-        from: range.start,
-        to: range.end,
-      );
-    }
+    if (range == null || !context.mounted) return;
+
+    await cubit.select(
+      DashboardPeriod.custom,
+      from: range.start,
+      to: range.end,
+    );
   }
 
   @override
@@ -90,7 +86,7 @@ class DashboardScreen extends StatelessWidget {
               ],
             ),
             const Text(
-              'Завершённые заказы · Московское время',
+              'Завершённые заказы',
               style: TextStyle(color: AppColors.inkMuted),
             ),
             const SizedBox(height: 20),
@@ -138,7 +134,7 @@ class DashboardScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              '${_date(revenue.from.toUtc().add(const Duration(hours: 3)))} — ${_date(revenue.to.toUtc().add(const Duration(hours: 3)))} · МСК',
+              '${_date(revenue.from.toUtc().add(const Duration(hours: 3)))} — ${_date(revenue.to.toUtc().add(const Duration(hours: 3)))}',
             ),
             if (revenue.summary.ordersCount == 0)
               const Padding(
