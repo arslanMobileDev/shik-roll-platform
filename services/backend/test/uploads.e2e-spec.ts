@@ -119,7 +119,7 @@ describe('Uploads (e2e, ADR-008)', () => {
   it('rejects a backoffice subject outside the allowlist (403)', async () => {
     const res = await request(app.getHttpServer())
       .post('/uploads/menu')
-      .set('Authorization', `Bearer ${tokenFor('other', 'BACKOFFICE')}`)
+      .set('Authorization', `Bearer ${tokenFor('other', 'OWNER')}`)
       .attach('file', jpeg, { filename: 'dish.jpg', contentType: 'image/jpeg' });
     expect(res.status).toBe(403);
     expect(res.body).toMatchObject({
@@ -131,7 +131,7 @@ describe('Uploads (e2e, ADR-008)', () => {
   it('rejects a request without a file (400)', async () => {
     const res = await request(app.getHttpServer())
       .post('/uploads/menu')
-      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'BACKOFFICE')}`)
+      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'OWNER')}`)
       .field('note', 'no file attached');
     expect(res.status).toBe(400);
     // fields: 0 is violated first (multipart contract) or IMAGE_REQUIRED —
@@ -143,7 +143,7 @@ describe('Uploads (e2e, ADR-008)', () => {
   it('rejects an extra text field next to the file (400)', async () => {
     const res = await request(app.getHttpServer())
       .post('/uploads/menu')
-      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'BACKOFFICE')}`)
+      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'OWNER')}`)
       .field('caption', 'not allowed')
       .attach('file', jpeg, { filename: 'dish.jpg', contentType: 'image/jpeg' });
     expect(res.status).toBe(400);
@@ -156,7 +156,7 @@ describe('Uploads (e2e, ADR-008)', () => {
   it('rejects a second file field (400)', async () => {
     const res = await request(app.getHttpServer())
       .post('/uploads/menu')
-      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'BACKOFFICE')}`)
+      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'OWNER')}`)
       .attach('file', jpeg, { filename: 'dish.jpg', contentType: 'image/jpeg' })
       .attach('extra', png, { filename: 'extra.png', contentType: 'image/png' });
     expect(res.status).toBe(400);
@@ -169,7 +169,7 @@ describe('Uploads (e2e, ADR-008)', () => {
   it('rejects a disallowed declared MIME at the boundary (415)', async () => {
     const res = await request(app.getHttpServer())
       .post('/uploads/menu')
-      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'BACKOFFICE')}`)
+      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'OWNER')}`)
       .attach('file', Buffer.from('hello'), {
         filename: 'note.txt',
         contentType: 'text/plain',
@@ -184,7 +184,7 @@ describe('Uploads (e2e, ADR-008)', () => {
     );
     const res = await request(app.getHttpServer())
       .post('/uploads/menu')
-      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'BACKOFFICE')}`)
+      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'OWNER')}`)
       .attach('file', svg, { filename: 'fake.jpg', contentType: 'image/jpeg' });
     expect(res.status).toBe(415);
     expect(res.body).toMatchObject({ statusCode: 415, code: 'IMAGE_TYPE' });
@@ -193,7 +193,7 @@ describe('Uploads (e2e, ADR-008)', () => {
   it('rejects undecodable content (422)', async () => {
     const res = await request(app.getHttpServer())
       .post('/uploads/menu')
-      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'BACKOFFICE')}`)
+      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'OWNER')}`)
       .attach('file', Buffer.alloc(4096, 7), {
         filename: 'broken.png',
         contentType: 'image/png',
@@ -207,7 +207,7 @@ describe('Uploads (e2e, ADR-008)', () => {
     expect(exact.length).toBe(MAX_IMAGE_BYTES);
     const res = await request(app.getHttpServer())
       .post('/uploads/menu')
-      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'BACKOFFICE')}`)
+      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'OWNER')}`)
       .attach('file', exact, { filename: 'big.png', contentType: 'image/png' });
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({ mimeType: 'image/webp', width: 1000, height: 1000 });
@@ -217,7 +217,7 @@ describe('Uploads (e2e, ADR-008)', () => {
     const over = padPngToSize(png, MAX_IMAGE_BYTES + 1);
     const res = await request(app.getHttpServer())
       .post('/uploads/menu')
-      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'BACKOFFICE')}`)
+      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'OWNER')}`)
       .attach('file', over, { filename: 'big.png', contentType: 'image/png' });
     expect(res.status).toBe(413);
     expect(res.body).toMatchObject({ statusCode: 413, code: 'IMAGE_TOO_LARGE' });
@@ -226,7 +226,7 @@ describe('Uploads (e2e, ADR-008)', () => {
   it('rejects a file beyond the Multer limit via the filter (413)', async () => {
     const res = await request(app.getHttpServer())
       .post('/uploads/menu')
-      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'BACKOFFICE')}`)
+      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'OWNER')}`)
       .attach('file', Buffer.alloc(MAX_IMAGE_BYTES + 64 * 1024, 1), {
         filename: 'huge.png',
         contentType: 'image/png',
@@ -239,7 +239,7 @@ describe('Uploads (e2e, ADR-008)', () => {
     const server = app.getHttpServer();
     const res = await request(server)
       .post('/uploads/menu')
-      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'BACKOFFICE')}`)
+      .set('Authorization', `Bearer ${tokenFor(STAFF_ID, 'OWNER')}`)
       .attach('file', jpeg, { filename: 'dish.jpg', contentType: 'image/jpeg' });
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
