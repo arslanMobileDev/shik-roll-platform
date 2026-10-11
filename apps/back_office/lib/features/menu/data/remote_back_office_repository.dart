@@ -119,11 +119,14 @@ final class RemoteBackOfficeRepository implements BackOfficeRepository {
   }
 
   @override
-  Future<MenuItem> updateMenuItem(MenuItem item) async {
+  Future<MenuItem> updateMenuItem({
+    required String id,
+    required MenuItemDraft draft,
+  }) async {
     try {
       final response = await _dio.patch<Map<String, dynamic>>(
-        '/menu-items/${item.id}',
-        data: item.toJson(),
+        '/menu-items/$id',
+        data: draft.toJson(),
       );
       final data = response.data ?? const <String, dynamic>{};
       final itemMap =

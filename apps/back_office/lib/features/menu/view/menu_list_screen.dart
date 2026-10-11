@@ -145,7 +145,11 @@ class _Body extends StatelessWidget {
 
 /// Opens the create/edit dish dialog and dispatches the result.
 Future<void> openMenuItemForm(BuildContext context, {MenuItem? item}) async {
-  final draft = await MenuItemFormDialog.show(context, initial: item);
+  final draft = await MenuItemFormDialog.show(
+    context,
+    initial: item,
+    categories: context.read<MenuCatalogBloc>().state.categories,
+  );
   if (draft != null && context.mounted) {
     context.read<MenuCatalogBloc>().add(
       MenuItemSubmitted(draft: draft, editingId: item?.id),

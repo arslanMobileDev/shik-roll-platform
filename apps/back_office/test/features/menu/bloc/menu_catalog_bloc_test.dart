@@ -18,7 +18,7 @@ const _roll = MenuItem(
   id: 'r1',
   name: 'Филадельфия',
   description: 'Лосось, сыр',
-  category: MenuCategory.rolls,
+  categoryName: 'Роллы',
   categoryId: 'cat-roll',
   price: Money(44900),
   isHalal: true,
@@ -29,7 +29,7 @@ const _burger = MenuItem(
   id: 'b1',
   name: 'ШИК бургер',
   description: 'Говядина',
-  category: MenuCategory.burgers,
+  categoryName: 'Бургеры',
   categoryId: 'cat-burger',
   price: Money(34900),
   isHalal: true,
@@ -45,7 +45,7 @@ void main() {
       const MenuItemDraft(
         name: '',
         description: '',
-        category: MenuCategory.rolls,
+        categoryId: 'cat-roll',
         price: Money.zero,
         isHalal: true,
       ),
@@ -320,7 +320,7 @@ void main() {
     const draft = MenuItemDraft(
       name: 'Новый ролл',
       description: 'Состав',
-      category: MenuCategory.rolls,
+      categoryId: 'cat-roll',
       price: Money(19900),
       isHalal: true,
     );
@@ -347,9 +347,14 @@ void main() {
     );
 
     blocTest<MenuCatalogBloc, MenuCatalogState>(
-      'updates existing item preserving availability',
+      'updates the item from the server response',
       setUp: () {
-        when(() => repository.updateMenuItem(any())).thenAnswer(
+        when(
+          () => repository.updateMenuItem(
+            id: any(named: 'id'),
+            draft: any(named: 'draft'),
+          ),
+        ).thenAnswer(
           (_) async => _roll.copyWith(name: 'Обновлено', isAvailable: false),
         );
       },
@@ -370,12 +375,59 @@ void main() {
       verify: (_) {
         final captured =
             verify(
-                  () => repository.updateMenuItem(captureAny()),
+                  () => repository.updateMenuItem(
+                    id: 'r1',
+                    draft: captureAny(named: 'draft'),
+                  ),
                 ).captured.single
-                as MenuItem;
-        expect(captured.id, 'r1');
+                as MenuItemDraft;
         expect(captured.name, draft.name);
-        expect(captured.isAvailable, isTrue);
+      },
+    );
+
+    // Regression: the bloc used to forward `existing.categoryId`, so moving a
+    // dish to another category saved the old one and only the toast changed.
+    blocTest<MenuCatalogBloc, MenuCatalogState>(
+      'sends the category the manager picked, not the stored one',
+      setUp: () {
+        when(
+          () => repository.updateMenuItem(
+            id: any(named: 'id'),
+            draft: any(named: 'draft'),
+          ),
+        ).thenAnswer(
+          (_) async =>
+              _roll.copyWith(categoryName: 'Бургеры', categoryId: 'cat-burger'),
+        );
+      },
+      build: buildBloc,
+      seed: () => const MenuCatalogState(
+        status: MenuCatalogStatus.ready,
+        branchId: 'b1',
+        items: [_roll],
+      ),
+      act: (bloc) => bloc.add(
+        const MenuItemSubmitted(
+          draft: MenuItemDraft(
+            name: 'Филадельфия',
+            description: 'Лосось, сыр',
+            categoryId: 'cat-burger',
+            price: Money(44900),
+            isHalal: true,
+          ),
+          editingId: 'r1',
+        ),
+      ),
+      verify: (_) {
+        final captured =
+            verify(
+                  () => repository.updateMenuItem(
+                    id: 'r1',
+                    draft: captureAny(named: 'draft'),
+                  ),
+                ).captured.single
+                as MenuItemDraft;
+        expect(captured.categoryId, 'cat-burger');
       },
     );
 

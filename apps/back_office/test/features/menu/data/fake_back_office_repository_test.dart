@@ -16,8 +16,8 @@ void main() {
       final items = await repository.fetchMenuItems(branchId: 'branch-center');
       expect(items, isNotEmpty);
       expect(
-        items.map((e) => e.category).toSet(),
-        containsAll(MenuCategory.values),
+        items.map((e) => e.categoryName).toSet(),
+        containsAll(FakeBackOfficeRepository.categories.map((c) => c.name)),
       );
     });
 
@@ -56,50 +56,74 @@ void main() {
 
   group('createMenuItem', () {
     test('creates available item with generated id', () async {
-      const draft = MenuItemDraft(
+      final draft = MenuItemDraft(
         name: 'Новый ролл',
         description: 'Тест',
-        category: MenuCategory.rolls,
-        price: Money(19900),
+        categoryId: FakeBackOfficeRepository.categoryRolls.id,
+        price: const Money(19900),
         isHalal: true,
       );
       final created = await repository.createMenuItem(draft);
       expect(created.id, isNotEmpty);
       expect(created.isAvailable, isTrue);
       expect(created.name, 'Новый ролл');
+      expect(created.categoryName, 'Роллы');
       final items = await repository.fetchMenuItems(branchId: 'branch-center');
       expect(items.map((e) => e.id), contains(created.id));
     });
   });
 
   group('updateMenuItem', () {
-    test('updates fields of existing item', () async {
+    test('moves the item to the category the draft names', () async {
       final items = await repository.fetchMenuItems(branchId: 'branch-center');
       final target = items.first;
       final updated = await repository.updateMenuItem(
-        target.copyWith(name: 'Переименовано', price: const Money(100)),
+        id: target.id,
+        draft: MenuItemDraft(
+          name: 'Переименовано',
+          description: target.description,
+          categoryId: FakeBackOfficeRepository.categoryBurgers.id,
+          price: const Money(100),
+        ),
       );
       expect(updated.name, 'Переименовано');
       expect(updated.price, const Money(100));
+      expect(updated.categoryId, FakeBackOfficeRepository.categoryBurgers.id);
+      expect(updated.categoryName, 'Бургеры');
+
       final reloaded = await repository.fetchMenuItems(
         branchId: 'branch-center',
       );
-      expect(reloaded.firstWhere((e) => e.id == target.id).name,
-          'Переименовано');
+      final stored = reloaded.firstWhere((e) => e.id == target.id);
+      expect(stored.categoryName, 'Бургеры');
     });
 
     test('throws for unknown id', () {
-      const ghost = MenuItem(
-        id: 'nope',
-        name: 'x',
-        description: '',
-        category: MenuCategory.rolls,
-        price: Money.zero,
-        isHalal: true,
-        isAvailable: true,
-      );
       expect(
-        () => repository.updateMenuItem(ghost),
+        () => repository.updateMenuItem(
+          id: 'nope',
+          draft: MenuItemDraft(
+            name: 'x',
+            description: '',
+            categoryId: FakeBackOfficeRepository.categoryRolls.id,
+            price: Money.zero,
+          ),
+        ),
+        throwsA(isA<BackOfficeApiException>()),
+      );
+    });
+
+    test('rejects an unknown categoryId like the API does', () {
+      expect(
+        () => repository.updateMenuItem(
+          id: 'demo-1',
+          draft: const MenuItemDraft(
+            name: 'x',
+            description: '',
+            categoryId: 'no-such-category',
+            price: Money.zero,
+          ),
+        ),
         throwsA(isA<BackOfficeApiException>()),
       );
     });

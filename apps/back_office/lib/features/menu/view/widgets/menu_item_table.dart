@@ -133,7 +133,7 @@ class _MenuItemRow extends StatelessWidget {
               ],
             ),
           ),
-          Expanded(child: _CategoryChip(category: item.category)),
+          Expanded(child: _CategoryChip(name: item.categoryName)),
           SizedBox(
             width: 110,
             child: Text(
@@ -177,9 +177,9 @@ class _MenuItemRow extends StatelessWidget {
 }
 
 class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({required this.category});
+  const _CategoryChip({required this.name});
 
-  final MenuCategory category;
+  final String name;
 
   @override
   Widget build(BuildContext context) {
@@ -193,7 +193,7 @@ class _CategoryChip extends StatelessWidget {
           border: Border.all(color: AppColors.outline),
         ),
         child: Text(
-          category.label,
+          name,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: AppColors.ink,
           ),

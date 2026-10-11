@@ -35,6 +35,26 @@ function pageMeta(page: number, limit: number, total: number): PageMeta {
   return { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) };
 }
 
+/**
+ * Prefix for minted SKUs. Readable in 1C exports (`AUTO-ROLLY-007`) and, by
+ * construction, outside the `<PREFIX>-<NNN>` space humans type.
+ */
+function autoSkuPrefix(categoryName: string): string {
+  // The slug is truncated so prefix + 3 digits stay inside the 64-character DTO limit.
+  return `AUTO-${slugify(categoryName, 'ITEM').toUpperCase().slice(0, 40)}-`;
+}
+
+/** True when Prisma rejected a write because `(brand_id, sku)` is already taken. */
+function isSkuConflict(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+    return false;
+  }
+  const target = error.meta?.target;
+  return Array.isArray(target)
+    ? target.includes('sku')
+    : String(target ?? '').includes('sku');
+}
+
 @Injectable()
 export class MenuService {
   constructor(private readonly repository: MenuRepository) {}
@@ -103,13 +123,39 @@ export class MenuService {
     if (!category) {
       throw notFound('CATEGORY_NOT_FOUND', `Category ${dto.categoryId} not found`);
     }
-    const slug = dto.slug ?? slugify(dto.name, dto.sku.toLowerCase());
-    const created = await this.repository.createMenuItem(
-      dto,
-      { brandId: category.brandId, menuId: category.menuId },
-      slug,
-    );
-    return this.getItemById(created.id);
+
+    // The back-office dish form carries no SKU, so the API mints one. Two
+    // managers saving at the same moment can compute the same number — the
+    // (brand_id, sku) unique index arbitrates and we retry with the next one.
+    // ponytail: three attempts is plenty for the back-office; a bulk importer
+    // should send explicit SKUs (or this needs a DB sequence).
+    for (let attempt = 0; ; attempt++) {
+      const sku = dto.sku ?? (await this.nextAutoSku(category.brandId, category.name));
+      const slug = dto.slug ?? slugify(dto.name, sku.toLowerCase());
+      try {
+        const created = await this.repository.createMenuItem(
+          { ...dto, sku },
+          { brandId: category.brandId, menuId: category.menuId },
+          slug,
+        );
+        return await this.getItemById(created.id);
+      } catch (error) {
+        if (dto.sku !== undefined || attempt >= 2 || !isSkuConflict(error)) {
+          throw error;
+        }
+      }
+    }
+  }
+
+  /** Next free `AUTO-<CATEGORY-SLUG>-<NNN>` for the brand. */
+  private async nextAutoSku(brandId: string, categoryName: string): Promise<string> {
+    const prefix = autoSkuPrefix(categoryName);
+    const rows = await this.repository.listAutoSkus(brandId, prefix);
+    const highest = rows.reduce((max, row) => {
+      const suffix = Number(row.sku.slice(prefix.length));
+      return Number.isInteger(suffix) && suffix > max ? suffix : max;
+    }, 0);
+    return `${prefix}${String(highest + 1).padStart(3, '0')}`;
   }
 
   async updateMenuItem(id: string, dto: UpdateMenuItemDto): Promise<MenuItemEntity> {
