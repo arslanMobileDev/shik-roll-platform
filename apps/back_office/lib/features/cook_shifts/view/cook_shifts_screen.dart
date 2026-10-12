@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import '../../../core/theme/app_breakpoints.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/shik_date_picker.dart';
 import '../bloc/cook_shifts_cubit.dart';
+import '../data/cook_shift_models.dart';
+
+String _date(DateTime d) => DateFormat(
+  'dd.MM.yyyy HH:mm',
+).format(d.toUtc().add(const Duration(hours: 3)));
 
 class CookShiftsScreen extends StatelessWidget {
   const CookShiftsScreen({super.key});
-  String date(DateTime d) => DateFormat(
-    'dd.MM.yyyy HH:mm',
-  ).format(d.toUtc().add(const Duration(hours: 3)));
+
   @override
   Widget build(BuildContext context) {
     final cubit = context.watch<CookShiftsCubit>();
@@ -79,6 +84,14 @@ class CookShiftsScreen extends StatelessWidget {
               CookShiftsStatus.ready =>
                 state.shifts.isEmpty
                     ? const Center(child: Text('Смен пока не было'))
+                    : AppBreakpoints.isMobile(MediaQuery.sizeOf(context).width)
+                    ? ListView.separated(
+                        itemCount: state.displayShifts.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 8),
+                        itemBuilder: (context, index) =>
+                            _ShiftCard(shift: state.displayShifts[index]),
+                      )
                     : SingleChildScrollView(
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -107,12 +120,12 @@ class CookShiftsScreen extends StatelessWidget {
                                   cells: [
                                     DataCell(Text(s.cookName)),
                                     DataCell(Text(s.terminalCode)),
-                                    DataCell(Text(date(s.clockInAt))),
+                                    DataCell(Text(_date(s.clockInAt))),
                                     DataCell(
                                       Text(
                                         s.clockOutAt == null
                                             ? '—'
-                                            : date(s.clockOutAt!),
+                                            : _date(s.clockOutAt!),
                                       ),
                                     ),
                                     DataCell(Text('${s.durationMinutes} мин')),
@@ -143,6 +156,77 @@ class CookShiftsScreen extends StatelessWidget {
                         ),
                       ),
             },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Phone layout of a `DataTable` row: same metrics, same badge keys, stacked.
+/// The value strings match the table cells byte for byte on purpose — the
+/// desktop tests then double as a parity check for the cards.
+class _ShiftCard extends StatelessWidget {
+  const _ShiftCard({required this.shift});
+
+  final CookShiftRecord shift;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: shift.isActive
+            ? Colors.green.withValues(alpha: 0.08)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  shift.cookName,
+                  style: textTheme.titleMedium,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                shift.isActive ? 'На смене' : 'Смена закрыта',
+                key: ValueKey(
+                  shift.isActive ? 'shiftActiveBadge' : 'shiftClosedBadge',
+                ),
+                style: textTheme.bodySmall?.copyWith(
+                  color: shift.isActive
+                      ? AppColors.success
+                      : AppColors.inkMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${shift.terminalCode} · ${_date(shift.clockInAt)} → '
+            '${shift.clockOutAt == null ? '—' : _date(shift.clockOutAt!)}',
+            style: textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              for (final metric in [
+                'Длительность ${shift.durationMinutes} мин',
+                'Заказов ${shift.completedOrders} шт.',
+                'Среднее ${shift.avgPrepSeconds == null ? '—' : '${(shift.avgPrepSeconds! / 60).toStringAsFixed(1)} мин'}',
+              ])
+                Text(metric, style: textTheme.bodySmall),
+            ],
           ),
         ],
       ),

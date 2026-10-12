@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_breakpoints.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/menu_item.dart';
 import 'menu_item_image.dart';
 
-/// Desktop table of catalog positions with quick stop-list switches.
+/// Catalog positions with quick stop-list switches — a table on desktop,
+/// stacked cards on phones.
 class MenuItemTable extends StatelessWidget {
   const MenuItemTable({
     super.key,
@@ -22,6 +24,19 @@ class MenuItemTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    if (AppBreakpoints.isMobile(MediaQuery.sizeOf(context).width)) {
+      if (items.isEmpty) return const Center(child: Text('Позиции не найдены'));
+      return ListView.separated(
+        itemCount: items.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 8),
+        itemBuilder: (context, index) => _MenuItemCard(
+          item: items[index],
+          isPending: pendingItemIds.contains(items[index].id),
+          onToggleStopList: onToggleStopList,
+          onEdit: onEdit,
+        ),
+      );
+    }
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -176,6 +191,110 @@ class _MenuItemRow extends StatelessWidget {
   }
 }
 
+/// Phone layout of [_MenuItemRow]: same data, same keys, stacked.
+class _MenuItemCard extends StatelessWidget {
+  const _MenuItemCard({
+    required this.item,
+    required this.isPending,
+    required this.onToggleStopList,
+    required this.onEdit,
+  });
+
+  final MenuItem item;
+  final bool isPending;
+  final ValueChanged<MenuItem> onToggleStopList;
+  final ValueChanged<MenuItem> onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final stopped = !item.isAvailable;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: stopped ? AppColors.stopListBg : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          MenuItemImage(imageUrl: item.imageUrl, size: 56),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        item.name,
+                        style: textTheme.titleMedium,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (item.isHalal) ...[
+                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.verified_rounded,
+                        size: 14,
+                        color: AppColors.halalGreen,
+                      ),
+                    ],
+                  ],
+                ),
+                if (item.description.isNotEmpty)
+                  Text(
+                    item.description,
+                    style: textTheme.bodySmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Flexible(child: _CategoryChip(name: item.categoryName)),
+                    const SizedBox(width: 8),
+                    Text(item.price.format(), style: textTheme.titleMedium),
+                  ],
+                ),
+                const Divider(height: 16),
+                Row(
+                  children: [
+                    Text(
+                      stopped ? 'Стоп' : 'В наличии',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: stopped ? AppColors.danger : null,
+                        fontWeight: stopped ? FontWeight.w700 : null,
+                      ),
+                    ),
+                    const Spacer(),
+                    Switch(
+                      key: ValueKey('stopListSwitch-${item.id}'),
+                      value: item.isAvailable,
+                      onChanged: isPending
+                          ? null
+                          : (_) => onToggleStopList(item),
+                    ),
+                    IconButton(
+                      key: ValueKey('editItem-${item.id}'),
+                      tooltip: 'Редактировать',
+                      icon: const Icon(Icons.edit_outlined, size: 20),
+                      onPressed: () => onEdit(item),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CategoryChip extends StatelessWidget {
   const _CategoryChip({required this.name});
 
@@ -194,9 +313,9 @@ class _CategoryChip extends StatelessWidget {
         ),
         child: Text(
           name,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: AppColors.ink,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.ink),
         ),
       ),
     );

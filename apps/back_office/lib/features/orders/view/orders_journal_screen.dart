@@ -53,22 +53,26 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<OrdersJournalBloc>().state;
+    // Expanded instead of a bare Column: on a phone the subtitle must be
+    // allowed to wrap rather than widen the row past the screen.
     return Row(
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Журнал заказов',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            Text(
-              state.status == OrdersJournalStatus.ready
-                  ? 'Показано ${state.visibleOrders.length} из ${state.total}'
-                  : 'Загрузка…',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Журнал заказов',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              Text(
+                state.status == OrdersJournalStatus.ready
+                    ? 'Показано ${state.visibleOrders.length} из ${state.total}'
+                    : 'Загрузка…',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
         ),
       ],
     );

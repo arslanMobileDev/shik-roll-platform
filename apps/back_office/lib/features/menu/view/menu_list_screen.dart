@@ -48,22 +48,25 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<MenuCatalogBloc>().state;
+    // Expanded instead of Spacer: the title shares the row with the button
+    // and wraps instead of overflowing on a phone.
     return Row(
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Меню и блюда',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            Text(
-              '${state.items.length} позиций в каталоге',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Меню и блюда',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              Text(
+                '${state.items.length} позиций в каталоге',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
         ),
-        const Spacer(),
         FilledButton.icon(
           key: const ValueKey('menuList.addItem'),
           onPressed: () => openMenuItemForm(context),
