@@ -80,4 +80,39 @@ void main() {
     expect(find.byType(DataTable), findsOneWidget);
     expect(find.text('Терминал'), findsOneWidget);
   });
+
+  // UI-303: the period chips scroll sideways in one row on a phone instead of
+  // stacking and pushing the shift cards off screen.
+  testWidgets('390px keeps the period chips on one scrolling line',
+      (tester) async {
+    await pumpScreen(tester, const Size(390, 844), shifts: [buildShift()]);
+
+    expect(tester.takeException(), isNull);
+    expect(_wrapAroundPeriodChips(), findsNothing);
+    expect(_periodChipBaselines(tester), hasLength(1));
+  });
+
+  testWidgets('1600px still wraps the period chips', (tester) async {
+    await pumpScreen(tester, const Size(1600, 1000), shifts: [buildShift()]);
+
+    expect(_wrapAroundPeriodChips(), findsOneWidget);
+  });
+}
+
+/// The [Wrap] the period chips sit in — present on wide screens only. The
+/// chips carry no keys, so the label is the handle. The metric `Wrap` inside a
+/// shift card holds `Длительность …` texts, never `Сегодня`.
+Finder _wrapAroundPeriodChips() => find.ancestor(
+  of: find.text('Сегодня'),
+  matching: find.byType(Wrap),
+);
+
+/// Distinct vertical offsets among the period chips: one entry means one row.
+/// They are the only [ChoiceChip]s on the screen.
+Set<double> _periodChipBaselines(WidgetTester tester) {
+  final chips = find.byType(ChoiceChip);
+  return {
+    for (var i = 0; i < chips.evaluate().length; i++)
+      tester.getTopLeft(chips.at(i)).dy,
+  };
 }

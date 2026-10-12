@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/widgets/adaptive_chip_row.dart';
 import '../../../core/widgets/shik_date_picker.dart';
 import '../bloc/orders_journal_bloc.dart';
 import '../bloc/orders_journal_event.dart';
@@ -88,9 +89,7 @@ class _StatusFilters extends StatelessWidget {
       (bloc) => bloc.state.statusFilter,
     );
     final bloc = context.read<OrdersJournalBloc>();
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    return AdaptiveChipRow(
       children: [
         ChoiceChip(
           key: const ValueKey('orders.statusFilter.all'),
@@ -133,10 +132,7 @@ class _DateFilters extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<OrdersJournalBloc>().state;
     final bloc = context.read<OrdersJournalBloc>();
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    return AdaptiveChipRow(
       children: [
         for (final filter in OrdersDateFilter.values)
           if (filter != OrdersDateFilter.customDay)

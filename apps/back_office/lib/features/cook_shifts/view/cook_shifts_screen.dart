@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/adaptive_chip_row.dart';
 import '../../../core/widgets/shik_date_picker.dart';
 import '../bloc/cook_shifts_cubit.dart';
 import '../data/cook_shift_models.dart';
@@ -28,8 +29,7 @@ class CookShiftsScreen extends StatelessWidget {
             'На линии сейчас: ${state.activeShifts.length} · выдано заказов: ${state.totalCompletedOrders} шт.',
           ),
           const Text('Счётчик: заказы, принятые в приготовление · МСК'),
-          Wrap(
-            spacing: 8,
+          AdaptiveChipRow(
             children: [
               for (final p in {
                 'today': 'Сегодня',

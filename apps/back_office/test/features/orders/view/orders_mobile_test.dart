@@ -78,24 +78,7 @@ void main() {
   });
 
   testWidgets('390px keeps the journal screen working', (tester) async {
-    final bloc = OrdersJournalBloc(
-      repository: FakeOrdersRepository(latency: Duration.zero),
-    )..add(const OrdersJournalRequested(branchId: 'branch-center'));
-    addTearDown(bloc.close);
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: BlocProvider<OrdersJournalBloc>.value(
-          value: bloc,
-          child: const Scaffold(body: OrdersJournalScreen()),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await pumpScreen(tester, const Size(390, 844));
 
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('orderRow-ord-1')), findsOneWidget);
@@ -104,4 +87,62 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(OrderDetailsDialog), findsOneWidget);
   });
+
+  // UI-303: both chip rows (status, date) become single scrolling lines on a
+  // phone, stacked one under the other.
+  testWidgets('390px keeps both chip rows on one scrolling line each',
+      (tester) async {
+    await pumpScreen(tester, const Size(390, 844));
+
+    expect(tester.takeException(), isNull);
+    expect(_wrapAround(const ValueKey('orders.statusFilter.all')), findsNothing);
+    expect(_wrapAround(const ValueKey('orders.dateFilter.all')), findsNothing);
+    expect(chipBaselines(tester), hasLength(2)); // status row + date row
+  });
+
+  testWidgets('1600px still wraps both chip rows', (tester) async {
+    await pumpScreen(tester, const Size(1600, 1000));
+
+    expect(
+      _wrapAround(const ValueKey('orders.statusFilter.all')),
+      findsOneWidget,
+    );
+    expect(_wrapAround(const ValueKey('orders.dateFilter.all')), findsOneWidget);
+  });
+}
+
+Future<void> pumpScreen(WidgetTester tester, Size size) async {
+  final bloc = OrdersJournalBloc(
+    repository: FakeOrdersRepository(latency: Duration.zero),
+  )..add(const OrdersJournalRequested(branchId: 'branch-center'));
+  addTearDown(bloc.close);
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(
+    MaterialApp(
+      home: BlocProvider<OrdersJournalBloc>.value(
+        value: bloc,
+        child: const Scaffold(body: OrdersJournalScreen()),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// The [Wrap] a chip row sits in — present on wide screens only.
+Finder _wrapAround(ValueKey<String> chipKey) => find.ancestor(
+  of: find.byKey(chipKey),
+  matching: find.byType(Wrap),
+);
+
+/// Distinct vertical offsets among the chips: one entry per row of chips.
+Set<double> chipBaselines(WidgetTester tester) {
+  final chips = find.byType(ChoiceChip);
+  return {
+    for (var i = 0; i < chips.evaluate().length; i++)
+      tester.getTopLeft(chips.at(i)).dy,
+  };
 }
