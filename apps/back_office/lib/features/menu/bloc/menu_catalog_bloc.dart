@@ -13,6 +13,7 @@ final class MenuCatalogBloc extends Bloc<MenuCatalogEvent, MenuCatalogState> {
     on<MenuCategoryFilterChanged>(_onFilterChanged);
     on<MenuItemStopListToggled>(_onStopListToggled);
     on<MenuItemSubmitted>(_onSubmitted);
+    on<MenuCategorySubmitted>(_onCategorySubmitted);
     on<MenuCatalogNoticeConsumed>(_onNoticeConsumed);
   }
 
@@ -100,6 +101,67 @@ final class MenuCatalogBloc extends Bloc<MenuCatalogEvent, MenuCatalogState> {
       emit(state.copyWith(categoryFilter: event.categoryId));
     }
   }
+
+  /// Creates a category at the end of the active menu, or renames/hides one.
+  ///
+  /// Answers through [MenuCategorySubmitted.result] because the dish form has
+  /// to select the created category while its own dialog stays open, and a
+  /// notice cannot carry a value. Failures land on the same future so their
+  /// dialog can render them inline instead of behind a snackbar.
+  Future<void> _onCategorySubmitted(
+    MenuCategorySubmitted event,
+    Emitter<MenuCatalogState> emit,
+  ) async {
+    try {
+      if (event.editingId == null) {
+        final menuId = state.selectedMenuId;
+        if (menuId == null) {
+          throw const BackOfficeApiException('Меню не выбрано');
+        }
+        final created = await _repository.createCategory(
+          menuId: menuId,
+          draft: event.draft,
+          sortOrder: _nextSortOrder,
+        );
+        emit(
+          state.copyWith(
+            categories: [...state.categories, created],
+            notice: 'Категория «${created.name}» создана',
+          ),
+        );
+        event.result.complete(created);
+      } else {
+        final updated = await _repository.updateCategory(
+          id: event.editingId!,
+          draft: event.draft,
+        );
+        // Hiding never drops the category from the list: the back-office is
+        // where it gets found again and switched back on.
+        emit(
+          state.copyWith(
+            categories: [
+              for (final category in state.categories)
+                if (category.id == event.editingId) updated else category,
+            ],
+            notice: event.draft.isActive
+                ? 'Категория «${updated.name}» обновлена'
+                : 'Категория «${updated.name}» скрыта из меню',
+          ),
+        );
+        event.result.complete(updated);
+      }
+    } on Object catch (error, stackTrace) {
+      event.result.completeError(error, stackTrace);
+    }
+  }
+
+  /// Appends after the last category of the menu.
+  int get _nextSortOrder =>
+      state.categories.fold(
+        0,
+        (max, category) => category.sortOrder > max ? category.sortOrder : max,
+      ) +
+      1;
 
   /// Optimistic flip with rollback on failure.
   Future<void> _onStopListToggled(

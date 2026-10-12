@@ -58,13 +58,58 @@ final class FakeBackOfficeRepository implements BackOfficeRepository {
     ];
   }
 
+  /// Editable copy of the seed list: the back-office adds and renames
+  /// categories at runtime, so [categories] stays the immutable fixture.
+  final List<MenuCategoryRef> _categories = [...categories];
+
   @override
   Future<List<MenuCategoryRef>> fetchCategories({
     required String menuId,
   }) async {
     await Future<void>.delayed(latency);
     if (menuId != FakeBackOfficeRepository.menuId) return [];
-    return categories;
+    return List.unmodifiable(_categories);
+  }
+
+  @override
+  Future<MenuCategoryRef> createCategory({
+    required String menuId,
+    required CategoryDraft draft,
+    required int sortOrder,
+  }) async {
+    await Future<void>.delayed(latency);
+    final created = MenuCategoryRef(
+      id: 'demo-category-${_nextId++}',
+      name: draft.name,
+      menuId: menuId,
+      description: draft.description,
+      sortOrder: sortOrder,
+      isActive: draft.isActive,
+    );
+    _categories.add(created);
+    return created;
+  }
+
+  @override
+  Future<MenuCategoryRef> updateCategory({
+    required String id,
+    required CategoryDraft draft,
+  }) async {
+    await Future<void>.delayed(latency);
+    final index = _categories.indexWhere((category) => category.id == id);
+    if (index == -1) {
+      throw BackOfficeApiException('Категория $id не найдена');
+    }
+    final updated = MenuCategoryRef(
+      id: id,
+      name: draft.name,
+      menuId: _categories[index].menuId,
+      description: draft.description,
+      sortOrder: _categories[index].sortOrder,
+      isActive: draft.isActive,
+    );
+    _categories[index] = updated;
+    return updated;
   }
 
   int _nextId = 100;
@@ -157,7 +202,8 @@ final class FakeBackOfficeRepository implements BackOfficeRepository {
   ];
 
   /// Mirrors the API: an unknown `categoryId` is rejected, not silently kept.
-  MenuCategoryRef _category(String id) => categories.firstWhere(
+  /// Searches [_categories] so a dish can be filed under a freshly created one.
+  MenuCategoryRef _category(String id) => _categories.firstWhere(
     (category) => category.id == id,
     orElse: () => throw BackOfficeApiException('Категория $id не найдена'),
   );

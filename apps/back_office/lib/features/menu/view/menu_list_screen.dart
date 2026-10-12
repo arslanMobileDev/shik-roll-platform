@@ -4,7 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/menu_catalog_bloc.dart';
 import '../bloc/menu_catalog_event.dart';
 import '../bloc/menu_catalog_state.dart';
+import '../data/models/menu_category_ref.dart';
 import '../data/models/menu_item.dart';
+import 'widgets/category_form_dialog.dart';
 import 'widgets/menu_item_form_dialog.dart';
 import 'widgets/menu_item_table.dart';
 
@@ -84,6 +86,7 @@ class _CategoryFilters extends StatelessWidget {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         ChoiceChip(
           key: const ValueKey('categoryFilter.all'),
@@ -92,12 +95,34 @@ class _CategoryFilters extends StatelessWidget {
           onSelected: (_) => bloc.add(const MenuCategoryFilterChanged(null)),
         ),
         for (final category in state.categories)
-          ChoiceChip(
-            key: ValueKey('categoryFilter.${category.id}'),
-            label: Text(category.name),
-            selected: selected == category.id,
-            onSelected: (_) => bloc.add(MenuCategoryFilterChanged(category.id)),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ChoiceChip(
+                key: ValueKey('categoryFilter.${category.id}'),
+                avatar: category.isActive
+                    ? null
+                    : const Icon(Icons.visibility_off, size: 16),
+                label: Text(category.name),
+                selected: selected == category.id,
+                onSelected: (_) =>
+                    bloc.add(MenuCategoryFilterChanged(category.id)),
+              ),
+              IconButton(
+                key: ValueKey('categoryEdit.${category.id}'),
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Изменить категорию',
+                onPressed: () => openCategoryForm(context, initial: category),
+              ),
+            ],
           ),
+        ActionChip(
+          key: const ValueKey('menuList.addCategory'),
+          avatar: const Icon(Icons.add, size: 16),
+          label: const Text('Категория'),
+          onPressed: () => openCategoryForm(context),
+        ),
       ],
     );
   }
@@ -149,10 +174,37 @@ Future<void> openMenuItemForm(BuildContext context, {MenuItem? item}) async {
     context,
     initial: item,
     categories: context.read<MenuCatalogBloc>().state.categories,
+    // Lets the dish form mint a category without closing itself; surfaces here
+    // because a dialog route sits above the bloc provider.
+    onCreateCategory: () => openCategoryForm(context),
   );
   if (draft != null && context.mounted) {
     context.read<MenuCatalogBloc>().add(
       MenuItemSubmitted(draft: draft, editingId: item?.id),
     );
   }
+}
+
+/// Opens the create/edit category dialog and returns the saved category, or
+/// `null` when the manager cancels.
+///
+/// The bloc is read before `showDialog` for the same reason as above. With no
+/// menu loaded the save fails inside the bloc and the dialog shows why.
+Future<MenuCategoryRef?> openCategoryForm(
+  BuildContext context, {
+  MenuCategoryRef? initial,
+}) {
+  final bloc = context.read<MenuCatalogBloc>();
+  return CategoryFormDialog.show(
+    context,
+    initial: initial,
+    onSubmit: (draft) {
+      final event = MenuCategorySubmitted(
+        draft: draft,
+        editingId: initial?.id,
+      );
+      bloc.add(event);
+      return event.result.future;
+    },
+  );
 }

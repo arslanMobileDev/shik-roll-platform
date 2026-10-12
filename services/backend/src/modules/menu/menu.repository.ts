@@ -98,7 +98,9 @@ export class MenuRepository {
   async findCategories(query: CategoryQueryDto): Promise<Paginated<CategoryRecord>> {
     const where: Prisma.CategoryWhereInput = {
       deletedAt: null,
-      isActive: true,
+      // Default keeps the public catalog to sellable categories; the
+      // back-office opts out so it can still show and reactivate the rest.
+      ...(query.includeInactive ? {} : { isActive: true }),
       ...(query.menuId ? { menuId: query.menuId } : {}),
       ...(query.brandId ? { brandId: query.brandId } : {}),
     };

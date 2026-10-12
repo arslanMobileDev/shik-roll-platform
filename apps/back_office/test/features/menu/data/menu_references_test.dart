@@ -95,7 +95,11 @@ void main() {
       final items = await remote(adapter).fetchCategories(menuId: 'menu');
       expect(items.single, MenuCategoryRef.fromJson(category));
       expect(adapter.requests.single.uri.path, '/categories');
-      expect(adapter.requests.single.queryParameters, {'menuId': 'menu'});
+      // The back-office manages hidden categories too, so it asks for them.
+      expect(adapter.requests.single.queryParameters, {
+        'menuId': 'menu',
+        'includeInactive': 'true',
+      });
     });
   }
   test('references follow pagination without reordering first page', () async {
@@ -115,6 +119,7 @@ void main() {
     expect(items.map((e) => e.id), [category['id'], 'second']);
     expect(adapter.requests.last.queryParameters, {
       'menuId': 'menu',
+      'includeInactive': 'true',
       'page': 2,
     });
   });
