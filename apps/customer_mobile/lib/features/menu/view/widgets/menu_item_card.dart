@@ -65,9 +65,15 @@ class MenuItemCard extends StatelessWidget {
               const Spacer(),
               Row(
                 children: [
+                  // Compact price, never wrapped: the cell holds 166dp of
+                  // content on a 2-column grid, and «1 490,00 ₽» next to the
+                  // action button did not fit — it wrapped, then ellipsised.
                   Expanded(
                     child: Text(
-                      item.price.format(),
+                      item.price.formatCompact(),
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall,
                     ),
                   ),

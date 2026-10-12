@@ -30,12 +30,27 @@ final class Money extends Equatable implements Comparable<Money> {
   int compareTo(Money other) => minorUnits.compareTo(other.minorUnits);
 
   /// Formats as localized RUB currency, e.g. `1 234,00 ₽`.
-  String format({String locale = 'ru_RU', String symbol = '₽'}) {
+  String format({
+    String locale = 'ru_RU',
+    String symbol = '₽',
+    int decimalDigits = 2,
+  }) {
     return NumberFormat.currency(
       locale: locale,
       symbol: symbol,
-      decimalDigits: 2,
+      decimalDigits: decimalDigits,
     ).format(rubles);
+  }
+
+  /// Narrow-surface form used by the menu card, where the row also has to
+  /// hold the action button: `1 234 ₽` when kopecks are zero, `1 234,50 ₽`
+  /// when they are not.
+  String formatCompact({String locale = 'ru_RU', String symbol = '₽'}) {
+    return format(
+      locale: locale,
+      symbol: symbol,
+      decimalDigits: minorUnits % 100 == 0 ? 0 : 2,
+    );
   }
 
   @override

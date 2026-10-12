@@ -8,6 +8,11 @@ import 'menu_item_json_fixture.dart';
 
 const _photoUrl = 'https://api.shik-roll.ru/uploads/menu/roll.webp';
 
+/// ICU `ru_RU` separates both the digit groups and the currency symbol with a
+/// non-breaking space (U+00A0), so expectations are written as readable prices
+/// and swapped here.
+String _rub(String readable) => readable.replaceAll(' ', ' ');
+
 MenuItem _item({
   String name = 'Филадельфия',
   int priceKopecks = 39000,
@@ -30,8 +35,9 @@ MenuItem _item({
   );
 }
 
-/// Mirrors the real grid cell (2 columns on a 390dp phone): square photo plus
-/// the text block under it.
+/// Mirrors the real grid cell: 198dp on the widest shipping phone (440dp
+/// screen − 2×16 outer padding − 12 gutter, halved). That leaves 166dp of
+/// card content — the constraint the price row has to survive.
 Future<void> _pumpCard(
   WidgetTester tester,
   MenuItem item, {
@@ -42,7 +48,7 @@ Future<void> _pumpCard(
     MaterialApp(
       home: Scaffold(
         body: SizedBox(
-          width: 220,
+          width: 198,
           height: 400,
           child: MenuItemCard(
             item: item,
@@ -61,8 +67,37 @@ void main() {
     await _pumpCard(tester, item);
 
     expect(find.text('Филадельфия'), findsOneWidget);
-    expect(find.text(item.price.format()), findsOneWidget);
+    expect(find.text(item.price.formatCompact()), findsOneWidget);
     expect(find.byIcon(Icons.verified_outlined), findsOneWidget);
+  });
+
+  // The kopeck tail pushed «1 490,00 ₽» onto a second line inside 166dp; the
+  // card now drops it when it is zero and keeps it when it is not.
+  testWidgets('shows whole rubles, without the zero kopeck tail', (
+    tester,
+  ) async {
+    await _pumpCard(tester, _item(priceKopecks: 149000));
+    expect(find.text(_rub('1 490 ₽')), findsOneWidget);
+    expect(find.text(_rub('1 490,00 ₽')), findsNothing);
+  });
+
+  testWidgets('keeps kopecks when the price actually has them', (
+    tester,
+  ) async {
+    await _pumpCard(tester, _item(priceKopecks: 149050));
+    expect(find.text(_rub('1 490,50 ₽')), findsOneWidget);
+  });
+
+  testWidgets('price is pinned to a single line next to the action button', (
+    tester,
+  ) async {
+    await _pumpCard(tester, _item(priceKopecks: 149000));
+
+    final price = tester.widget<Text>(find.text(_rub('1 490 ₽')));
+    expect(price.maxLines, 1);
+    expect(price.softWrap, isFalse);
+    // The button label must not wrap either — it competes for the same row.
+    expect(find.text('В корзину', findRichText: false), findsOneWidget);
   });
 
   testWidgets('hides HALAL badge when item is not halal', (tester) async {
