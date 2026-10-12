@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/widgets/adaptive_chip_row.dart';
 import '../bloc/menu_catalog_bloc.dart';
 import '../bloc/menu_catalog_event.dart';
 import '../bloc/menu_catalog_state.dart';
@@ -86,10 +87,7 @@ class _CategoryFilters extends StatelessWidget {
     final state = context.watch<MenuCatalogBloc>().state;
     final selected = state.categoryFilter;
     final bloc = context.read<MenuCatalogBloc>();
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    return AdaptiveChipRow(
       children: [
         ChoiceChip(
           key: const ValueKey('categoryFilter.all'),

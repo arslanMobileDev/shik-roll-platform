@@ -93,27 +93,64 @@ void main() {
   // shares one row and would overflow without the Expanded fix.
   testWidgets('390px renders the menu screen without a layout error',
       (tester) async {
-    final bloc = MenuCatalogBloc(
-      repository: FakeBackOfficeRepository(latency: Duration.zero),
-    )..add(const MenuCatalogRequested(branchId: 'branch-center'));
-    addTearDown(bloc.close);
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: BlocProvider<MenuCatalogBloc>.value(
-          value: bloc,
-          child: const Scaffold(body: MenuListScreen()),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await pumpScreen(tester, const Size(390, 844));
 
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('menuList.addItem')), findsOneWidget);
     expect(find.text('Доступность'), findsNothing);
   });
+
+  // UI-303: on a phone the category chips scroll sideways in a single row
+  // instead of stacking up and pushing the dish list off screen.
+  testWidgets('390px keeps the category chips on one scrolling line',
+      (tester) async {
+    await pumpScreen(tester, const Size(390, 844));
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(ChoiceChip), findsWidgets);
+    expect(_wrapAround(const ValueKey('categoryFilter.all')), findsNothing);
+    expect(chipBaselines(tester), hasLength(1));
+  });
+
+  testWidgets('1600px still wraps the category chips', (tester) async {
+    await pumpScreen(tester, const Size(1600, 1000));
+
+    expect(_wrapAround(const ValueKey('categoryFilter.all')), findsOneWidget);
+  });
+}
+
+Future<void> pumpScreen(WidgetTester tester, Size size) async {
+  final bloc = MenuCatalogBloc(
+    repository: FakeBackOfficeRepository(latency: Duration.zero),
+  )..add(const MenuCatalogRequested(branchId: 'branch-center'));
+  addTearDown(bloc.close);
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(
+    MaterialApp(
+      home: BlocProvider<MenuCatalogBloc>.value(
+        value: bloc,
+        child: const Scaffold(body: MenuListScreen()),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// The [Wrap] the category chips sit in — present on wide screens only.
+Finder _wrapAround(ValueKey<String> chipKey) => find.ancestor(
+  of: find.byKey(chipKey),
+  matching: find.byType(Wrap),
+);
+
+/// Vertical offsets of every chip, as a set: one entry means a single row.
+Set<double> chipBaselines(WidgetTester tester) {
+  final chips = find.byType(ChoiceChip);
+  return {
+    for (var i = 0; i < chips.evaluate().length; i++)
+      tester.getTopLeft(chips.at(i)).dy,
+  };
 }
