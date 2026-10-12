@@ -75,10 +75,20 @@ String _buttonLabel(Money total) => 'Добавить в корзину за ${t
 
 Finder _button() => find.byKey(const ValueKey('add-to-cart-button'));
 
+/// The sheet's photo is square now, so the modifier rows sit lower than the
+/// default 800×600 test surface; enlarging the surface keeps taps working
+/// (no scroll hacks — see agent-memory id=44).
+void _useTallSurface(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 2600);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+}
+
 void main() {
   testWidgets('initial total = базовая цена: 390,00 ₽, кнопка активна', (
     tester,
   ) async {
+    _useTallSurface(tester);
     await tester.pumpWidget(
       MaterialApp(
         home: BlocProvider<CustomerCartBloc>(
@@ -98,6 +108,7 @@ void main() {
   testWidgets('меняет итог при выборе порции/соуса и обратном отключении', (
     tester,
   ) async {
+    _useTallSurface(tester);
     await tester.pumpWidget(
       MaterialApp(
         home: BlocProvider<CustomerCartBloc>(

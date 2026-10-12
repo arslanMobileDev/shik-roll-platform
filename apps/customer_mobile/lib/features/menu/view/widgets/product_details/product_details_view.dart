@@ -10,6 +10,7 @@ import '../../../../cart/bloc/customer_cart_bloc.dart';
 import '../../../../loyalty/bloc/loyalty_cubit.dart';
 import '../../../../loyalty/domain/bonus_math.dart';
 import '../../../data/menu_models.dart';
+import '../menu_item_photo.dart';
 import 'modifier_selector.dart';
 import 'product_details_cubit.dart';
 
@@ -81,19 +82,11 @@ class _ProductDetailsContent extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: AppSpacing.s12),
-                      // Photo placeholder
-                      Container(
-                        height: 180,
-                        decoration: BoxDecoration(
-                          color: AppColors.gray100,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.restaurant_outlined,
-                            size: 48,
-                            color: AppColors.gray400,
-                          ),
+                      AspectRatio(
+                        aspectRatio: 1,
+                        child: MenuItemPhoto(
+                          imageUrl: item.imageUrl,
+                          iconSize: 48,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.s12),

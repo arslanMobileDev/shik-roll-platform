@@ -156,6 +156,7 @@ final class MenuItem extends Equatable {
     required this.available,
     required this.modifierGroups,
     this.description,
+    this.imageUrl,
     this.weight,
     this.calories,
   });
@@ -165,6 +166,7 @@ final class MenuItem extends Equatable {
     sku: json['sku'] as String,
     name: json['name'] as String,
     description: json['description'] as String?,
+    imageUrl: json['imageUrl'] as String?,
     category: MenuItemCategoryRef.fromJson(
       json['category'] as Map<String, dynamic>,
     ),
@@ -188,6 +190,7 @@ final class MenuItem extends Equatable {
   final String sku;
   final String name;
   final String? description;
+  final String? imageUrl;
   final MenuItemCategoryRef category;
   final int? weight;
   final int? calories;
@@ -207,6 +210,7 @@ final class MenuItem extends Equatable {
     sku,
     name,
     description,
+    imageUrl,
     category,
     weight,
     calories,

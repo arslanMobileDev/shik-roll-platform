@@ -4,6 +4,10 @@ import 'package:customer_mobile/features/menu/view/widgets/menu_item_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'menu_item_json_fixture.dart';
+
+const _photoUrl = 'https://api.shik-roll.ru/uploads/menu/roll.webp';
+
 MenuItem _item({
   String name = 'Филадельфия',
   int priceKopecks = 39000,
@@ -26,6 +30,8 @@ MenuItem _item({
   );
 }
 
+/// Mirrors the real grid cell (2 columns on a 390dp phone): square photo plus
+/// the text block under it.
 Future<void> _pumpCard(
   WidgetTester tester,
   MenuItem item, {
@@ -37,7 +43,7 @@ Future<void> _pumpCard(
       home: Scaffold(
         body: SizedBox(
           width: 220,
-          height: 320,
+          height: 400,
           child: MenuItemCard(
             item: item,
             onAddToCart: onAddToCart ?? () {},
@@ -62,6 +68,40 @@ void main() {
   testWidgets('hides HALAL badge when item is not halal', (tester) async {
     await _pumpCard(tester, _item(isHalal: false));
     expect(find.byIcon(Icons.verified_outlined), findsNothing);
+  });
+
+  testWidgets('renders the dish photo when the API sends imageUrl', (
+    tester,
+  ) async {
+    await _pumpCard(
+      tester,
+      MenuItem.fromJson(menuItemJson(imageUrl: _photoUrl)),
+    );
+
+    final image = tester.widget<Image>(find.byType(Image));
+    expect((image.image as NetworkImage).url, _photoUrl);
+    expect(image.fit, BoxFit.cover);
+  });
+
+  testWidgets('photo window is square (1:1), matching the 1000×1000 upload', (
+    tester,
+  ) async {
+    await _pumpCard(
+      tester,
+      MenuItem.fromJson(menuItemJson(imageUrl: _photoUrl)),
+    );
+
+    final ratio = tester.widget<AspectRatio>(find.byType(AspectRatio));
+    expect(ratio.aspectRatio, 1.0);
+  });
+
+  testWidgets('falls back to the placeholder icon without imageUrl', (
+    tester,
+  ) async {
+    await _pumpCard(tester, MenuItem.fromJson(menuItemJson()));
+
+    expect(find.byType(Image), findsNothing);
+    expect(find.byIcon(Icons.restaurant_outlined), findsOneWidget);
   });
 
   testWidgets('plain dish offers «В корзину» and calls onAddToCart', (
