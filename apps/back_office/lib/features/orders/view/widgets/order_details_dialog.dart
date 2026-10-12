@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/theme/app_breakpoints.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../bloc/orders_journal_bloc.dart';
 import '../../bloc/orders_journal_event.dart';
@@ -36,8 +37,13 @@ class OrderDetailsDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final mobile = AppBreakpoints.isMobile(MediaQuery.sizeOf(context).width);
     return Dialog(
       backgroundColor: Colors.white,
+      // +56px of usable width on a phone; the desktop dialog keeps the default.
+      insetPadding: mobile
+          ? const EdgeInsets.symmetric(horizontal: 12, vertical: 24)
+          : null,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
@@ -257,18 +263,24 @@ class _KeyValueRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final labelWidget = Text(label, style: textTheme.bodySmall);
+    final valueWidget = Text(value, style: textTheme.bodyMedium);
+    // The fixed 170px label column leaves too little for the value on a
+    // phone, so the pair stacks there.
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 170,
-            child: Text(label, style: textTheme.bodySmall),
-          ),
-          Expanded(child: Text(value, style: textTheme.bodyMedium)),
-        ],
-      ),
+      child: AppBreakpoints.isMobile(MediaQuery.sizeOf(context).width)
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [labelWidget, valueWidget],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 170, child: labelWidget),
+                Expanded(child: valueWidget),
+              ],
+            ),
     );
   }
 }

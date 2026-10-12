@@ -7,6 +7,7 @@ import '../../cubit/menu_image_upload_cubit.dart';
 import '../../cubit/menu_image_upload_state.dart';
 import 'menu_image_upload_field.dart';
 
+import '../../../../core/theme/app_breakpoints.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/money.dart';
 import '../../data/models/menu_category_ref.dart';
@@ -208,12 +209,81 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
     );
   }
 
+  bool get _isMobile =>
+      AppBreakpoints.isMobile(MediaQuery.sizeOf(context).width);
+
+  /// Category picker: a full-width field of its own on phones, half of a pair
+  /// on desktop.
+  Widget _categoryField() {
+    return KeyedSubtree(
+      key: ValueKey('menuItemForm.category.$_categoryFieldEpoch'),
+      child: DropdownButtonFormField<String>(
+        key: const ValueKey('menuItemForm.category'),
+        initialValue: _categoryId,
+        // The trailing "create" entry is wider than the field; without this
+        // the row overflows.
+        isExpanded: true,
+        decoration: const InputDecoration(labelText: 'Категория'),
+        items: [
+          for (final option in _categoryOptions)
+            DropdownMenuItem(
+              value: option.id,
+              child: Text(option.name, overflow: TextOverflow.ellipsis),
+            ),
+          if (widget.onCreateCategory != null)
+            const DropdownMenuItem(
+              value: _createCategoryValue,
+              child: Text(
+                '+ Создать новую категорию',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+        validator: (value) => value == null || value == _createCategoryValue
+            ? 'Выберите категорию'
+            : null,
+        onChanged: (value) {
+          if (value == _createCategoryValue) {
+            unawaited(_createCategory());
+            return;
+          }
+          setState(() => _categoryId = value);
+        },
+      ),
+    );
+  }
+
+  Widget _priceField() {
+    return TextFormField(
+      key: const ValueKey('menuItemForm.price'),
+      controller: _priceController,
+      decoration: const InputDecoration(
+        labelText: 'Базовая цена, ₽',
+        hintText: '349.90',
+      ),
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9., ]'))],
+      validator: (value) {
+        try {
+          Money.parse(value ?? '');
+          return null;
+        } on FormatException {
+          return 'Некорректная цена';
+        }
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<MenuImageUploadCubit, MenuImageUploadState>(
       bloc: _uploadCubit,
       builder: (context, uploadState) => Dialog(
         backgroundColor: Colors.white,
+        // +56px of usable width on a phone.
+        insetPadding: _isMobile
+            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 24)
+            : null,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
@@ -250,82 +320,24 @@ class _MenuItemFormDialogState extends State<MenuItemFormDialog> {
                     maxLines: 4,
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: KeyedSubtree(
-                          key: ValueKey('menuItemForm.category.$_categoryFieldEpoch'),
-                          child: DropdownButtonFormField<String>(
-                            key: const ValueKey('menuItemForm.category'),
-                            initialValue: _categoryId,
-                            // The trailing "create" entry is wider than the
-                            // field; without this the row overflows.
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Категория',
-                            ),
-                            items: [
-                              for (final option in _categoryOptions)
-                                DropdownMenuItem(
-                                  value: option.id,
-                                  child: Text(
-                                    option.name,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              if (widget.onCreateCategory != null)
-                                const DropdownMenuItem(
-                                  value: _createCategoryValue,
-                                  child: Text(
-                                    '+ Создать новую категорию',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                            ],
-                            validator: (value) =>
-                                value == null || value == _createCategoryValue
-                                ? 'Выберите категорию'
-                                : null,
-                            onChanged: (value) {
-                              if (value == _createCategoryValue) {
-                                unawaited(_createCategory());
-                                return;
-                              }
-                              setState(() => _categoryId = value);
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          key: const ValueKey('menuItemForm.price'),
-                          controller: _priceController,
-                          decoration: const InputDecoration(
-                            labelText: 'Базовая цена, ₽',
-                            hintText: '349.90',
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                              RegExp(r'[0-9., ]'),
-                            ),
-                          ],
-                          validator: (value) {
-                            try {
-                              Money.parse(value ?? '');
-                              return null;
-                            } on FormatException {
-                              return 'Некорректная цена';
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
+                  if (_isMobile)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _categoryField(),
+                        const SizedBox(height: 12),
+                        _priceField(),
+                      ],
+                    )
+                  else
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _categoryField()),
+                        const SizedBox(width: 12),
+                        Expanded(child: _priceField()),
+                      ],
+                    ),
                   const SizedBox(height: 12),
                   MenuImageUploadField(
                     cubit: _uploadCubit,

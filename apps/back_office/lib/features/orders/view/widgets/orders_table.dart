@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/theme/app_breakpoints.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/order.dart';
 import 'order_status_badge.dart';
 
-/// Desktop table of journal orders; a tap opens the receipt details.
+final DateFormat _createdFormat = DateFormat('dd.MM.yyyy · HH:mm');
+
+/// Journal orders — a table on desktop, stacked cards on phones. A tap opens
+/// the receipt details either way.
 class OrdersTable extends StatelessWidget {
   const OrdersTable({
     super.key,
@@ -19,6 +23,15 @@ class OrdersTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    if (AppBreakpoints.isMobile(MediaQuery.sizeOf(context).width)) {
+      if (orders.isEmpty) return const Center(child: Text('Заказы не найдены'));
+      return ListView.separated(
+        itemCount: orders.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 8),
+        itemBuilder: (context, index) =>
+            _OrderCard(order: orders[index], onOpenDetails: onOpenDetails),
+      );
+    }
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -81,8 +94,6 @@ class _OrderRow extends StatelessWidget {
   final Order order;
   final ValueChanged<Order> onOpenDetails;
 
-  static final DateFormat _createdFormat = DateFormat('dd.MM.yyyy · HH:mm');
-
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -136,9 +147,87 @@ class _OrderRow extends StatelessWidget {
             ),
             const SizedBox(
               width: 40,
-              child: Icon(Icons.chevron_right_rounded, color: AppColors.inkMuted),
+              child: Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.inkMuted,
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Phone layout of [_OrderRow]: same data, same tap key, stacked.
+/// Material carries the background so the ink ripple stays visible.
+class _OrderCard extends StatelessWidget {
+  const _OrderCard({required this.order, required this.onOpenDetails});
+
+  final Order order;
+  final ValueChanged<Order> onOpenDetails;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Material(
+      color: Colors.white,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.outline),
+      ),
+      child: InkWell(
+        key: ValueKey('orderRow-${order.id}'),
+        onTap: () => onOpenDetails(order),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      '№ ${order.orderNumber}',
+                      style: textTheme.titleMedium,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    order.totalAmount.format(),
+                    style: textTheme.titleMedium,
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.inkMuted,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              // Wrap, not Row: the badge plus the type must never overflow a
+              // narrow screen — they just move onto the next line.
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  OrderStatusBadge(status: order.status),
+                  Text(order.type.label, style: textTheme.bodySmall),
+                ],
+              ),
+              Text(
+                '${_createdFormat.format(order.createdAt)} · '
+                '${order.itemsSummary} · '
+                '${order.items.map((i) => i.name).take(2).join(', ')}',
+                style: textTheme.bodySmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/auth/auth_storage.dart';
 import '../../../core/auth/session_events.dart';
@@ -42,19 +43,50 @@ class BackOfficeShell extends StatefulWidget {
 class _BackOfficeShellState extends State<BackOfficeShell> {
   BackOfficeSection _section = BackOfficeSection.dashboard;
 
+  /// `Scaffold.of(context)` from this State's build throws (this context sits
+  /// above the Scaffold), so the drawer is driven through an explicit key.
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  void _select(BackOfficeSection section) {
+    setState(() => _section = section);
+    _scaffoldKey.currentState?.closeDrawer();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final mobile = AppBreakpoints.isMobile(MediaQuery.sizeOf(context).width);
     return Scaffold(
+      key: _scaffoldKey,
+      // On mobile the sidebar moves into a drawer; the Drawer lays its child
+      // out with the window's width in MediaQuery, so _Sidebar would collapse
+      // to the icon rail without the override.
+      drawer: mobile
+          ? Drawer(
+              width: _Sidebar._expandedWidth,
+              child: _Sidebar(
+                active: _section,
+                expandedOverride: true,
+                onSelected: _select,
+              ),
+            )
+          : null,
       body: Row(
         children: [
-          _Sidebar(
-            active: _section,
-            onSelected: (section) => setState(() => _section = section),
-          ),
+          if (!mobile)
+            _Sidebar(
+              active: _section,
+              onSelected: (section) => setState(() => _section = section),
+            ),
           Expanded(
             child: Column(
               children: [
-                BackOfficeTopBar(title: _section.label),
+                BackOfficeTopBar(
+                  title: _section.label,
+                  compact: mobile,
+                  onMenuTap: mobile
+                      ? () => _scaffoldKey.currentState?.openDrawer()
+                      : null,
+                ),
                 Expanded(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 150),
@@ -74,27 +106,54 @@ class _BackOfficeShellState extends State<BackOfficeShell> {
 }
 
 /// Light top bar: active branch selector + Halal compliance badge.
+///
+/// On mobile the selector is dropped (it is decorative — the branch list holds
+/// a single entry) and a burger opens the drawer instead.
 class BackOfficeTopBar extends StatelessWidget {
-  const BackOfficeTopBar({super.key, required this.title});
+  const BackOfficeTopBar({
+    super.key,
+    required this.title,
+    this.onMenuTap,
+    this.compact = false,
+  });
 
   final String title;
+
+  /// Non-null on mobile: shows the burger and opens the navigation drawer.
+  final VoidCallback? onMenuTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 24),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: AppColors.outline)),
       ),
       child: Row(
         children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          const Spacer(),
-          const BranchSelector(),
-          const SizedBox(width: 12),
-          const HalalBadge(),
+          if (onMenuTap != null)
+            IconButton(
+              key: const ValueKey('topbar.menu'),
+              icon: const Icon(Icons.menu_rounded),
+              tooltip: 'Меню',
+              color: AppColors.sidebar,
+              onPressed: onMenuTap,
+            ),
+          Expanded(
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (onMenuTap == null) ...[
+            const BranchSelector(),
+            const SizedBox(width: 12),
+          ],
+          HalalBadge(compact: compact),
           const SizedBox(width: 8),
           const _LogoutButton(),
         ],
@@ -104,10 +163,18 @@ class BackOfficeTopBar extends StatelessWidget {
 }
 
 class _Sidebar extends StatelessWidget {
-  const _Sidebar({required this.active, required this.onSelected});
+  const _Sidebar({
+    required this.active,
+    required this.onSelected,
+    this.expandedOverride,
+  });
 
   final BackOfficeSection active;
   final ValueChanged<BackOfficeSection> onSelected;
+
+  /// Forces the wide layout regardless of the window width — used inside the
+  /// mobile drawer, where MediaQuery still reports the full window width.
+  final bool? expandedOverride;
 
   static const double _expandedWidth = 264;
   static const double _collapsedWidth = 76;
@@ -117,7 +184,9 @@ class _Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final expanded = MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
+        final expanded =
+            expandedOverride ??
+            MediaQuery.sizeOf(context).width >= _desktopBreakpoint;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           width: expanded ? _expandedWidth : _collapsedWidth,
@@ -240,6 +309,7 @@ class _SidebarItem extends StatelessWidget {
     return Tooltip(message: section.label, child: tile);
   }
 }
+
 /// Top-bar logout: clears the stored JWT and signals AuthGate to return
 /// to the login form. Same mechanism as a 401 — no navigation stack needed.
 class _LogoutButton extends StatelessWidget {

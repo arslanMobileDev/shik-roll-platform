@@ -219,9 +219,13 @@ class _ShikCalendarDialogState extends State<_ShikCalendarDialog> {
                 ),
               ),
               const SizedBox(height: 4),
-              SizedBox(
-                height: 300,
-                child: _monthGrid ? _buildMonths() : _buildDays(),
+              // Flexible, not a bare SizedBox: the grid wants 300px and a
+              // phone in landscape has less than that to give.
+              Flexible(
+                child: SizedBox(
+                  height: 300,
+                  child: _monthGrid ? _buildMonths() : _buildDays(),
+                ),
               ),
               const SizedBox(height: 4),
               SizedBox(height: 44, child: _buildFooter()),
