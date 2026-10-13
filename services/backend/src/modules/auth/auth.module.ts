@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { CustomersModule } from '../customers/customers.module';
 import { AuthController } from './auth.controller';
 import { ACCESS_TOKEN_TTL_SECONDS, JWT_SECRET } from './auth.config';
 import { AuthService } from './auth.service';
@@ -11,6 +12,7 @@ import { SmsRuProvider } from './providers/sms/smsru.provider';
  * Guest authentication bounded context (phone + OTP -> JWT).
  * JwtModule is registered globally so sibling modules (orders) can verify
  * guest tokens on shared endpoints without importing this module's internals.
+ * CustomersModule is pulled in for the restore branch of the OTP login.
  */
 @Module({
   imports: [
@@ -19,6 +21,7 @@ import { SmsRuProvider } from './providers/sms/smsru.provider';
       secret: JWT_SECRET,
       signOptions: { expiresIn: ACCESS_TOKEN_TTL_SECONDS },
     }),
+    CustomersModule,
   ],
   controllers: [AuthController],
   providers: [

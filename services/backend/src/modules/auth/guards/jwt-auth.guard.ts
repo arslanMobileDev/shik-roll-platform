@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../../../prisma/prisma.service';
 import {
   AuthenticatedCustomer,
   CustomerTokenPayload,
@@ -17,7 +18,10 @@ import {
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(private readonly jwt: JwtService) {}
+  constructor(
+    private readonly jwt: JwtService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RequestWithCustomer>();
@@ -46,8 +50,23 @@ export class JwtAuthGuard implements CanActivate {
           (payload.role !== undefined && payload.role !== 'CUSTOMER')) {
         throw new Error(`Unexpected token type: ${payload.type}`);
       }
+      // Signature and expiry alone are not enough: deleting an account leaves
+      // its 30-day access token cryptographically valid, and without this row
+      // check the deleted customer would keep reading their order history.
+      // Same PK lookup the courier and staff guards already do.
+      const live = await this.prisma.customer.findUnique({
+        where: { id: payload.sub, deletedAt: null },
+        select: { id: true },
+      });
+      if (!live) {
+        throw new Error('Customer no longer exists');
+      }
       // Tokens minted before the role column existed fall back to CUSTOMER.
-      return { id: payload.sub, phone: payload.phone, role: payload.role ?? 'CUSTOMER' };
+      return {
+        id: payload.sub,
+        phone: payload.phone ?? null,
+        role: payload.role ?? 'CUSTOMER',
+      };
     } catch {
       throw new UnauthorizedException({
         statusCode: 401,

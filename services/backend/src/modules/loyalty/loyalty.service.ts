@@ -25,20 +25,34 @@ export const LedgerKeys = {
   spend: (orderId: string) => `spend:${orderId}`,
   earn: (orderId: string) => `earn:${orderId}`,
   refund: (orderId: string) => `refund:${orderId}`,
+  /**
+   * Account deletion: keyed by the deletion event, not by the customer. A
+   * plain `expire:delete:{customerId}` would break "delete -> restore -> order
+   * -> delete again" — applyLedgerEntry returns early on a known key, so the
+   * second deletion would silently skip the expiry and leave the anonymized
+   * row holding a positive balance. Retrying one deletion is still a no-op.
+   */
+  expireOnDelete: (customerId: string, deletionId: string) =>
+    `expire:delete:${customerId}:${deletionId}`,
 } as const;
 
 /** Bounded retries of the balance compare-and-set loop. */
 const MAX_LEDGER_ATTEMPTS = 3;
 
-interface LedgerEntryParams {
+/**
+ * How much the entry moves. A fixed signed amount, or the whole current
+ * balance — the latter read inside the compare-and-set loop (see
+ * `expireAllWithinTransaction` for why that matters).
+ */
+type LedgerAmount = { points: number } | { drain: true };
+
+type LedgerEntryParams = {
   customerId: string;
   orderId: string | null;
   type: BonusTransactionType;
-  /** Signed points: EARN/REFUND > 0; SPEND/EXPIRE < 0. */
-  points: number;
   idempotencyKey: string;
   createAccountIfMissing: boolean;
-}
+} & LedgerAmount;
 
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -192,17 +206,62 @@ export class LoyaltyService {
   }
 
   /**
+   * Expires the customer's entire bonus balance as one EXPIRE ledger entry,
+   * inside the account-deletion transaction (decision: deleting the account
+   * burns the bonuses). Ledger key: expire:delete:{customerId}:{deletionId}.
+   *
+   * The amount is `drain`, not `-balance` read by the caller: the balance is
+   * read inside the compare-and-set loop, so a cashback that lands between the
+   * read and the write (earnCashback is called from the couriers and orders
+   * paths) cannot turn the delta negative. A caller-computed -balance would
+   * make updateMany match nothing, the retry would re-read the higher balance,
+   * and the stale delta would surface as 409 INSUFFICIENT_BONUS_BALANCE —
+   * failing the whole deletion.
+   *
+   * No account or a zero balance is a no-op: there is nothing to record, and
+   * ledger rows are never zero (CHECK points <> 0).
+   */
+  async expireAllWithinTransaction(
+    tx: Prisma.TransactionClient,
+    params: { customerId: string; deletionId: string },
+  ): Promise<number> {
+    const applied = await this.applyLedgerEntry(tx, {
+      customerId: params.customerId,
+      orderId: null,
+      type: BonusTransactionType.EXPIRE,
+      idempotencyKey: LedgerKeys.expireOnDelete(
+        params.customerId,
+        params.deletionId,
+      ),
+      createAccountIfMissing: false,
+      drain: true,
+    });
+    // Returned to the caller as the actually-burned amount (positive): the
+    // deletion preview is a separate round-trip and may already be stale.
+    // Math.abs also normalizes the -0 a drain of nothing would produce.
+    return Math.abs(applied);
+  }
+
+  /**
    * Cashback accrual on the internal transition to COMPLETED (projected to
    * the customer as DELIVERED): floor(payable_item_amount * rate / 100) on
    * the amount actually paid for items (after all discounts). Idempotent —
    * a repeated COMPLETED never changes the balance. Ledger key: earn:{orderId}.
+   *
+   * A deleted customer is skipped: an order completing alongside the deletion
+   * would otherwise put bonuses back on an anonymized row, where they would
+   * be waiting for the client after a restore.
    */
   async earnCashback(orderId: string): Promise<void> {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, deletedAt: null },
-      select: { customerId: true, totalAmount: true },
+      select: {
+        customerId: true,
+        totalAmount: true,
+        customer: { select: { deletedAt: true } },
+      },
     });
-    if (!order?.customerId) {
+    if (!order?.customerId || order.customer?.deletedAt) {
       return;
     }
     const account = await this.prisma.bonusAccount.findUnique({
@@ -232,13 +291,15 @@ export class LoyaltyService {
    * Compensation for a cancelled/refunded order (ADR-1614): the points spent
    * at checkout return to the balance as a REFUND entry. Idempotent; a no-op
    * when the order never spent bonuses. Ledger key: refund:{orderId}.
+   *
+   * A deleted customer is skipped for the same reason as in earnCashback.
    */
   async refundOnCancel(orderId: string): Promise<void> {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, deletedAt: null },
-      select: { customerId: true },
+      select: { customerId: true, customer: { select: { deletedAt: true } } },
     });
-    if (!order?.customerId) {
+    if (!order?.customerId || order.customer?.deletedAt) {
       return;
     }
     const spend = await this.prisma.bonusTransaction.findUnique({
@@ -266,7 +327,7 @@ export class LoyaltyService {
    * commit carried both the balance and the ledger row.
    */
   private async runIdempotent(
-    mutation: (tx: Prisma.TransactionClient) => Promise<void>,
+    mutation: (tx: Prisma.TransactionClient) => Promise<unknown>,
   ): Promise<void> {
     try {
       await this.prisma.$transaction(mutation);
@@ -284,17 +345,20 @@ export class LoyaltyService {
    * concurrent modification the loop re-reads and retries, so balance_after
    * is always the balance immediately after this entry. Negative outcomes
    * are rejected before the write (409 INSUFFICIENT_BONUS_BALANCE).
+   *
+   * Returns the signed points actually applied, or 0 when nothing was written
+   * (duplicate key, zero delta, or an absent account on a drain).
    */
   private async applyLedgerEntry(
     tx: Prisma.TransactionClient,
     params: LedgerEntryParams,
-  ): Promise<void> {
+  ): Promise<number> {
     const existing = await tx.bonusTransaction.findUnique({
       where: { idempotencyKey: params.idempotencyKey },
       select: { id: true },
     });
     if (existing) {
-      return;
+      return 0;
     }
 
     // ADR-1622: resolved once outside the retry loop — the customer cannot
@@ -306,6 +370,10 @@ export class LoyaltyService {
         where: { customerId: params.customerId },
       });
       if (!account) {
+        // Nothing to expire on an account that was never provisioned.
+        if ('drain' in params) {
+          return 0;
+        }
         if (!params.createAccountIfMissing) {
           throw insufficientBalance(0, -params.points);
         }
@@ -322,9 +390,15 @@ export class LoyaltyService {
         }
       }
 
-      const balanceAfter = account.balance + params.points;
+      // Read here, inside the loop, so balance_after is right even if the
+      // balance moved since the previous attempt.
+      const points = 'drain' in params ? -account.balance : params.points;
+      if (points === 0) {
+        return 0; // zero rows are rejected by CHECK chk_bonus_transactions_points_non_zero
+      }
+      const balanceAfter = account.balance + points;
       if (balanceAfter < 0) {
-        throw insufficientBalance(account.balance, -params.points);
+        throw insufficientBalance(account.balance, -points);
       }
 
       const updated = await tx.bonusAccount.updateMany({
@@ -340,12 +414,12 @@ export class LoyaltyService {
           accountId: account.id,
           orderId: params.orderId,
           type: params.type,
-          points: params.points,
+          points,
           balanceAfter,
           idempotencyKey: params.idempotencyKey,
         },
       });
-      return;
+      return points;
     }
 
     throw new ConflictException({

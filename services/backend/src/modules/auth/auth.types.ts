@@ -4,7 +4,12 @@ import { CustomerRole } from '@prisma/client';
 export interface CustomerTokenPayload {
   /** Customer id (customers.id) */
   sub: string;
-  phone: string;
+  /**
+   * Informational only — no endpoint reads it. Nullable because a deleted
+   * customer's phone is erased; the row check in JwtAuthGuard rejects those
+   * tokens anyway, so an authenticated request always has a phone.
+   */
+  phone?: string | null;
   /** Present on tokens issued after the role column landed. */
   role?: CustomerRole;
   type: 'access' | 'refresh';
@@ -13,7 +18,7 @@ export interface CustomerTokenPayload {
 /** Guest identity attached to the request by the JWT guards. */
 export interface AuthenticatedCustomer {
   id: string;
-  phone: string;
+  phone: string | null;
   role: CustomerRole;
 }
 

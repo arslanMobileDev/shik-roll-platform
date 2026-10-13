@@ -394,6 +394,19 @@ describe('LoyaltyService', () => {
 
       await expect(service.earnCashback(ORDER_ID)).resolves.toBeUndefined();
     });
+
+    it('is a no-op for a deleted customer: bonuses must not revive on an anonymized row', async () => {
+      prisma.order.findFirst.mockResolvedValue({
+        customerId: CUSTOMER_ID,
+        totalAmount: D('1000.00'),
+        customer: { deletedAt: new Date('2026-10-01T00:00:00Z') },
+      });
+
+      await service.earnCashback(ORDER_ID);
+
+      expect(prisma.bonusAccount.findUnique).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
   });
 
   describe('refundOnCancel — compensation for a cancelled order', () => {
@@ -451,6 +464,129 @@ describe('LoyaltyService', () => {
 
       expect(tx.bonusAccount.updateMany).not.toHaveBeenCalled();
       expect(tx.bonusTransaction.create).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op for a deleted customer: bonuses must not revive on an anonymized row', async () => {
+      prisma.order.findFirst.mockResolvedValue({
+        customerId: CUSTOMER_ID,
+        customer: { deletedAt: new Date('2026-10-01T00:00:00Z') },
+      });
+
+      await service.refundOnCancel(ORDER_ID);
+
+      expect(prisma.bonusTransaction.findUnique).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('expireAllWithinTransaction — bonus burn on account deletion', () => {
+    const DELETION_ID = '40404040-4040-4040-4040-404040404040';
+
+    it('drains the whole balance as one negative EXPIRE entry and returns the burned amount', async () => {
+      tx.bonusTransaction.findUnique.mockResolvedValue(null);
+      tx.bonusAccount.findUnique.mockResolvedValue(makeAccount(500));
+      tx.bonusAccount.updateMany.mockResolvedValue({ count: 1 });
+      tx.bonusTransaction.create.mockResolvedValue({});
+
+      await expect(
+        service.expireAllWithinTransaction(tx as never, {
+          customerId: CUSTOMER_ID,
+          deletionId: DELETION_ID,
+        }),
+      ).resolves.toBe(500);
+
+      expect(tx.bonusAccount.updateMany).toHaveBeenCalledWith({
+        where: { id: ACCOUNT_ID, balance: 500 },
+        data: { balance: 0 },
+      });
+      expect(tx.bonusTransaction.create).toHaveBeenCalledWith({
+        data: {
+          accountId: ACCOUNT_ID,
+          orderId: null,
+          type: BonusTransactionType.EXPIRE,
+          points: -500,
+          balanceAfter: 0,
+          idempotencyKey: LedgerKeys.expireOnDelete(CUSTOMER_ID, DELETION_ID),
+        },
+      });
+    });
+
+    it('reads the drained amount inside the compare-and-set loop', async () => {
+      // A cashback lands between the first read and the write. A delta computed
+      // outside the loop would be -500 against a 520 balance: updateMany would
+      // miss, the retry would re-read 520, and the stale -500 would surface as
+      // 409 INSUFFICIENT_BONUS_BALANCE — failing the whole deletion.
+      tx.bonusTransaction.findUnique.mockResolvedValue(null);
+      tx.bonusAccount.findUnique
+        .mockResolvedValueOnce(makeAccount(500))
+        .mockResolvedValueOnce(makeAccount(520));
+      tx.bonusAccount.updateMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 1 });
+      tx.bonusTransaction.create.mockResolvedValue({});
+
+      await expect(
+        service.expireAllWithinTransaction(tx as never, {
+          customerId: CUSTOMER_ID,
+          deletionId: DELETION_ID,
+        }),
+      ).resolves.toBe(520);
+
+      expect(tx.bonusTransaction.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ points: -520, balanceAfter: 0 }),
+      });
+    });
+
+    it('is a no-op when the customer has no bonus account', async () => {
+      tx.bonusTransaction.findUnique.mockResolvedValue(null);
+      tx.bonusAccount.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.expireAllWithinTransaction(tx as never, {
+          customerId: CUSTOMER_ID,
+          deletionId: DELETION_ID,
+        }),
+      ).resolves.toBe(0);
+
+      expect(tx.bonusAccount.create).not.toHaveBeenCalled();
+      expect(tx.bonusTransaction.create).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op at a zero balance (ledger rows are never zero)', async () => {
+      tx.bonusTransaction.findUnique.mockResolvedValue(null);
+      tx.bonusAccount.findUnique.mockResolvedValue(makeAccount(0));
+
+      await expect(
+        service.expireAllWithinTransaction(tx as never, {
+          customerId: CUSTOMER_ID,
+          deletionId: DELETION_ID,
+        }),
+      ).resolves.toBe(0);
+
+      expect(tx.bonusTransaction.create).not.toHaveBeenCalled();
+    });
+
+    it('is idempotent for one deletion but keys the next deletion separately', async () => {
+      tx.bonusTransaction.findUnique.mockResolvedValue({ id: 'existing' });
+
+      await service.expireAllWithinTransaction(tx as never, {
+        customerId: CUSTOMER_ID,
+        deletionId: DELETION_ID,
+      });
+
+      expect(tx.bonusTransaction.findUnique).toHaveBeenCalledWith({
+        where: {
+          idempotencyKey: LedgerKeys.expireOnDelete(CUSTOMER_ID, DELETION_ID),
+        },
+        select: { id: true },
+      });
+      expect(tx.bonusTransaction.create).not.toHaveBeenCalled();
+
+      // delete -> restore -> order -> delete again must expire the second
+      // balance; a per-customer key would silently skip it.
+      expect(LedgerKeys.expireOnDelete(CUSTOMER_ID, DELETION_ID)).not.toBe(
+        LedgerKeys.expireOnDelete(CUSTOMER_ID, 'another-deletion-id'),
+      );
     });
   });
 });

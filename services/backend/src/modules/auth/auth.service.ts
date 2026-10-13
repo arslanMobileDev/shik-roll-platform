@@ -8,7 +8,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Customer } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CustomersService } from '../customers/customers.service';
+import {
+  ACCOUNT_FLOW_TOKEN_TTL_SECONDS,
+  RESTORE_TOKEN_TYPE,
+} from '../customers/customers.config';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   DEV_OTP_CODE,
@@ -23,6 +29,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import {
   AuthTokensResponse,
   CustomerEntity,
+  RestoreOfferResponse,
   SendOtpResponse,
   toCustomerEntity,
 } from './entities/auth.entities';
@@ -48,6 +55,7 @@ export class AuthService {
     @Inject(SMS_PROVIDER) private readonly sms: SmsProvider,
     private readonly jwt: JwtService,
     private readonly prisma: PrismaService,
+    private readonly customers: CustomersService,
   ) {}
 
   private cachedTenantId: string | null = null;
@@ -114,7 +122,9 @@ export class AuthService {
     };
   }
 
-  async verifyOtp(dto: VerifyOtpDto): Promise<AuthTokensResponse> {
+  async verifyOtp(
+    dto: VerifyOtpDto,
+  ): Promise<AuthTokensResponse | RestoreOfferResponse> {
     const entry = await this.otpStore.get(dto.phone);
     if (entry === null) {
       throw new UnauthorizedException({
@@ -146,12 +156,54 @@ export class AuthService {
     // One-time use: a verified code cannot be replayed.
     await this.otpStore.delete(dto.phone);
 
+    const live = await this.prisma.customer.findUnique({
+      where: { phone: dto.phone },
+      select: { id: true },
+    });
+    // Only ever checked after the code is verified: an unauthenticated caller
+    // must not be able to probe arbitrary numbers for deleted accounts.
+    const frozen = live
+      ? null
+      : await this.customers.findFrozenByPhone(dto.phone);
+    if (frozen) {
+      // The number is frozen by a deletion still inside its restore window, so
+      // no account is provisioned here. Refusing the restore leaves the freeze
+      // in place — otherwise one tap on "Cancel" would hand out a second
+      // account on a number the previous owner is still inside the window for.
+      const restoreToken = await this.jwt.signAsync(
+        { sub: frozen.id, type: RESTORE_TOKEN_TYPE },
+        { expiresIn: ACCOUNT_FLOW_TOKEN_TTL_SECONDS },
+      );
+      return {
+        status: 'RESTORE_AVAILABLE',
+        restoreToken,
+        expiresInSeconds: ACCOUNT_FLOW_TOKEN_TTL_SECONDS,
+        deletedAt: frozen.deletedAt.toISOString(),
+      };
+    }
+
     const customer = await this.prisma.customer.upsert({
       where: { phone: dto.phone },
       create: { phone: dto.phone, tenantId: await this.defaultTenantId() },
       update: {},
     });
 
+    return this.issueTokens(customer);
+  }
+
+  /**
+   * Lifts the tombstone of a deleted account and signs the customer in.
+   * Order history comes back; the burned bonuses do not.
+   */
+  async restoreAccount(restoreToken: string): Promise<AuthTokensResponse> {
+    const payload = await this.customers.verifyFlowToken(
+      restoreToken,
+      RESTORE_TOKEN_TYPE,
+    );
+    return this.issueTokens(await this.customers.unfreeze(payload.sub));
+  }
+
+  private async issueTokens(customer: Customer): Promise<AuthTokensResponse> {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwt.signAsync(
         { sub: customer.id, phone: customer.phone, role: customer.role, type: 'access' },

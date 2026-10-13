@@ -491,7 +491,9 @@ export class CouriersService {
     });
   }
 
-  private toCourierOrder(order: Order & { customer?: { phone: string } | null }) {
+  // phone is nullable: a deleted customer's number is erased, and the courier
+  // must see an empty contact rather than anything fabricated.
+  private toCourierOrder(order: Order & { customer?: { phone: string | null } | null }) {
     return {
       id: order.id,
       number: order.orderNumber,

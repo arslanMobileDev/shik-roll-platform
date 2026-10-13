@@ -711,12 +711,22 @@ enum CustomerRole {
 model Customer {
   id        String       @id @default(uuid()) @db.Uuid
   tenantId  String      @map("tenant_id") @db.Uuid
-  phone     String       // E.164, unique sign-in identifier
+  // E.164, unique sign-in identifier. NULL once the account is deleted and
+  // anonymized; the original number waits in phonePendingRelease for 30 days.
+  phone     String?
   name      String?
   email     String?
   role      CustomerRole @default(CUSTOMER)
   createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Soft delete: the row survives as the anchor of the order history, the
+  // personal fields above are erased. deletedReason is always a server-side
+  // constant (never caller input) so nothing is smuggled back into the row.
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedReason      String?   @map("deleted_reason")
+  // Holds the phone while the number is frozen; restored back into phone.
+  phonePendingRelease String?  @map("phone_pending_release")
 
   orders Order[]
   bonusAccount BonusAccount?
@@ -725,6 +735,7 @@ model Customer {
 
   @@unique([phone], map: "uq_customers_phone")
   @@index([tenantId], map: "idx_customers_tenant_id")
+  @@index([deletedAt], map: "idx_customers_deleted_at")
   @@map("customers")
 }
 

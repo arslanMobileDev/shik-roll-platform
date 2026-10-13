@@ -5,8 +5,11 @@ export class CustomerEntity {
   @ApiProperty()
   id!: string;
 
-  @ApiProperty({ example: '+79991234567' })
-  phone!: string;
+  @ApiPropertyOptional({
+    example: '+79991234567',
+    description: 'Null once the account has been deleted and anonymized',
+  })
+  phone!: string | null;
 
   @ApiPropertyOptional()
   name!: string | null;
@@ -54,6 +57,29 @@ export class AuthTokensResponse {
 
   @ApiProperty({ type: CustomerEntity })
   customer!: CustomerEntity;
+}
+
+/**
+ * Alternative outcome of POST /auth/otp/verify: the code was correct, but the
+ * phone belongs to a deleted account still inside its 30-day freeze window.
+ * No session is issued — the client either POSTs the token to /auth/restore,
+ * or leaves it. Cancelling deliberately creates nothing: the number stays
+ * frozen and the same offer comes back on the next sign-in attempt.
+ */
+export class RestoreOfferResponse {
+  @ApiProperty({ enum: ['RESTORE_AVAILABLE'], example: 'RESTORE_AVAILABLE' })
+  status!: 'RESTORE_AVAILABLE';
+
+  @ApiProperty({
+    description: 'One-shot token for POST /auth/restore (5 minute TTL)',
+  })
+  restoreToken!: string;
+
+  @ApiProperty({ description: 'Token lifetime in seconds', example: 300 })
+  expiresInSeconds!: number;
+
+  @ApiProperty({ description: 'When the account was deleted' })
+  deletedAt!: string;
 }
 
 export function toCustomerEntity(record: Customer): CustomerEntity {
