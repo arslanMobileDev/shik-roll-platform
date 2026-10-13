@@ -16,6 +16,7 @@ import 'features/menu/data/menu_repository.dart';
 import 'features/orders/data/order_history_repository.dart';
 import 'features/orders/data/order_tracking_repository.dart';
 import 'features/payments/data/payments_repository.dart';
+import 'features/profile/data/account_repository.dart';
 import 'features/profile/data/user_settings_repository.dart';
 
 Future<void> main() async {
@@ -71,6 +72,12 @@ Future<void> main() async {
     tokenProvider,
   );
 
+  // Самостоятельное удаление аккаунта (требование Apple).
+  final AccountRepository accountRepository = RemoteAccountRepository(
+    ApiClient(baseUrl: AppConfig.apiBaseUrl),
+    tokenProvider,
+  );
+
   // Локальные UI-настройки гостя (ADR-1616).
   final userSettingsRepository = SharedPreferencesUserSettingsRepository(
     await SharedPreferences.getInstance(),
@@ -95,6 +102,7 @@ Future<void> main() async {
       orderTrackingRepository: orderTrackingRepository,
       userSettingsRepository: userSettingsRepository,
       loyaltyRepository: loyaltyRepository,
+      accountRepository: accountRepository,
     ),
   );
 }

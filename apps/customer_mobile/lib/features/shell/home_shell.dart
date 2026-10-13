@@ -24,6 +24,7 @@ import '../orders/data/order_history_repository.dart';
 import '../orders/data/order_tracking_repository.dart';
 import '../orders/view/order_history_screen.dart';
 import '../payments/data/payments_repository.dart';
+import '../profile/data/account_repository.dart';
 import '../profile/view/profile_screen.dart';
 
 /// Mobile shell with the bottom navigation: Меню, Корзина, Заказы, Профиль.
@@ -39,6 +40,7 @@ class HomeShell extends StatefulWidget {
     required this.orderHistoryRepository,
     required this.orderTrackingRepository,
     required this.loyaltyRepository,
+    required this.accountRepository,
   });
 
   final CustomerMenuRepository repository;
@@ -50,6 +52,7 @@ class HomeShell extends StatefulWidget {
   final OrderHistoryRepository orderHistoryRepository;
   final OrderTrackingRepository orderTrackingRepository;
   final LoyaltyRepository loyaltyRepository;
+  final AccountRepository accountRepository;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -119,7 +122,9 @@ class _HomeShellState extends State<HomeShell> {
                     onGoToCart: () => setState(() => _tab = 1),
                     orderTrackingRepository: widget.orderTrackingRepository,
                   ),
-                  const ProfileScreen(),
+                  ProfileScreen(
+                    accountRepository: widget.accountRepository,
+                  ),
                 ],
               ),
               bottomNavigationBar: NavigationBar(
