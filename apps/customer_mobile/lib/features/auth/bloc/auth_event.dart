@@ -43,6 +43,18 @@ final class AuthOtpCancelled extends AuthEvent {
   const AuthOtpCancelled();
 }
 
+/// Confirms the restore offer: signs the deleted account back in with the
+/// one-shot token of the active offer.
+final class AuthRestoreRequested extends AuthEvent {
+  const AuthRestoreRequested();
+}
+
+/// Declines the restore offer. Deliberately creates nothing: the number stays
+/// frozen, and the same offer comes back on the next sign-in attempt.
+final class AuthRestoreDeclined extends AuthEvent {
+  const AuthRestoreDeclined();
+}
+
 /// Saves a locally edited display name.
 ///
 /// The auth contract has no profile-update endpoint, so the name is kept
