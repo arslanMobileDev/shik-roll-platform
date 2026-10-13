@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { TenantMiddleware } from './modules/tenant/tenant.middleware';
 import { TooManyAttemptsFilter } from './modules/tenant/pin-rate-limit';
 import { AuthModule } from './modules/auth/auth.module';
+import { CustomersModule } from './modules/customers/customers.module';
 import { MenuModule } from './modules/menu/menu.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
@@ -25,6 +26,7 @@ import { RestaurantsController } from './restaurants.controller';
     PrismaModule,
     QueuesModule.register(),
     AuthModule,
+    CustomersModule,
     MenuModule,
     OrdersModule,
     PaymentsModule,

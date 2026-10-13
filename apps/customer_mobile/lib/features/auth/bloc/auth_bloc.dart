@@ -21,6 +21,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthOtpResendRequested>(_onOtpResendRequested);
     on<AuthOtpVerifyRequested>(_onOtpVerifyRequested);
     on<AuthOtpCancelled>(_onOtpCancelled);
+    on<AuthRestoreRequested>(_onRestoreRequested);
+    on<AuthRestoreDeclined>(_onRestoreDeclined);
     on<AuthNameSubmitted>(_onNameSubmitted);
     on<AuthLoggedOut>(_onLoggedOut);
   }
@@ -115,19 +117,24 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     if (phone == null || state.isLoading) return;
     emit(state.copyWith(isLoading: true, clearError: true));
     try {
-      final session = await _repository.verifyOtp(
+      final outcome = await _repository.verifyOtp(
         phone: phone,
         code: event.code,
       );
-      await _tokenStorage.save(session.toStored());
-      _tokenProvider.accessToken = session.accessToken;
-      emit(
-        AuthState(
-          status: AuthStatus.authenticated,
-          phone: session.customer.phone,
-          customer: session.customer,
-        ),
-      );
+      switch (outcome) {
+        case OtpVerified(:final session):
+          await _persistSession(session, emit);
+        case AccountRestoreOffered(:final offer):
+          // No session: the phone is frozen, the guest decides.
+          emit(
+            state.copyWith(
+              status: AuthStatus.restoreOffered,
+              restoreOffer: offer,
+              isLoading: false,
+              clearError: true,
+            ),
+          );
+      }
     } on AuthException catch (e) {
       emit(
         state.copyWith(
@@ -137,6 +144,57 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         ),
       );
     }
+  }
+
+  Future<void> _onRestoreRequested(
+    AuthRestoreRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    final offer = state.restoreOffer;
+    if (offer == null || state.isLoading) return;
+    emit(state.copyWith(isLoading: true, clearError: true));
+    try {
+      final session = await _repository.restoreAccount(
+        restoreToken: offer.restoreToken,
+      );
+      await _persistSession(session, emit);
+    } on AuthException catch (e) {
+      // The token is one-shot and already spent by the failed attempt:
+      // back to the phone step for a fresh sign-in.
+      emit(
+        AuthState(
+          status: AuthStatus.unauthenticated,
+          phone: state.phone,
+          errorMessage: e.message,
+        ),
+      );
+    }
+  }
+
+  void _onRestoreDeclined(AuthRestoreDeclined event, Emitter<AuthState> emit) {
+    emit(
+      AuthState(
+        status: AuthStatus.unauthenticated,
+        phone: state.phone,
+        errorMessage: 'Аккаунт на этот номер удалён. Вход не выполнен.',
+      ),
+    );
+  }
+
+  /// Persists the session and publishes it as [AuthStatus.authenticated].
+  Future<void> _persistSession(
+    AuthSession session,
+    Emitter<AuthState> emit,
+  ) async {
+    await _tokenStorage.save(session.toStored());
+    _tokenProvider.accessToken = session.accessToken;
+    emit(
+      AuthState(
+        status: AuthStatus.authenticated,
+        phone: session.customer.phone,
+        customer: session.customer,
+      ),
+    );
   }
 
   void _onOtpCancelled(AuthOtpCancelled event, Emitter<AuthState> emit) {

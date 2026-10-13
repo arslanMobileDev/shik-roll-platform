@@ -12,6 +12,7 @@ import '../features/orders/data/order_history_repository.dart';
 import '../features/orders/data/order_tracking_repository.dart';
 import '../features/payments/data/payments_repository.dart';
 import '../features/profile/bloc/user_settings_cubit.dart';
+import '../features/profile/data/account_repository.dart';
 import '../features/profile/data/user_settings_repository.dart';
 import '../features/shell/home_shell.dart';
 
@@ -29,6 +30,7 @@ class CustomerApp extends StatelessWidget {
     required this.orderTrackingRepository,
     required this.userSettingsRepository,
     required this.loyaltyRepository,
+    required this.accountRepository,
   });
 
   final CustomerMenuRepository repository;
@@ -41,6 +43,7 @@ class CustomerApp extends StatelessWidget {
   final OrderTrackingRepository orderTrackingRepository;
   final UserSettingsRepository userSettingsRepository;
   final LoyaltyRepository loyaltyRepository;
+  final AccountRepository accountRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +66,7 @@ class CustomerApp extends StatelessWidget {
           orderHistoryRepository: orderHistoryRepository,
           orderTrackingRepository: orderTrackingRepository,
           loyaltyRepository: loyaltyRepository,
+          accountRepository: accountRepository,
         ),
       ),
     );

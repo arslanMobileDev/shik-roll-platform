@@ -9,6 +9,7 @@ import {
   JwtAuthGuard,
   OptionalJwtAuthGuard,
 } from '../auth/guards/jwt-auth.guard';
+import { PrismaService } from '../../prisma/prisma.service';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 
@@ -97,6 +98,16 @@ describe('OrdersController — operational HTTP access', () => {
       controllers: [OrdersController],
       providers: [
         { provide: OrdersService, useValue: service },
+        // The guard checks that the customer row still exists (deleted
+        // accounts are rejected); every request below is rejected earlier.
+        {
+          provide: PrismaService,
+          useValue: {
+            customer: {
+              findUnique: jest.fn().mockResolvedValue({ id: CUSTOMER.id }),
+            },
+          },
+        },
       ],
     }).compile();
     app = module.createNestApplication();

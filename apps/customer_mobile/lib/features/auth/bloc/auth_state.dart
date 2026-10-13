@@ -2,8 +2,9 @@ import 'package:equatable/equatable.dart';
 
 import '../data/auth_models.dart';
 
-/// Guest session lifecycle: anonymous → OTP sent → authenticated.
-enum AuthStatus { unknown, unauthenticated, otpSent, authenticated }
+/// Guest session lifecycle: anonymous → OTP sent → authenticated, with a
+/// detour through [restoreOffered] for a phone whose account was deleted.
+enum AuthStatus { unknown, unauthenticated, otpSent, restoreOffered, authenticated }
 
 /// Single auth state; [AuthStatus] carries the step while [isLoading] and
 /// [errorMessage] cover the Loading/Error cases without losing the context
@@ -14,6 +15,7 @@ final class AuthState extends Equatable {
     this.phone,
     this.otpExpiresInSeconds = 0,
     this.customer,
+    this.restoreOffer,
     this.isLoading = false,
     this.errorMessage,
   });
@@ -29,6 +31,10 @@ final class AuthState extends Equatable {
   /// Set when [status] is [AuthStatus.authenticated].
   final GuestCustomer? customer;
 
+  /// Set when [status] is [AuthStatus.restoreOffered]: the deleted account
+  /// found behind the verified phone, waiting for the guest's decision.
+  final RestoreOffer? restoreOffer;
+
   /// A request (`send` / `verify` / restore) is in flight.
   final bool isLoading;
 
@@ -42,6 +48,7 @@ final class AuthState extends Equatable {
     String? phone,
     int? otpExpiresInSeconds,
     GuestCustomer? customer,
+    RestoreOffer? restoreOffer,
     bool? isLoading,
     String? errorMessage,
     bool clearError = false,
@@ -51,6 +58,7 @@ final class AuthState extends Equatable {
       phone: phone ?? this.phone,
       otpExpiresInSeconds: otpExpiresInSeconds ?? this.otpExpiresInSeconds,
       customer: customer ?? this.customer,
+      restoreOffer: restoreOffer ?? this.restoreOffer,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
     );
@@ -62,6 +70,7 @@ final class AuthState extends Equatable {
     phone,
     otpExpiresInSeconds,
     customer,
+    restoreOffer,
     isLoading,
     errorMessage,
   ];

@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'fake_account_repository.dart';
 import 'fake_user_settings_repository.dart';
 
 final _sectionTile = find.byKey(const ValueKey('delivery-style-tile'));
@@ -38,7 +39,7 @@ Future<void> _pumpProfile(
             BlocProvider<AuthBloc>.value(value: authBloc),
             BlocProvider<UserSettingsCubit>.value(value: settingsCubit),
           ],
-          child: const ProfileScreen(),
+          child: ProfileScreen(accountRepository: FakeAccountRepository()),
         ),
       ),
     ),

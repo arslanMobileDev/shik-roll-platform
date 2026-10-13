@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -58,12 +59,75 @@ class AuthFlowView extends StatelessWidget {
           ),
           child: switch (state.status) {
             AuthStatus.otpSent => const _OtpStep(),
+            AuthStatus.restoreOffered => const _RestorePrompt(),
             _ => const _PhoneStep(),
           },
         );
       },
     );
   }
+}
+
+/// Предложение восстановить удалённый аккаунт поверх шага кода.
+///
+/// Диалог открывается из [initState], а не из listener'а по смене статуса:
+/// шит можно закрыть свайпом, оставив блок в `restoreOffered`, и при
+/// повторном открытии смены статуса уже не будет — предложение пропало бы.
+class _RestorePrompt extends StatefulWidget {
+  const _RestorePrompt();
+
+  @override
+  State<_RestorePrompt> createState() => _RestorePromptState();
+}
+
+class _RestorePromptState extends State<_RestorePrompt> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _ask();
+    });
+  }
+
+  Future<void> _ask() async {
+    final bloc = context.read<AuthBloc>();
+    final offer = bloc.state.restoreOffer;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      // Выбор обязателен: отказ — тоже решение (вход не выполнен).
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Восстановить аккаунт?'),
+        content: Text(
+          offer == null
+              ? 'Аккаунт на этот номер удалён. Восстановить его?'
+              : 'Аккаунт на этот номер удалён '
+                    '${DateFormat('dd.MM.yyyy').format(offer.deletedAt.toLocal())}. '
+                    'История заказов вернётся, сгоревшие бонусы — нет.',
+        ),
+        actions: [
+          TextButton(
+            key: const ValueKey('restore-decline-button'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Не сейчас'),
+          ),
+          FilledButton(
+            key: const ValueKey('restore-confirm-button'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Восстановить'),
+          ),
+        ],
+      ),
+    );
+    bloc.add(
+      (confirmed ?? false)
+          ? const AuthRestoreRequested()
+          : const AuthRestoreDeclined(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => const _OtpStep();
 }
 
 class _PhoneStep extends StatefulWidget {

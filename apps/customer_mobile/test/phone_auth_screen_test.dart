@@ -47,9 +47,13 @@ class _Harness extends StatelessWidget {
 Future<AuthBloc> _pumpSheet(
   WidgetTester tester, {
   ValueChanged<bool>? onResult,
+  Set<String> frozenPhones = const {},
 }) async {
   final authBloc = AuthBloc(
-    repository: FakeAuthRepository(latency: Duration.zero),
+    repository: FakeAuthRepository(
+      latency: Duration.zero,
+      frozenPhones: frozenPhones,
+    ),
     tokenStorage: InMemoryAuthTokenStorage(),
     tokenProvider: AuthTokenProvider(),
   );
@@ -184,5 +188,59 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(_phoneField, findsOneWidget);
+  });
+
+  testWidgets('номер в заморозке: предложение восстановления → шторка '
+      'закрывается с true', (tester) async {
+    bool? result;
+    final authBloc = await _pumpSheet(
+      tester,
+      onResult: (r) => result = r,
+      frozenPhones: {'+79991234567'},
+    );
+    await _requestCode(tester);
+    await tester.enterText(_otpField, '1234');
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Восстановить аккаунт?'), findsOneWidget);
+    expect(authBloc.state.status, AuthStatus.restoreOffered);
+
+    await tester.tap(find.byKey(const ValueKey('restore-confirm-button')));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(authBloc.state.status, AuthStatus.authenticated);
+    expect(result, isTrue);
+    expect(_otpField, findsNothing);
+  });
+
+  testWidgets('номер в заморозке: «Не сейчас» → назад на шаг телефона', (
+    tester,
+  ) async {
+    final authBloc = await _pumpSheet(
+      tester,
+      frozenPhones: {'+79991234567'},
+    );
+    await _requestCode(tester);
+    await tester.enterText(_otpField, '1234');
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.tap(find.byKey(const ValueKey('restore-decline-button')));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(authBloc.state.status, AuthStatus.unauthenticated);
+    expect(_phoneField, findsOneWidget);
+    expect(find.text('Аккаунт на этот номер удалён. Вход не выполнен.'),
+        findsOneWidget);
   });
 }

@@ -1,5 +1,6 @@
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../../../prisma/prisma.service';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from './jwt-auth.guard';
 import { RequestWithCustomer } from '../auth.types';
 
@@ -16,13 +17,26 @@ function contextFor(headers: { authorization?: string }): {
   return { context, request };
 }
 
+/**
+ * Stands in for the deleted-customer row check: every id resolves to a live
+ * customer unless it is listed in `deletedIds`.
+ */
+function prismaStub(deletedIds: string[] = []): PrismaService {
+  return {
+    customer: {
+      findUnique: async ({ where }: { where: { id: string } }) =>
+        deletedIds.includes(where.id) ? null : { id: where.id },
+    },
+  } as unknown as PrismaService;
+}
+
 describe('JwtAuthGuard', () => {
   let jwt: JwtService;
   let guard: JwtAuthGuard;
 
   beforeEach(() => {
     jwt = new JwtService({ secret: SECRET });
-    guard = new JwtAuthGuard(jwt);
+    guard = new JwtAuthGuard(jwt, prismaStub());
   });
 
   it('rejects a request without an Authorization header (UNAUTHORIZED)', async () => {
@@ -67,6 +81,18 @@ describe('JwtAuthGuard', () => {
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(request.customer).toEqual({ id: 'c1', phone: '+79990000000', role: 'CUSTOMER' });
   });
+
+  it('rejects a valid token whose customer row is deleted (TOKEN_INVALID)', async () => {
+    // Account deletion leaves the 30-day access token cryptographically valid,
+    // so the row check is the only thing that ends the session.
+    const deleted = new JwtAuthGuard(jwt, prismaStub(['c9']));
+    const token = await jwt.signAsync({ sub: 'c9', phone: '+79990000000', type: 'access' });
+    const { context } = contextFor({ authorization: `Bearer ${token}` });
+
+    await expect(deleted.canActivate(context)).rejects.toMatchObject({
+      response: { code: 'TOKEN_INVALID' },
+    });
+  });
 });
 
 describe('OptionalJwtAuthGuard', () => {
@@ -75,7 +101,7 @@ describe('OptionalJwtAuthGuard', () => {
 
   beforeEach(() => {
     jwt = new JwtService({ secret: SECRET });
-    guard = new OptionalJwtAuthGuard(jwt);
+    guard = new OptionalJwtAuthGuard(jwt, prismaStub());
   });
 
   it('passes anonymous requests through without a customer', async () => {
@@ -105,7 +131,7 @@ describe.each([JwtAuthGuard, OptionalJwtAuthGuard])('%s role boundaries', (Guard
     { role: 'CUSTOMER' }, { sub: '', role: 'CUSTOMER' },
   ])('rejects unsafe claims %j', async (claims) => {
     const jwt = new JwtService({ secret: SECRET });
-    const guard = new Guard(jwt);
+    const guard = new Guard(jwt, prismaStub());
     const token = jwt.sign({ ...claims, type: 'access' });
     const { context } = contextFor({ authorization: `Bearer ${token}` });
     await expect(guard.canActivate(context)).rejects.toMatchObject({

@@ -2,6 +2,10 @@ import { BullModule, getQueueToken } from '@nestjs/bullmq';
 import { Global, Logger, Module } from '@nestjs/common';
 import { KitchenModule } from '../kitchen/kitchen.module';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
+import {
+  CUSTOMER_MAINTENANCE_QUEUE,
+  CustomerMaintenanceProcessor,
+} from './customer-maintenance.processor';
 import { OrderProcessingProcessor } from './order-processing.processor';
 import { OrderQueuesService, ORDER_PROCESSING_QUEUE } from './order-queues.service';
 
@@ -61,6 +65,7 @@ export class QueuesModule {
               },
             }),
             BullModule.registerQueue({ name: ORDER_PROCESSING_QUEUE }),
+            BullModule.registerQueue({ name: CUSTOMER_MAINTENANCE_QUEUE }),
           ],
       providers: disabled
         ? [
@@ -77,8 +82,17 @@ export class QueuesModule {
                 },
               },
             },
+            {
+              // The maintenance processor is not registered when queues are
+              // off, so nothing injects this — it exists only so the module
+              // graph matches the enabled branch.
+              provide: getQueueToken(CUSTOMER_MAINTENANCE_QUEUE),
+              useValue: {
+                upsertJobScheduler: async () => ({ id: 'disabled' }),
+              },
+            },
           ]
-        : [OrderQueuesService, OrderProcessingProcessor],
+        : [OrderQueuesService, OrderProcessingProcessor, CustomerMaintenanceProcessor],
       exports: disabled
         ? [OrderQueuesService, getQueueToken(ORDER_PROCESSING_QUEUE)]
         : [BullModule, OrderQueuesService],

@@ -27,8 +27,17 @@ abstract interface class AuthRepository {
   Future<OtpChallenge> sendOtp({required String phone});
 
   /// Verifies the [code]; the backend auto-creates the customer on the
-  /// first sign-in and issues the JWT pair.
-  Future<AuthSession> verifyOtp({required String phone, required String code});
+  /// first sign-in and issues the JWT pair. A code on a phone whose account
+  /// was deleted inside the freeze window answers [AccountRestoreOffered]
+  /// instead — no session, nothing created.
+  Future<OtpVerifyOutcome> verifyOtp({
+    required String phone,
+    required String code,
+  });
+
+  /// Restores the deleted account behind [restoreToken] and signs it in
+  /// (`POST /auth/restore`); the one-shot token comes from [RestoreOffer].
+  Future<AuthSession> restoreAccount({required String restoreToken});
 
   /// Profile of the authenticated guest (`GET /auth/me`, Bearer required).
   Future<GuestCustomer> getProfile();
@@ -64,7 +73,7 @@ final class RemoteAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<AuthSession> verifyOtp({
+  Future<OtpVerifyOutcome> verifyOtp({
     required String phone,
     required String code,
   }) async {
@@ -72,6 +81,31 @@ final class RemoteAuthRepository implements AuthRepository {
       final response = await _client.dio.post<Map<String, dynamic>>(
         '/auth/otp/verify',
         data: {'phone': phone, 'code': code},
+      );
+      final data = response.data;
+      if (data == null) {
+        throw AuthException(
+          'Пустой ответ сервера. Попробуйте ещё раз.',
+          statusCode: response.statusCode,
+        );
+      }
+      return switch (data['status']) {
+        'RESTORE_AVAILABLE' => AccountRestoreOffered(RestoreOffer.fromJson(data)),
+        _ => OtpVerified(AuthSession.fromJson(data)),
+      };
+    } on DioException catch (e) {
+      throw _mapDioError(e);
+    } on FormatException {
+      throw const AuthException('Некорректный ответ сервера.');
+    }
+  }
+
+  @override
+  Future<AuthSession> restoreAccount({required String restoreToken}) async {
+    try {
+      final response = await _client.dio.post<Map<String, dynamic>>(
+        '/auth/restore',
+        data: {'restoreToken': restoreToken},
       );
       final data = response.data;
       if (data == null) {
@@ -150,8 +184,16 @@ final class RemoteAuthRepository implements AuthRepository {
           code: code,
         ),
       DioExceptionType.badResponse => AuthException(
-        _backendMessage(error.response) ??
-            'Не удалось выполнить запрос. Попробуйте ещё раз.',
+        switch (code) {
+          'RESTORE_CONFLICT' =>
+            'Этот номер уже занят другим аккаунтом. Войдите заново.',
+          'RESTORE_WINDOW_EXPIRED' =>
+            'Время на восстановление истекло. Войдите заново.',
+          'ACCOUNT_NOT_DELETED' => 'Аккаунт уже активен. Войдите заново.',
+          _ =>
+            _backendMessage(error.response) ??
+                'Не удалось выполнить запрос. Попробуйте ещё раз.',
+        },
         statusCode: statusCode,
         code: code,
       ),

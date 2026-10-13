@@ -11,12 +11,16 @@ import '../../auth/view/auth_flow.dart';
 import '../../legal/data/legal_constants.dart';
 import '../../legal/data/legal_document.dart';
 import '../../legal/view/legal_document_viewer_screen.dart';
+import '../data/account_repository.dart';
+import 'delete_account_screen.dart';
 import 'widgets/delivery_style_section.dart';
 
 /// Guest profile tab: identity, legal documents and logout for the
 /// authenticated guest; a login prompt for the anonymous one.
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, required this.accountRepository});
+
+  final AccountRepository accountRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +56,8 @@ class ProfileScreen extends StatelessWidget {
               if (state.isAuthenticated) ...[
                 const SizedBox(height: AppSpacing.s16),
                 const _LogoutButton(),
+                const SizedBox(height: AppSpacing.s4),
+                _DeleteAccountButton(repository: accountRepository),
               ],
             ],
           );
@@ -273,6 +279,40 @@ class _LegalSection extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Пункт «Удалить аккаунт» — вход в флоу удаления. Виден всегда, пока гость
+/// авторизован: доступ к удалению аккаунта не должен зависеть от состояния
+/// заказов (требование Apple), поэтому блокировка живёт внутри экрана.
+class _DeleteAccountButton extends StatelessWidget {
+  const _DeleteAccountButton({required this.repository});
+
+  final AccountRepository repository;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      key: const ValueKey('delete-account-tile'),
+      onPressed: () => _open(context),
+      icon: const Icon(Icons.delete_forever_outlined, color: AppColors.error),
+      label: const Text(
+        'Удалить аккаунт',
+        style: TextStyle(color: AppColors.error),
+      ),
+    );
+  }
+
+  Future<void> _open(BuildContext context) async {
+    final authBloc = context.read<AuthBloc>();
+    final deleted = await Navigator.of(
+      context,
+    ).push(DeleteAccountScreen.route(repository));
+    // Аккаунта на сервере больше нет: сбрасываем сессию, профиль на месте
+    // переключается в анонимный вид.
+    if (deleted ?? false) {
+      authBloc.add(const AuthLoggedOut());
+    }
   }
 }
 

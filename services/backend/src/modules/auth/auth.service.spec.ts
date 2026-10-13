@@ -10,6 +10,8 @@ import {
   REFRESH_TOKEN_TTL_SECONDS,
 } from './auth.config';
 import { AuthService } from './auth.service';
+import { RESTORE_TOKEN_TYPE } from '../customers/customers.config';
+import { AuthTokensResponse, RestoreOfferResponse } from './entities/auth.entities';
 import { InMemoryOtpStore } from './otp-store.service';
 import { SmsProvider } from './providers/sms/sms.provider';
 
@@ -17,7 +19,30 @@ const PHONE = '+79991234567';
 const CUSTOMER_ID = '11111111-1111-1111-1111-111111111111';
 const TENANT_ID = '22222222-2222-2222-2222-222222222222';
 
-function makeCustomer(phone: string = PHONE): Customer {
+/**
+ * verifyOtp answers with a union: a session, or the RESTORE_AVAILABLE offer
+ * for a frozen phone. These tests exercise the session branch.
+ */
+function requireSession(
+  result: AuthTokensResponse | RestoreOfferResponse,
+): AuthTokensResponse {
+  if (!('accessToken' in result)) {
+    throw new Error(`expected a session, got ${result.status}`);
+  }
+  return result;
+}
+
+/** The mirror of requireSession: the frozen-phone branch. */
+function requireRestoreOffer(
+  result: AuthTokensResponse | RestoreOfferResponse,
+): RestoreOfferResponse {
+  if ('accessToken' in result) {
+    throw new Error('expected a restore offer, got a session');
+  }
+  return result;
+}
+
+function makeCustomer(phone: string | null = PHONE): Customer {
   return {
     id: CUSTOMER_ID,
     tenantId: TENANT_ID,
@@ -27,6 +52,9 @@ function makeCustomer(phone: string = PHONE): Customer {
     role: 'CUSTOMER',
     createdAt: new Date('2026-09-04T10:00:00Z'),
     updatedAt: new Date('2026-09-04T10:00:00Z'),
+    deletedAt: null,
+    deletedReason: null,
+    phonePendingRelease: null,
   };
 }
 
@@ -39,6 +67,7 @@ describe('AuthService', () => {
     customer: { upsert: jest.Mock; findUnique: jest.Mock };
     tenant: { findUnique: jest.Mock };
   };
+  let customers: { findFrozenByPhone: jest.Mock; unfreeze: jest.Mock; verifyFlowToken: jest.Mock };
   let originalNodeEnv: string | undefined;
 
   beforeEach(() => {
@@ -53,7 +82,19 @@ describe('AuthService', () => {
       // ADR-1622: the tenant is looked up by code, never by a hardcoded UUID.
       tenant: { findUnique: jest.fn().mockResolvedValue({ id: TENANT_ID }) },
     };
-    service = new AuthService(otpStore, sms as unknown as SmsProvider, jwt, prisma as never);
+    // The deleted-account lookup: no frozen row unless a test stages one.
+    customers = {
+      findFrozenByPhone: jest.fn().mockResolvedValue(null),
+      unfreeze: jest.fn().mockResolvedValue(makeCustomer()),
+      verifyFlowToken: jest.fn().mockResolvedValue({ sub: CUSTOMER_ID }),
+    };
+    service = new AuthService(
+      otpStore,
+      sms as unknown as SmsProvider,
+      jwt,
+      prisma as never,
+      customers as never,
+    );
     originalNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'test';
     delete process.env.SMS_PROVIDER;
@@ -191,7 +232,9 @@ describe('AuthService', () => {
 
     it('verifies, consumes the code, upserts the customer and issues both tokens', async () => {
       await service.sendOtp({ phone: PHONE });
-      const result = await service.verifyOtp({ phone: PHONE, code: DEV_OTP_CODE });
+      const result = requireSession(
+        await service.verifyOtp({ phone: PHONE, code: DEV_OTP_CODE }),
+      );
 
       expect(prisma.customer.upsert).toHaveBeenCalledWith({
         where: { phone: PHONE },
@@ -230,6 +273,34 @@ describe('AuthService', () => {
       ).rejects.toMatchObject({ response: { code: 'OTP_EXPIRED' } });
     });
 
+    it('offers a restore instead of a session when the phone is frozen, creating nothing', async () => {
+      const deletedAt = new Date('2026-10-01T00:00:00Z');
+      prisma.customer.findUnique.mockResolvedValue(null);
+      customers.findFrozenByPhone.mockResolvedValue({ id: CUSTOMER_ID, deletedAt });
+
+      await service.sendOtp({ phone: PHONE });
+      const result = requireRestoreOffer(
+        await service.verifyOtp({ phone: PHONE, code: DEV_OTP_CODE }),
+      );
+      expect(result).toMatchObject({
+        status: 'RESTORE_AVAILABLE',
+        expiresInSeconds: 300,
+        deletedAt: deletedAt.toISOString(),
+      });
+      await expect(
+        jwt.verifyAsync(result.restoreToken),
+      ).resolves.toMatchObject({ sub: CUSTOMER_ID, type: RESTORE_TOKEN_TYPE });
+      // Refusing the offer must not provision a second account on the number.
+      expect(prisma.customer.upsert).not.toHaveBeenCalled();
+    });
+
+    it('never probes the frozen-account lookup for a live customer', async () => {
+      await service.sendOtp({ phone: PHONE });
+      await service.verifyOtp({ phone: PHONE, code: DEV_OTP_CODE });
+
+      expect(customers.findFrozenByPhone).not.toHaveBeenCalled();
+    });
+
     it('rejects an expired code (TTL elapsed)', async () => {
       jest.useFakeTimers();
       try {
@@ -241,6 +312,30 @@ describe('AuthService', () => {
       } finally {
         jest.useRealTimers();
       }
+    });
+  });
+
+  describe('restoreAccount', () => {
+    it('validates the token, unfreezes the account and signs the customer in', async () => {
+      const result = await service.restoreAccount('restore-token');
+
+      expect(customers.verifyFlowToken).toHaveBeenCalledWith(
+        'restore-token',
+        RESTORE_TOKEN_TYPE,
+      );
+      expect(customers.unfreeze).toHaveBeenCalledWith(CUSTOMER_ID);
+      expect(result.customer).toMatchObject({ id: CUSTOMER_ID, phone: PHONE });
+      await expect(jwt.verifyAsync(result.accessToken)).resolves.toMatchObject({
+        sub: CUSTOMER_ID,
+        type: 'access',
+      });
+    });
+
+    it('propagates a rejected token without touching the account', async () => {
+      customers.verifyFlowToken.mockRejectedValue(new Error('bad token'));
+
+      await expect(service.restoreAccount('garbage')).rejects.toThrow('bad token');
+      expect(customers.unfreeze).not.toHaveBeenCalled();
     });
   });
 

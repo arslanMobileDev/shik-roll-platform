@@ -33,6 +33,12 @@ const _stored = StoredAuthSession(
   name: 'Арслан',
 );
 
+final _offer = RestoreOffer(
+  restoreToken: 'restore-jwt',
+  expiresInSeconds: 300,
+  deletedAt: DateTime.utc(2026, 9, 13),
+);
+
 void main() {
   late _MockAuthRepository repository;
   late InMemoryAuthTokenStorage storage;
@@ -166,7 +172,7 @@ void main() {
       build: buildBloc,
       setUp: () => when(
         () => repository.verifyOtp(phone: _phone, code: '1234'),
-      ).thenAnswer((_) async => _session),
+      ).thenAnswer((_) async => const OtpVerified(_session)),
       seed: () => const AuthState(
         status: AuthStatus.otpSent,
         phone: _phone,
@@ -259,6 +265,119 @@ void main() {
           (s) => s.status == AuthStatus.unauthenticated && s.phone == _phone,
         ),
       ],
+    );
+  });
+
+  group('AuthBloc: восстановление удалённого аккаунта', () {
+    blocTest<AuthBloc, AuthState>(
+      'код на замороженный номер → restoreOffered, сессия не выдана',
+      build: buildBloc,
+      setUp: () => when(
+        () => repository.verifyOtp(phone: _phone, code: '1234'),
+      ).thenAnswer((_) async => AccountRestoreOffered(_offer)),
+      seed: () => const AuthState(
+        status: AuthStatus.otpSent,
+        phone: _phone,
+        otpExpiresInSeconds: 180,
+      ),
+      act: (bloc) => bloc.add(const AuthOtpVerifyRequested(code: '1234')),
+      expect: () => [
+        predicate<AuthState>((s) => s.isLoading),
+        predicate<AuthState>(
+          (s) =>
+              s.status == AuthStatus.restoreOffered &&
+              s.restoreOffer?.restoreToken == 'restore-jwt' &&
+              s.customer == null &&
+              !s.isLoading,
+        ),
+      ],
+      verify: (_) async {
+        expect(tokenProvider.accessToken, isNull);
+        expect(await storage.read(), isNull);
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'подтверждение → authenticated, токены сохранены',
+      build: buildBloc,
+      setUp: () => when(
+        () => repository.restoreAccount(restoreToken: 'restore-jwt'),
+      ).thenAnswer((_) async => _session),
+      seed: () => AuthState(
+        status: AuthStatus.restoreOffered,
+        phone: _phone,
+        restoreOffer: _offer,
+      ),
+      act: (bloc) => bloc.add(const AuthRestoreRequested()),
+      expect: () => [
+        predicate<AuthState>((s) => s.isLoading),
+        predicate<AuthState>(
+          (s) =>
+              s.status == AuthStatus.authenticated &&
+              s.customer?.id == 'customer-1' &&
+              !s.isLoading,
+        ),
+      ],
+      verify: (_) async {
+        expect(tokenProvider.accessToken, 'access-jwt');
+        expect((await storage.read())?.customerId, 'customer-1');
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'отказ → unauthenticated, новый аккаунт не создаётся',
+      build: buildBloc,
+      seed: () => AuthState(
+        status: AuthStatus.restoreOffered,
+        phone: _phone,
+        restoreOffer: _offer,
+      ),
+      act: (bloc) => bloc.add(const AuthRestoreDeclined()),
+      expect: () => [
+        predicate<AuthState>(
+          (s) =>
+              s.status == AuthStatus.unauthenticated &&
+              s.phone == _phone &&
+              s.errorMessage != null,
+        ),
+      ],
+      verify: (_) async {
+        verifyNever(() => repository.restoreAccount(restoreToken: any(named: 'restoreToken')));
+        expect(await storage.read(), isNull);
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'номер заняли до подтверждения → unauthenticated с сообщением сервера',
+      build: buildBloc,
+      setUp: () => when(
+        () => repository.restoreAccount(restoreToken: 'restore-jwt'),
+      ).thenThrow(
+        const AuthException(
+          'Этот номер уже занят другим аккаунтом. Войдите заново.',
+          statusCode: 409,
+          code: 'RESTORE_CONFLICT',
+        ),
+      ),
+      seed: () => AuthState(
+        status: AuthStatus.restoreOffered,
+        phone: _phone,
+        restoreOffer: _offer,
+      ),
+      act: (bloc) => bloc.add(const AuthRestoreRequested()),
+      expect: () => [
+        predicate<AuthState>((s) => s.isLoading),
+        predicate<AuthState>(
+          (s) =>
+              s.status == AuthStatus.unauthenticated &&
+              s.errorMessage ==
+                  'Этот номер уже занят другим аккаунтом. Войдите заново.',
+        ),
+      ],
+      verify: (_) async {
+        expect(tokenProvider.accessToken, isNull);
+        expect(await storage.read(), isNull);
+      },
     );
   });
 

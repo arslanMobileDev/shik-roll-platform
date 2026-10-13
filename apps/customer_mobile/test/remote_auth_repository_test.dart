@@ -1,5 +1,6 @@
 import 'package:customer_mobile/core/auth/auth_token_provider.dart';
 import 'package:customer_mobile/core/network/api_client.dart';
+import 'package:customer_mobile/features/auth/data/auth_models.dart';
 import 'package:customer_mobile/features/auth/data/auth_repository.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -84,11 +85,13 @@ void main() {
         }, '/auth/otp/verify'),
       );
 
-      final session = await repository.verifyOtp(
+      final outcome = await repository.verifyOtp(
         phone: '+79991234567',
         code: '1234',
       );
 
+      expect(outcome, isA<OtpVerified>());
+      final session = (outcome as OtpVerified).session;
       expect(session.accessToken, 'access-jwt');
       expect(session.refreshToken, 'refresh-jwt');
       expect(session.customer.id, 'customer-1');
@@ -100,6 +103,33 @@ void main() {
         ),
       ).captured;
       expect(captured.single, {'phone': '+79991234567', 'code': '1234'});
+    });
+
+    test('RESTORE_AVAILABLE → предложение восстановления, а не сессия', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/otp/verify',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => _ok(const {
+          'status': 'RESTORE_AVAILABLE',
+          'restoreToken': 'restore-jwt',
+          'expiresInSeconds': 300,
+          'deletedAt': '2026-09-13T10:00:00.000Z',
+        }, '/auth/otp/verify'),
+      );
+
+      final outcome = await repository.verifyOtp(
+        phone: '+79991234567',
+        code: '1234',
+      );
+
+      expect(outcome, isA<AccountRestoreOffered>());
+      final offer = (outcome as AccountRestoreOffered).offer;
+      expect(offer.restoreToken, 'restore-jwt');
+      expect(offer.expiresInSeconds, 300);
+      expect(offer.deletedAt, DateTime.utc(2026, 9, 13, 10));
     });
 
     test('401 OTP_INVALID → понятное сообщение', () {
@@ -170,6 +200,61 @@ void main() {
             'message',
             'Нет соединения с сервером. Проверьте интернет и попробуйте ещё раз.',
           ),
+        ),
+      );
+    });
+  });
+
+  group('RemoteAuthRepository: restoreAccount', () {
+    test('шлёт restoreToken в POST /auth/restore и возвращает сессию', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/restore',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => _ok(const {
+          'accessToken': 'access-jwt',
+          'refreshToken': 'refresh-jwt',
+          'expiresInSeconds': 2592000,
+          'customer': {'id': 'customer-1', 'phone': '+79991234567'},
+        }, '/auth/restore'),
+      );
+
+      final session = await repository.restoreAccount(
+        restoreToken: 'restore-jwt',
+      );
+
+      expect(session.customer.phone, '+79991234567');
+      final captured = verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/restore',
+          data: captureAny(named: 'data'),
+        ),
+      ).captured;
+      expect(captured.single, {'restoreToken': 'restore-jwt'});
+    });
+
+    test('409 RESTORE_CONFLICT → номер занят, нужен новый вход', () {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/auth/restore',
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(
+        _badResponse(
+          '/auth/restore',
+          409,
+          body: {'message': 'RESTORE_CONFLICT'},
+        ),
+      );
+
+      expect(
+        repository.restoreAccount(restoreToken: 'restore-jwt'),
+        throwsA(
+          isA<AuthException>()
+              .having((e) => e.code, 'code', 'RESTORE_CONFLICT')
+              .having((e) => e.message, 'message', contains('занят')),
         ),
       );
     });

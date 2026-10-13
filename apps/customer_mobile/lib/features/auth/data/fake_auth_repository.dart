@@ -6,10 +6,17 @@ import 'auth_repository.dart';
 /// Mirrors the dev backend (`SMS_PROVIDER` unset): any phone is accepted
 /// and the fixed code `1234` verifies successfully.
 final class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({this.latency = const Duration(milliseconds: 300)});
+  FakeAuthRepository({
+    this.latency = const Duration(milliseconds: 300),
+    this.frozenPhones = const {},
+  });
 
   /// Simulated network latency; pass [Duration.zero] in tests.
   final Duration latency;
+
+  /// Phones of deleted accounts still inside the freeze window: verifying a
+  /// code on one of them offers a restore instead of a session.
+  final Set<String> frozenPhones;
 
   /// Fixed dev code, same as the backend without an SMS provider.
   static const devOtpCode = '1234';
@@ -19,6 +26,13 @@ final class FakeAuthRepository implements AuthRepository {
     phone: '+79991234567',
   );
 
+  static const _demoSession = AuthSession(
+    accessToken: 'demo-access-token',
+    refreshToken: 'demo-refresh-token',
+    expiresInSeconds: 2592000,
+    customer: _demoCustomer,
+  );
+
   @override
   Future<OtpChallenge> sendOtp({required String phone}) async {
     if (latency > Duration.zero) await Future<void>.delayed(latency);
@@ -26,7 +40,7 @@ final class FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<AuthSession> verifyOtp({
+  Future<OtpVerifyOutcome> verifyOtp({
     required String phone,
     required String code,
   }) async {
@@ -38,12 +52,22 @@ final class FakeAuthRepository implements AuthRepository {
         code: 'OTP_INVALID',
       );
     }
-    return const AuthSession(
-      accessToken: 'demo-access-token',
-      refreshToken: 'demo-refresh-token',
-      expiresInSeconds: 2592000,
-      customer: _demoCustomer,
-    );
+    if (frozenPhones.contains(phone)) {
+      return AccountRestoreOffered(
+        RestoreOffer(
+          restoreToken: 'demo-restore-token',
+          expiresInSeconds: 300,
+          deletedAt: DateTime.now().subtract(const Duration(days: 3)),
+        ),
+      );
+    }
+    return const OtpVerified(_demoSession);
+  }
+
+  @override
+  Future<AuthSession> restoreAccount({required String restoreToken}) async {
+    if (latency > Duration.zero) await Future<void>.delayed(latency);
+    return _demoSession;
   }
 
   @override
