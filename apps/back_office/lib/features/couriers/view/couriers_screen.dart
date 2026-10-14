@@ -74,7 +74,7 @@ class CouriersScreen extends StatelessWidget {
                     courier.name,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  Text(courier.phone),
+                  Text(courier.phone ?? 'без номера'),
                   Text(
                     '${courier.isActive ? 'Активен' : 'Заблокирован'} · ${courier.isAvailable ? 'Свободен' : 'Занят'}',
                   ),
@@ -194,7 +194,11 @@ class _CourierDialogState extends State<_CourierDialog> {
                 enabled: !_saving,
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(labelText: 'Телефон'),
-                validator: (v) => isRussianCourierPhone(v ?? '')
+                // Only a new courier needs the number: on an existing one the
+                // field is read-only and never sent, so validating it would
+                // only block edits of a deleted courier, whose number is null.
+                validator: (v) =>
+                    widget.courier != null || isRussianCourierPhone(v ?? '')
                     ? null
                     : 'Введите российский телефон',
               ),
