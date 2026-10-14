@@ -876,7 +876,18 @@ model Courier {
   // how orphan courier rows appeared in the e2e database.
   brandBranch BrandBranch @relation(fields: [tenantId, brandId, branchId], references: [tenantId, brandId, branchId], onDelete: Restrict, map: "fk_couriers_brand_branches")
 
-  @@unique([tenantId, phone], map: "uq_couriers_tenant_id_phone")
+  // No @@unique([tenantId, phone]) on purpose. The constraint exists in the
+  // database as uq_couriers_tenant_id_phone, but it is partial from
+  // 20261014140000_courier_phone_restore_window on: a self-deleted courier keeps
+  // its number for the 7-day restore window, so uniqueness may only cover live
+  // rows (WHERE deleted_at IS NULL). Prisma cannot express an index predicate,
+  // and declaring the plain unique here would make every `migrate dev` emit a
+  // phantom migration that re-creates the index without the WHERE clause and
+  // fails with 42P07 ("relation already exists"). Measured 2026-10-14 on
+  // Prisma 6: with the declaration gone, `migrate diff` is empty in all three
+  // directions and Prisma leaves the predicate index alone.
+  // The login lookup compensates: CouriersService.authenticateByPin filters
+  // deletedAt: null, which is what keeps "one row per tenant per phone" true.
   @@index([phone], map: "idx_couriers_phone")
   @@index([tenantId], map: "idx_couriers_tenant_id")
   @@map("couriers")

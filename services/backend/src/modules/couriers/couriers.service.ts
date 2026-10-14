@@ -68,21 +68,35 @@ export class CouriersService {
     // (ADR-1622 step 4, C4). The raw phone is the key because it is also the
     // lookup value — a variant that misses the row has no account to guess.
     pinRateLimitConsume('courier', tenant?.code, dto.phone);
-    // `phone` is unique per tenant, not globally (ADR-1622 step 4b).
+    // `phone` is unique per tenant among LIVE rows, not globally (ADR-1622
+    // step 4b). `deletedAt: null` is what keeps resolveLoginRow's "at most one
+    // row per tenant" invariant true — the unique index is partial since the
+    // restore window, so a deleted row can hold the same number, and two rows
+    // in one tenant would answer a bogus 409 AMBIGUOUS_TENANT. A deleted
+    // courier must not authenticate at all either way.
     const courier = await resolveLoginRow(
       tenant,
       () =>
         this.prisma.courier.findMany({
-          where: { phone: dto.phone, tenant: ACTIVE_TENANT_FILTER },
+          where: {
+            phone: dto.phone,
+            deletedAt: null,
+            tenant: ACTIVE_TENANT_FILTER,
+          },
           take: 2,
         }),
       (tenantId) =>
-        this.prisma.courier.findUnique({
+        // findFirst, not findUnique: dropping the @@unique declaration from the
+        // schema took the generated tenantId_phone key with it. Same filters,
+        // same single row.
+        this.prisma.courier.findFirst({
           // Same as the staff lookup: the declared tenant is re-checked in the
           // query itself, so a tenant suspended between the middleware and here
           // cannot mint a courier token.
           where: {
-            tenantId_phone: { tenantId, phone: dto.phone },
+            tenantId,
+            phone: dto.phone,
+            deletedAt: null,
             tenant: ACTIVE_TENANT_FILTER,
           },
         }),

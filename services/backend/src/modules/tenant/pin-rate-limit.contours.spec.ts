@@ -31,7 +31,12 @@ const staffPrisma = () => ({
 });
 
 const courierPrisma = () => ({
-  courier: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+  courier: {
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
+    findFirst: jest.fn(),
+    update: jest.fn(),
+  },
 });
 
 describe('PIN rate limit is scoped per auth contour', () => {
@@ -67,7 +72,7 @@ describe('PIN rate limit is scoped per auth contour', () => {
       // so it resets the courier bucket. On the old `tenant:key` bucket that
       // reset deleted the staff budget too, and an attacker could probe four
       // staff PINs, log in once as a courier, and repeat forever.
-      courierDb.courier.findUnique.mockResolvedValue({
+      courierDb.courier.findFirst.mockResolvedValue({
         id: 'courier-1',
         name: 'Курьер',
         phone: PHONE,
@@ -118,7 +123,7 @@ describe('PIN rate limit is scoped per auth contour', () => {
 
     it('courier passes its own contour and tenant', async () => {
       const courierDb = courierPrisma();
-      courierDb.courier.findUnique.mockResolvedValue(null);
+      courierDb.courier.findFirst.mockResolvedValue(null);
       const couriers = new CouriersService(
         courierDb as never,
         jwt,

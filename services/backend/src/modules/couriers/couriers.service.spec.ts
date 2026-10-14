@@ -22,6 +22,7 @@ function prismaMock() {
   const mock: any = {
     courier: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -169,6 +170,7 @@ describe('CouriersService.authenticateByPin', () => {
     expect(prisma.courier.findMany).toHaveBeenCalledWith({
       where: {
         phone: existingCourier.phone,
+        deletedAt: null,
         tenant: { status: 'ACTIVE', deletedAt: null },
       },
       take: 2,
@@ -176,7 +178,7 @@ describe('CouriersService.authenticateByPin', () => {
   });
 
   it('scopes the declared-tenant lookup to an active owning tenant', async () => {
-    prisma.courier.findUnique.mockResolvedValue(null);
+    prisma.courier.findFirst.mockResolvedValue(null);
     const sign = jest.spyOn(jwt, 'signAsync');
 
     await expect(
@@ -190,9 +192,11 @@ describe('CouriersService.authenticateByPin', () => {
 
     // Same suspension window as the legacy branch, one query later: the
     // declared tenant is re-checked in the row lookup itself.
-    expect(prisma.courier.findUnique).toHaveBeenCalledWith({
+    expect(prisma.courier.findFirst).toHaveBeenCalledWith({
       where: {
-        tenantId_phone: { tenantId: 'tenant-a', phone: existingCourier.phone },
+        tenantId: 'tenant-a',
+        phone: existingCourier.phone,
+        deletedAt: null,
         tenant: { status: 'ACTIVE', deletedAt: null },
       },
     });
