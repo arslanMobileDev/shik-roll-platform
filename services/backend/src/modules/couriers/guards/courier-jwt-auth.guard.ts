@@ -77,7 +77,11 @@ export class CourierJwtAuthGuard implements CanActivate {
         isActive: true,
       },
     });
-    if (!courier || !courier.isActive) {
+    // A self-deleted courier lands here on its next request: deleteOwnAccount
+    // clears isActive in the same update as the phone, so the still-valid JWT
+    // dies with the row. `!courier.phone` is the same narrowed type as the
+    // login check in CouriersService.authenticateByPin.
+    if (!courier || !courier.isActive || !courier.phone) {
       throw new UnauthorizedException({
         statusCode: 401,
         code: 'TOKEN_INVALID',

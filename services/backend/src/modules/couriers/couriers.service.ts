@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from 'crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { constantTimePinCheck } from '../tenant/pin-timing';
 import {
@@ -30,10 +30,12 @@ import { CourierPinAuthDto } from './dto/courier-auth.dto';
 import { UpdateCourierOrderStatusDto } from './dto/update-courier-order-status.dto';
 import { ReportCourierLocationDto } from './dto/report-courier-location.dto';
 import { CourierHistoryQueryDto } from './dto/courier-history-query.dto';
+import { DeleteCourierAccountDto } from './dto/delete-courier-account.dto';
 import {
   COURIER_LOCATION_MAX_CLOCK_SKEW_MS,
   COURIER_LOCATION_MIN_INTERVAL_MS,
   COURIER_TOKEN_TTL_SECONDS,
+  DELETED_COURIER_NAME,
   PIN_BCRYPT_ROUNDS,
 } from './couriers.config';
 import { AuthenticatedCourier, CourierTokenPayload } from './couriers.types';
@@ -90,8 +92,13 @@ export class CouriersService {
     // must not receive a token at all (ADR-1622 step 3, blocker A2).
     // verifyPin runs unconditionally so a missing row pays the bcrypt cost
     // too (ADR-1622 step 4, C3).
+    // `phone` is part of the check because it is a JWT claim and the login key:
+    // deleteOwnAccount nulls it, and a row with no number has nothing to
+    // authenticate with. (Deletion also clears isActive, so this arm is
+    // unreachable today — it is here so the type stays honest rather than
+    // asserting non-null on an invariant another file has to keep.)
     const pinOk = await this.verifyPin(courier, dto.pin);
-    if (!courier || !courier.isActive || !pinOk) {
+    if (!courier || !courier.isActive || !courier.phone || !pinOk) {
       throw new UnauthorizedException({
         statusCode: 401,
         code: 'INVALID_CREDENTIALS',
@@ -121,6 +128,88 @@ export class CouriersService {
         phone: courier.phone,
       },
     };
+  }
+
+  /**
+   * Self-service account deletion (Apple 5.1.1(v)): soft delete plus
+   * anonymization. The row survives because orders reference it — see the
+   * courier_account_deletion migration for why hard deletion is not an option.
+   *
+   * The re-entered PIN is the whole second factor. Unlike the customer flow
+   * there is no one-shot deletion token: a courier already holds a secret the
+   * client cannot fabricate, and bcrypt-checking it here is cheaper than
+   * minting one — and there is nothing to preview, since a courier has no
+   * bonus balance to warn about.
+   *
+   * ponytail: the PIN check is not rate-limited. The caller must already hold a
+   * valid courier JWT to reach this method, so the only thing a guess buys is
+   * the deletion of an account the guesser already controls. Reuse
+   * pinRateLimitConsume with a 'courier-delete' contour if a stolen-token DoS
+   * ever shows up.
+   */
+  async deleteOwnAccount(
+    courier: AuthenticatedCourier,
+    dto: DeleteCourierAccountDto,
+  ): Promise<{ deleted: true }> {
+    const row = await this.prisma.courier.findUnique({
+      where: { id: courier.id },
+    });
+    // Mirrors authenticateByPin: the PIN check runs unconditionally, so a row
+    // that vanished (or was blocked) between the guard and here pays the bcrypt
+    // cost instead of answering faster.
+    const pinOk = await this.verifyPin(row, dto.pin);
+    if (!row || !row.isActive || !pinOk) {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        code: 'INVALID_CREDENTIALS',
+        message: 'Invalid PIN',
+      });
+    }
+
+    // The active-order guard rides on the UPDATE instead of being a count
+    // before it. Two statements would leave a window in which the courier
+    // claims an order and the account is then deleted out from under a live
+    // delivery — and the order would stay assigned to a courier whose token is
+    // already dead, with nobody able to transition it.
+    //
+    // READY/ON_WAY are exactly the states a courier can own (see claimOrder).
+    // A branch's unassigned COOKING order does not block: nobody has taken it,
+    // so it is not this courier's to finish, and blocking on it would strand
+    // the account behind other people's work.
+    const { count } = await this.prisma.courier.updateMany({
+      where: {
+        id: courier.id,
+        isActive: true,
+        orders: {
+          none: { status: { in: [OrderStatus.READY, OrderStatus.ON_WAY] } },
+        },
+      },
+      data: {
+        name: DELETED_COURIER_NAME,
+        // Releases uq_couriers_tenant_id_phone, and removes the login key: a
+        // NULL never matches the phone lookup in authenticateByPin.
+        phone: null,
+        // Erased like the rest of the personal data rather than left in place.
+        // Nothing reaches it any more — no phone to look the row up by — but a
+        // live hash of the courier's PIN is still their PIN.
+        pinHash: await bcrypt.hash(randomUUID(), PIN_BCRYPT_ROUNDS),
+        isActive: false,
+        isAvailable: false,
+        deletedAt: new Date(),
+      },
+    });
+    if (count === 0) {
+      // A row deleted a moment ago never reaches this method — the guard
+      // re-reads isActive and answers 401 first — so an order that appeared
+      // between the guard and here is the only way to land on zero.
+      throw new ConflictException({
+        statusCode: 409,
+        code: 'ACTIVE_ORDERS_EXIST',
+        message: 'Finish the active delivery before deleting the account',
+      });
+    }
+
+    return { deleted: true };
   }
 
   /**

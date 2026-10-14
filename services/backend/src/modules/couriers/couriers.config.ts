@@ -27,3 +27,12 @@ export const COURIER_LOCATION_MAX_CLOCK_SKEW_MS = Number(
 export const COURIER_LOCATION_MIN_INTERVAL_MS = Number(
   process.env.COURIER_LOCATION_MIN_INTERVAL_MS ?? 5 * 1000,
 );
+
+/**
+ * Written over a self-deleted courier's own name. Product copy, not tuning —
+ * the owner reads it in the staff courier list — so it is a constant, not an
+ * env var, and dev and production cannot drift. A placeholder is needed at all
+ * because the row survives deletion (see the courier_account_deletion
+ * migration) while `name` is NOT NULL.
+ */
+export const DELETED_COURIER_NAME = 'Удалённый курьер';
