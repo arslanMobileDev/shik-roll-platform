@@ -853,14 +853,21 @@ model Courier {
   id          String   @id @default(uuid()) @db.Uuid
   tenantId    String  @map("tenant_id") @db.Uuid
   name        String
-  phone       String
+  // Nullable since self-service deletion (CouriersService.deleteOwnAccount):
+  // the row survives as the anchor of the order history, the number does not.
+  // Same reasoning as Customer.phone — see the customer_account_deletion
+  // migration for why a 'deleted:<uuid>' tombstone is the wrong answer.
+  phone       String?
   pinHash     String   @map("pin_hash")
   brandId     String   @map("brand_id") @db.Uuid
   branchId    String   @map("branch_id") @db.Uuid
   isAvailable Boolean  @default(true) @map("is_available")
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  // Null = never self-deleted. isActive alone cannot say this: staff also set
+  // it (DELETE /staff/couriers/:id), and that is a block, not a deletion.
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   orders      Order[]
 

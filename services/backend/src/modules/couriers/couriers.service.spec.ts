@@ -9,7 +9,10 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { OrderStatus, OrderType, PaymentMethod } from '@prisma/client';
 import { CouriersService } from './couriers.service';
-import { COURIER_TOKEN_TTL_SECONDS } from './couriers.config';
+import {
+  COURIER_TOKEN_TTL_SECONDS,
+  DELETED_COURIER_NAME,
+} from './couriers.config';
 import { AuthenticatedCourier, CourierTokenPayload } from './couriers.types';
 import { __pinRateLimitResetForTests } from '../tenant/pin-rate-limit';
 
@@ -22,6 +25,7 @@ function prismaMock() {
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
     branch: { findFirst: jest.fn() },
     brand: { findFirst: jest.fn() },
@@ -807,5 +811,100 @@ describe('CouriersService.getHistory', () => {
     expect(result.data[0].address.lat).toBeCloseTo(55.7893);
     expect(result.data[0].address.lon).toBeCloseTo(49.1221);
     expect(result.data[0].clientPhone).toBe('+79171234567');
+  });
+});
+
+describe('CouriersService.deleteOwnAccount', () => {
+  let prisma: ReturnType<typeof prismaMock>;
+  let service: CouriersService;
+
+  const activeCourier = {
+    ...existingCourier,
+    pinHash: bcrypt.hashSync('1234', 4),
+  };
+
+  beforeEach(() => {
+    prisma = prismaMock();
+    service = new CouriersService(
+      prisma as any,
+      new JwtService({ secret: SECRET }),
+      eventsMock() as any,
+      loyaltyMock() as any,
+    );
+    prisma.courier.findUnique.mockResolvedValue(activeCourier);
+    prisma.courier.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it('erases the personal fields and blocks the row', async () => {
+    const result = await service.deleteOwnAccount(jwtCourier, { pin: '1234' });
+
+    expect(result).toEqual({ deleted: true });
+    const data = prisma.courier.updateMany.mock.calls[0][0].data;
+    expect(data.name).toBe(DELETED_COURIER_NAME);
+    // The number is the login key and the unique slot — both have to go.
+    expect(data.phone).toBeNull();
+    expect(data.isActive).toBe(false);
+    expect(data.isAvailable).toBe(false);
+    expect(data.deletedAt).toBeInstanceOf(Date);
+    // The old PIN must not survive as a credential of the deleted account.
+    expect(await bcrypt.compare('1234', data.pinHash)).toBe(false);
+  });
+
+  it('scopes the write to the courier own claimable orders', async () => {
+    await service.deleteOwnAccount(jwtCourier, { pin: '1234' });
+
+    // The order guard is in the WHERE, not in a count before it: that is what
+    // makes "no live delivery" and "the row is anonymized" one atomic step.
+    // A branch's unassigned COOKING order is absent on purpose — it is not
+    // this courier's to finish, so it must not block.
+    expect(prisma.courier.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'courier-1',
+        isActive: true,
+        orders: {
+          none: { status: { in: [OrderStatus.READY, OrderStatus.ON_WAY] } },
+        },
+      },
+      data: expect.objectContaining({ isActive: false }),
+    });
+  });
+
+  it('rejects a wrong PIN and writes nothing', async () => {
+    await expect(
+      service.deleteOwnAccount(jwtCourier, { pin: '9999' }),
+    ).rejects.toMatchObject({ response: { code: 'INVALID_CREDENTIALS' } });
+
+    expect(prisma.courier.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects an already deactivated courier', async () => {
+    prisma.courier.findUnique.mockResolvedValue({
+      ...activeCourier,
+      isActive: false,
+    });
+
+    await expect(
+      service.deleteOwnAccount(jwtCourier, { pin: '1234' }),
+    ).rejects.toMatchObject({ response: { code: 'INVALID_CREDENTIALS' } });
+    expect(prisma.courier.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('409s when the guarded write matched no row (a live delivery)', async () => {
+    // What the database returns when the orders:none clause does not hold —
+    // an order claimed since the guard let the request through.
+    prisma.courier.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.deleteOwnAccount(jwtCourier, { pin: '1234' }),
+    ).rejects.toMatchObject({ response: { code: 'ACTIVE_ORDERS_EXIST' } });
+  });
+
+  it('deletes a courier whose only orders are finished', async () => {
+    // COMPLETED/CANCELLED history is not a blocker, so the clause matches.
+    prisma.courier.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(
+      service.deleteOwnAccount(jwtCourier, { pin: '1234' }),
+    ).resolves.toEqual({ deleted: true });
   });
 });

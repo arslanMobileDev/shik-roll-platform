@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -26,6 +27,7 @@ import { CourierPinAuthDto } from './dto/courier-auth.dto';
 import { UpdateCourierOrderStatusDto } from './dto/update-courier-order-status.dto';
 import { ReportCourierLocationDto } from './dto/report-courier-location.dto';
 import { CourierHistoryQueryDto } from './dto/courier-history-query.dto';
+import { DeleteCourierAccountDto } from './dto/delete-courier-account.dto';
 import { CourierJwtAuthGuard } from './guards/courier-jwt-auth.guard';
 import { CurrentCourier } from './decorators/current-courier.decorator';
 import { AuthenticatedCourier } from './couriers.types';
@@ -94,6 +96,29 @@ export class CouriersController {
     @Body() dto: UpdateCourierOrderStatusDto,
   ) {
     return this.couriersService.updateCourierOrderStatus(courier, orderId, dto);
+  }
+
+  /**
+   * Self-service account deletion, required by Apple 5.1.1(v).
+   *
+   * One step rather than the customer flow's request/confirm pair: there is
+   * nothing to preview (a courier has no bonus balance) and the re-entered PIN
+   * is itself an unforgeable confirmation.
+   */
+  @Post('me/delete')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(CourierJwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete the courier account and erase its data' })
+  @ApiUnauthorizedResponse({ description: 'UNAUTHORIZED / INVALID_CREDENTIALS' })
+  @ApiConflictResponse({
+    description: 'ACTIVE_ORDERS_EXIST — a READY or ON_WAY order is still held',
+  })
+  async deleteOwnAccount(
+    @CurrentCourier() courier: AuthenticatedCourier,
+    @Body() dto: DeleteCourierAccountDto,
+  ) {
+    return this.couriersService.deleteOwnAccount(courier, dto);
   }
 
   /**

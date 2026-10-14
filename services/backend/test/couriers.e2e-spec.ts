@@ -6,6 +6,7 @@ import { OrderStatus, PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { DELETED_COURIER_NAME } from '../src/modules/couriers/couriers.config';
 
 const TEST_DATABASE_URL =
   process.env.DATABASE_URL_TEST ??
@@ -355,4 +356,99 @@ describe('Couriers API (e2e)', () => {
     });
   });
 
+  /**
+   * Apple 5.1.1(v) self-service deletion.
+   *
+   * Declared last on purpose: the success case anonymizes the fixture courier
+   * for good, so every test above has to have run by then. The non-destructive
+   * cases come first and assert the account is untouched, which is what keeps
+   * this ordering honest rather than merely convenient.
+   */
+  describe('POST /couriers/me/delete', () => {
+    const deleteAccount = (pin: string, token?: string) => {
+      const req = http().post('/couriers/me/delete').send({ pin });
+      if (token) req.set('Authorization', `Bearer ${token}`);
+      return req;
+    };
+
+    const readCourier = () =>
+      prisma.courier.findUniqueOrThrow({ where: { id: fx.courierId } });
+
+    it('401 without a token', async () => {
+      await deleteAccount(fx.courierPin).expect(401);
+    });
+
+    it('401 on a wrong PIN, leaving the account untouched', async () => {
+      await deleteAccount('9999', courierToken).expect(401);
+
+      const courier = await readCourier();
+      expect(courier.phone).toBe(fx.courierPhone);
+      expect(courier.name).toBe('Courier E2E');
+      expect(courier.isActive).toBe(true);
+      expect(courier.deletedAt).toBeNull();
+    });
+
+    it('409 ACTIVE_ORDERS_EXIST while a READY order is held', async () => {
+      await createOrderInStatus(OrderStatus.READY, { courierId: fx.courierId });
+
+      const res = await deleteAccount(fx.courierPin, courierToken).expect(409);
+      expect(res.body.code).toBe('ACTIVE_ORDERS_EXIST');
+
+      expect((await readCourier()).isActive).toBe(true);
+    });
+
+    it('an unassigned COOKING order of the branch does not block deletion', async () => {
+      // Nobody owns it yet, so holding it hostage would strand the account.
+      await createOrderInStatus(OrderStatus.COOKING);
+
+      await deleteAccount('9999', courierToken).expect(401);
+    });
+
+    it('deletes: anonymizes the row, erases the phone and revokes access', async () => {
+      const res = await deleteAccount(fx.courierPin, courierToken).expect(200);
+      expect(res.body).toEqual({ deleted: true });
+
+      const courier = await readCourier();
+      expect(courier.name).toBe(DELETED_COURIER_NAME);
+      expect(courier.phone).toBeNull();
+      expect(courier.isActive).toBe(false);
+      expect(courier.isAvailable).toBe(false);
+      expect(courier.deletedAt).toBeInstanceOf(Date);
+
+      // The PIN that just authorized the deletion is not a credential of the
+      // deleted account any more.
+      await http()
+        .post('/couriers/auth/pin')
+        .send({ phone: fx.courierPhone, pin: fx.courierPin })
+        .expect(401);
+
+      // And the still-valid JWT dies with the row: the guard re-reads it on
+      // every request, which is what makes deletion actually revoke access.
+      await http()
+        .get('/couriers/orders/active')
+        .set('Authorization', `Bearer ${courierToken}`)
+        .expect(401);
+    });
+
+    it('releases the phone for a new courier', async () => {
+      // The unique slot is only genuinely free if this insert succeeds; a
+      // 'deleted:<uuid>' tombstone would have made it fail with P2002.
+      const replacement = await prisma.courier.create({
+        data: {
+          name: 'Replacement Courier',
+          phone: fx.courierPhone,
+          pinHash: await bcrypt.hash('4321', 4),
+          brandId: fx.brandId,
+          branchId: fx.branchId,
+          tenantId: fx.tenantId,
+        },
+      });
+      expect(replacement.id).not.toBe(fx.courierId);
+
+      await http()
+        .post('/couriers/auth/pin')
+        .send({ phone: fx.courierPhone, pin: '4321' })
+        .expect(200);
+    });
+  });
 });
