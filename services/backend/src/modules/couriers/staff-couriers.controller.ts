@@ -51,7 +51,9 @@ export class StaffCouriersController {
   async list(@CurrentStaff() staff: AuthenticatedStaff, @Query() query: CourierBranchQueryDto) {
     await this.assertBranch(staff, query.branchId);
     return this.prisma.courier.findMany({
-      where: { brandId: staff.brandId, branchId: query.branchId },
+      // Self-deleted couriers keep their row (orders reference it) and would
+      // otherwise stay in the panel forever — see deleteOwnAccount.
+      where: { brandId: staff.brandId, branchId: query.branchId, deletedAt: null },
       select: courierSelect, orderBy: [{ name: 'asc' }, { id: 'asc' }],
     });
   }

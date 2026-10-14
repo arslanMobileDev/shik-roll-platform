@@ -21,7 +21,7 @@ describe('StaffCouriersController HTTP contract', () => {
   const safe = (select: Record<string, boolean>) => Object.fromEntries(Object.keys(select).map(key => [key, row[key]]));
   beforeEach(async () => {
     actor = { id: 'owner', role: 'OWNER', phone: '+79990000000', brandId, isActive: true };
-    row = { id: courierId, name: 'Иван', phone: '+79280000000', pinHash: 'private', brandId, branchId, isActive: true, isAvailable: false, createdAt: new Date('2026-09-16T09:00:00Z') };
+    row = { id: courierId, name: 'Иван', phone: '+79280000000', pinHash: 'private', brandId, branchId, isActive: true, isAvailable: false, createdAt: new Date('2026-09-16T09:00:00Z'), deletedAt: null };
     db = {
       staff: { findUnique: jest.fn().mockImplementation(async () => actor) },
       branch: { findFirst: jest.fn().mockResolvedValue({ id: branchId }) },
@@ -77,8 +77,16 @@ describe('StaffCouriersController HTTP contract', () => {
     actor.role = 'DEVELOPER';
     const response = await request(app.getHttpServer()).get('/staff/couriers').query({ branchId }).set('Authorization', token()).expect(200);
     expect(response.body[0]).not.toHaveProperty('pinHash');
-    expect(db.courier.findMany.mock.calls[0][0].where).toEqual({ brandId, branchId });
+    expect(db.courier.findMany.mock.calls[0][0].where).toEqual({ brandId, branchId, deletedAt: null });
     expect(db.branch.findFirst.mock.calls[0][0].where.brandBranches).toEqual({ some: { brandId } });
+  });
+  it('hides a self-deleted courier from the list', async () => {
+    const rows = [row, { ...row, id: 'deleted-courier', name: 'Удалённый курьер', isActive: false, deletedAt: new Date('2026-10-14T00:00:00Z') }];
+    db.courier.findMany.mockImplementation(async ({ select, where }: any) =>
+      rows.filter(c => Object.entries(where).every(([key, value]) => (c as any)[key] === value))
+        .map(c => Object.fromEntries(Object.keys(select).map(key => [key, (c as any)[key]]))));
+    const response = await request(app.getHttpServer()).get('/staff/couriers').query({ branchId }).set('Authorization', token()).expect(200);
+    expect(response.body.map((c: any) => c.id)).toEqual([courierId]);
   });
   it('updates name/PIN while preserving availability and immutable phone', async () => {
     await request(app.getHttpServer()).patch(`/staff/couriers/${courierId}`).set('Authorization', token()).send({ name: ' Новое имя ', pin: '5678', isAvailable: true, phone: '+79999999999' }).expect(200);
