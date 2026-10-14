@@ -1,4 +1,4 @@
-import { createHash, randomUUID, timingSafeEqual } from 'crypto';
+import { createHash, timingSafeEqual } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { constantTimePinCheck } from '../tenant/pin-timing';
 import {
@@ -35,7 +35,6 @@ import {
   COURIER_LOCATION_MAX_CLOCK_SKEW_MS,
   COURIER_LOCATION_MIN_INTERVAL_MS,
   COURIER_TOKEN_TTL_SECONDS,
-  DELETED_COURIER_NAME,
   PIN_BCRYPT_ROUNDS,
 } from './couriers.config';
 import { AuthenticatedCourier, CourierTokenPayload } from './couriers.types';
@@ -106,11 +105,12 @@ export class CouriersService {
     // must not receive a token at all (ADR-1622 step 3, blocker A2).
     // verifyPin runs unconditionally so a missing row pays the bcrypt cost
     // too (ADR-1622 step 4, C3).
-    // `phone` is part of the check because it is a JWT claim and the login key:
-    // deleteOwnAccount nulls it, and a row with no number has nothing to
-    // authenticate with. (Deletion also clears isActive, so this arm is
-    // unreachable today — it is here so the type stays honest rather than
-    // asserting non-null on an invariant another file has to keep.)
+    // `phone` is part of the check because it is a JWT claim and the login key.
+    // Nothing nulls it any more — deleteOwnAccount keeps the number for the
+    // 7-day restore window — and the rows the old deletion did null are all
+    // soft-deleted, so the lookup above already filtered them out. The arm is
+    // here for the narrowing the payload needs rather than asserting non-null
+    // on an invariant another file has to keep.
     const pinOk = await this.verifyPin(courier, dto.pin);
     if (!courier || !courier.isActive || !courier.phone || !pinOk) {
       throw new UnauthorizedException({
@@ -145,8 +145,10 @@ export class CouriersService {
   }
 
   /**
-   * Self-service account deletion (Apple 5.1.1(v)): soft delete plus
-   * anonymization. The row survives because orders reference it — see the
+   * Self-service account deletion (Apple 5.1.1(v)): soft delete, no erasure.
+   * The row keeps name, phone and PIN hash for the 7-day restore window, so the
+   * account can be handed back whole; the data is burned at the end of the
+   * window, not here. The row survives because orders reference it — see the
    * courier_account_deletion migration for why hard deletion is not an option.
    *
    * The re-entered PIN is the whole second factor. Unlike the customer flow
@@ -199,16 +201,18 @@ export class CouriersService {
         },
       },
       data: {
-        name: DELETED_COURIER_NAME,
-        // Releases uq_couriers_tenant_id_phone, and removes the login key: a
-        // NULL never matches the phone lookup in authenticateByPin.
-        phone: null,
-        // Erased like the rest of the personal data rather than left in place.
-        // Nothing reaches it any more — no phone to look the row up by — but a
-        // live hash of the courier's PIN is still their PIN.
-        pinHash: await bcrypt.hash(randomUUID(), PIN_BCRYPT_ROUNDS),
+        // Deletion flips two flags and touches nothing else: name, phone and
+        // PIN hash stay for the 7-day restore window, which is the whole point
+        // of the window — a restore that came back as "Удалённый курьер" with a
+        // dead PIN would not be one. The phone in particular has to stay, it is
+        // the login key. Keeping it no longer blocks the number for a live
+        // courier: uq_couriers_tenant_id_phone is partial (deleted_at IS NULL)
+        // since 20261014140000_courier_phone_restore_window.
+        //
+        // Nothing burns the retained data yet — the expiry job is what closes
+        // the window. Until it lands, a deleted courier keeps its data
+        // indefinitely, so that job is not optional follow-up work.
         isActive: false,
-        isAvailable: false,
         deletedAt: new Date(),
       },
     });

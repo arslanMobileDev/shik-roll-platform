@@ -9,10 +9,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { OrderStatus, OrderType, PaymentMethod } from '@prisma/client';
 import { CouriersService } from './couriers.service';
-import {
-  COURIER_TOKEN_TTL_SECONDS,
-  DELETED_COURIER_NAME,
-} from './couriers.config';
+import { COURIER_TOKEN_TTL_SECONDS } from './couriers.config';
 import { AuthenticatedCourier, CourierTokenPayload } from './couriers.types';
 import { __pinRateLimitResetForTests } from '../tenant/pin-rate-limit';
 
@@ -839,26 +836,23 @@ describe('CouriersService.deleteOwnAccount', () => {
     prisma.courier.updateMany.mockResolvedValue({ count: 1 });
   });
 
-  it('erases the personal fields and blocks the row', async () => {
+  it('flags the row and writes nothing else back', async () => {
     const result = await service.deleteOwnAccount(jwtCourier, { pin: '1234' });
 
     expect(result).toEqual({ deleted: true });
     const data = prisma.courier.updateMany.mock.calls[0][0].data;
-    expect(data.name).toBe(DELETED_COURIER_NAME);
-    // The number is the login key and the unique slot — both have to go.
-    expect(data.phone).toBeNull();
-    expect(data.isActive).toBe(false);
-    expect(data.isAvailable).toBe(false);
-    expect(data.deletedAt).toBeInstanceOf(Date);
-    // The old PIN must not survive as a credential of the deleted account.
-    expect(await bcrypt.compare('1234', data.pinHash)).toBe(false);
+    // Exact object on purpose: the 7-day restore window is only real while the
+    // row keeps everything a restored account needs. A field added here — a
+    // nulled phone, a rotated pinHash, an anonymized name — silently breaks the
+    // restore, so it has to be a deliberate edit to this assertion.
+    expect(data).toEqual({ isActive: false, deletedAt: expect.any(Date) });
   });
 
   it('scopes the write to the courier own claimable orders', async () => {
     await service.deleteOwnAccount(jwtCourier, { pin: '1234' });
 
     // The order guard is in the WHERE, not in a count before it: that is what
-    // makes "no live delivery" and "the row is anonymized" one atomic step.
+    // makes "no live delivery" and "the row is deleted" one atomic step.
     // A branch's unassigned COOKING order is absent on purpose — it is not
     // this courier's to finish, so it must not block.
     expect(prisma.courier.updateMany).toHaveBeenCalledWith({

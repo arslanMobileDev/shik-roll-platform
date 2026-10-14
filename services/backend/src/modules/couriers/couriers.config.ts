@@ -29,10 +29,14 @@ export const COURIER_LOCATION_MIN_INTERVAL_MS = Number(
 );
 
 /**
- * Written over a self-deleted courier's own name. Product copy, not tuning —
- * the owner reads it in the staff courier list — so it is a constant, not an
- * env var, and dev and production cannot drift. A placeholder is needed at all
- * because the row survives deletion (see the courier_account_deletion
- * migration) while `name` is NOT NULL.
+ * Written over a self-deleted courier's name once the 7-day restore window
+ * closes. A placeholder is needed at all because the row survives deletion (see
+ * the courier_account_deletion migration) while `name` is NOT NULL. Product
+ * copy, not tuning — the owner reads it in the staff courier list — so it is a
+ * constant, not an env var, and dev and production cannot drift.
+ *
+ * Nothing writes it yet: deleteOwnAccount keeps the real name while a restore
+ * can still use it, and the expiry job that overwrites it does not exist. Until
+ * that job lands, a deleted courier's data is retained indefinitely.
  */
 export const DELETED_COURIER_NAME = 'Удалённый курьер';

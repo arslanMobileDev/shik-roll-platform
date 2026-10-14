@@ -6,7 +6,6 @@ import { OrderStatus, PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { DELETED_COURIER_NAME } from '../src/modules/couriers/couriers.config';
 
 const TEST_DATABASE_URL =
   process.env.DATABASE_URL_TEST ??
@@ -359,8 +358,8 @@ describe('Couriers API (e2e)', () => {
   /**
    * Apple 5.1.1(v) self-service deletion.
    *
-   * Declared last on purpose: the success case anonymizes the fixture courier
-   * for good, so every test above has to have run by then. The non-destructive
+   * Declared last on purpose: the success case deletes the fixture courier for
+   * good, so every test above has to have run by then. The non-destructive
    * cases come first and assert the account is untouched, which is what keeps
    * this ordering honest rather than merely convenient.
    */
@@ -404,19 +403,24 @@ describe('Couriers API (e2e)', () => {
       await deleteAccount('9999', courierToken).expect(401);
     });
 
-    it('deletes: anonymizes the row, erases the phone and revokes access', async () => {
+    it('deletes: flags the row, keeps the data and revokes access', async () => {
       const res = await deleteAccount(fx.courierPin, courierToken).expect(200);
       expect(res.body).toEqual({ deleted: true });
 
       const courier = await readCourier();
-      expect(courier.name).toBe(DELETED_COURIER_NAME);
-      expect(courier.phone).toBeNull();
+      // Kept on purpose — the 7-day restore window hands the account back
+      // whole, so everything a restored courier needs has to still be here.
+      expect(courier.name).toBe('Courier E2E');
+      expect(courier.phone).toBe(fx.courierPhone);
       expect(courier.isActive).toBe(false);
-      expect(courier.isAvailable).toBe(false);
       expect(courier.deletedAt).toBeInstanceOf(Date);
+      // Untouched: availability is the courier's own shift toggle, not part of
+      // the deletion, and restore must not have to reset it.
+      expect(courier.isAvailable).toBe(true);
 
-      // The PIN that just authorized the deletion is not a credential of the
-      // deleted account any more.
+      // The phone still resolves — this 401 is the deletedAt filter in the
+      // lookup, not a missing number, which is the whole reason the guard needs
+      // its own deletedAt arm.
       await http()
         .post('/couriers/auth/pin')
         .send({ phone: fx.courierPhone, pin: fx.courierPin })
@@ -431,7 +435,9 @@ describe('Couriers API (e2e)', () => {
     });
 
     it('releases the phone for a new courier', async () => {
-      // The unique slot is only genuinely free if this insert succeeds; a
+      // The deleted row still holds the number, so this insert only succeeds
+      // because uq_couriers_tenant_id_phone is partial (deleted_at IS NULL).
+      // The unique slot is also only genuinely free if this insert succeeds; a
       // 'deleted:<uuid>' tombstone would have made it fail with P2002.
       const replacement = await prisma.courier.create({
         data: {

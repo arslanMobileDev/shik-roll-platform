@@ -109,7 +109,7 @@ export class CouriersController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(CourierJwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete the courier account and erase its data' })
+  @ApiOperation({ summary: 'Delete the courier account (restorable for 7 days)' })
   @ApiUnauthorizedResponse({ description: 'UNAUTHORIZED / INVALID_CREDENTIALS' })
   @ApiConflictResponse({
     description: 'ACTIVE_ORDERS_EXIST — a READY or ON_WAY order is still held',
