@@ -108,4 +108,47 @@ void main() {
     expect(cubit.state.rows.single.phone, '+79280000000');
     expect(find.byType(AlertDialog), findsNothing);
   });
+
+  // A self-deleted courier keeps its row (it anchors the order history) but
+  // loses its number, so /staff/couriers answers "phone": null. The cast in
+  // CourierRecord.fromJson used to be unconditional, and a single deleted
+  // courier took the whole list down to "Не удалось выполнить запрос".
+  group('self-deleted courier (phone: null)', () {
+    Map<String, dynamic> json({Object? phone}) => {
+      'id': 'courier',
+      'name': 'Удалённый курьер',
+      'phone': phone,
+      'branchId': branch,
+      'isActive': false,
+      'isAvailable': false,
+      'createdAt': '2026-10-14T12:00:00.000Z',
+    };
+
+    test('parses a null phone instead of throwing', () {
+      expect(CourierRecord.fromJson(json()).phone, isNull);
+    });
+
+    testWidgets('the list still renders, with a placeholder contact', (
+      tester,
+    ) async {
+      await render(tester, rows: [CourierRecord.fromJson(json())]);
+
+      expect(find.text('Удалённый курьер'), findsOneWidget);
+      expect(find.text('без номера'), findsOneWidget);
+    });
+
+    testWidgets('editing it can be saved without re-entering a phone', (
+      tester,
+    ) async {
+      final cubit = await render(tester, rows: [CourierRecord.fromJson(json())]);
+      await tester.tap(find.text('Изменить'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Сохранить'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Введите российский телефон'), findsNothing);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(cubit.state.rows, hasLength(1));
+    });
+  });
 }

@@ -20,13 +20,19 @@ final class CourierRecord {
     required this.isAvailable,
     required this.createdAt,
   });
-  final String id, name, phone, branchId;
+  final String id, name, branchId;
+
+  /// Null on a self-deleted courier: the backend erases the number (it is the
+  /// login key) while the row survives as the anchor of the order history, so
+  /// `/staff/couriers` answers `"phone": null` for it. The list still returns
+  /// such rows — the staff panel is where an owner sees that the courier left.
+  final String? phone;
   final bool isActive, isAvailable;
   final DateTime createdAt;
   factory CourierRecord.fromJson(Map<String, dynamic> json) => CourierRecord(
     id: json['id'] as String,
     name: json['name'] as String,
-    phone: json['phone'] as String,
+    phone: json['phone'] as String?,
     branchId: json['branchId'] as String,
     isActive: json['isActive'] as bool,
     isAvailable: json['isAvailable'] as bool,
