@@ -9,12 +9,19 @@ final class CouriersState {
     this.branchId = '',
     this.rows = const [],
     this.saving = false,
+    this.includeDeleted = false,
     this.error,
   });
   final CouriersStatus status;
   final String branchId;
   final List<CourierRecord> rows;
   final bool saving;
+
+  /// Which half of the list is on screen: live couriers, or the self-deleted
+  /// ones still inside their restore window. Never both — the backend answers
+  /// either-or, and a deleted account has no business standing next to a
+  /// working one.
+  final bool includeDeleted;
   final String? error;
 }
 
@@ -26,17 +33,21 @@ final class CouriersCubit extends Cubit<CouriersState> {
   String _message(Object error) => error is CouriersApiException
       ? error.message
       : 'Не удалось выполнить запрос. Попробуйте снова.';
-  Future<void> load(String branchId) async {
+  Future<void> load(String branchId, {bool includeDeleted = false}) async {
     final request = ++_request;
     emit(
       CouriersState(
         status: CouriersStatus.loading,
         branchId: branchId,
         saving: _saving,
+        includeDeleted: includeDeleted,
       ),
     );
     try {
-      final rows = await repository.list(branchId);
+      final rows = await repository.list(
+        branchId,
+        includeDeleted: includeDeleted,
+      );
       if (!isClosed && request == _request) {
         emit(
           CouriersState(
@@ -44,6 +55,7 @@ final class CouriersCubit extends Cubit<CouriersState> {
             branchId: branchId,
             rows: List.unmodifiable(rows),
             saving: _saving,
+            includeDeleted: includeDeleted,
           ),
         );
       }
@@ -54,11 +66,54 @@ final class CouriersCubit extends Cubit<CouriersState> {
             status: CouriersStatus.error,
             branchId: branchId,
             saving: _saving,
+            includeDeleted: includeDeleted,
             error: _message(error),
           ),
         );
       }
     }
+  }
+
+  Future<void> loadDeleted() => load(state.branchId, includeDeleted: true);
+
+  /// Hands a self-deleted account back, then reloads the tab it was listed in —
+  /// the row is gone from "Удалённые" the moment it works, so a local edit
+  /// would leave a ghost card behind.
+  Future<bool> restore(String id) async {
+    if (_saving || state.status == CouriersStatus.loading) return false;
+    final branch = state.branchId;
+    _saving = true;
+    emit(
+      CouriersState(
+        status: state.status,
+        branchId: branch,
+        rows: state.rows,
+        saving: true,
+        includeDeleted: state.includeDeleted,
+      ),
+    );
+    try {
+      await repository.restore(id);
+    } catch (error) {
+      _saving = false;
+      if (!isClosed) {
+        emit(
+          CouriersState(
+            status: state.status,
+            branchId: branch,
+            rows: state.rows,
+            includeDeleted: state.includeDeleted,
+            error: _message(error),
+          ),
+        );
+      }
+      return false;
+    }
+    _saving = false;
+    // The mutation succeeded, so the refresh cannot undo it: a failed reload
+    // leaves the stale card with an error above it, not a duplicate restore.
+    if (!isClosed) await load(branch, includeDeleted: state.includeDeleted);
+    return true;
   }
 
   Future<bool> save({
@@ -85,6 +140,7 @@ final class CouriersCubit extends Cubit<CouriersState> {
         branchId: branch,
         rows: state.rows,
         saving: true,
+        includeDeleted: state.includeDeleted,
       ),
     );
     try {
@@ -104,6 +160,7 @@ final class CouriersCubit extends Cubit<CouriersState> {
             status: state.status,
             branchId: state.branchId,
             rows: state.rows,
+            includeDeleted: state.includeDeleted,
             error: state.branchId == branch ? _message(error) : null,
           ),
         );
@@ -121,6 +178,7 @@ final class CouriersCubit extends Cubit<CouriersState> {
             status: state.status,
             branchId: state.branchId,
             rows: state.rows,
+            includeDeleted: state.includeDeleted,
             error: state.error,
           ),
         );

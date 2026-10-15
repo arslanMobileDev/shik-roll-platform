@@ -1,9 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/adaptive_chip_row.dart';
 import '../bloc/couriers_cubit.dart';
 import '../data/couriers_repository.dart';
+
+/// The moment the window closes for a row deleted at [deletedAt].
+DateTime _restoreDeadline(DateTime deletedAt) =>
+    deletedAt.add(const Duration(days: kCourierRestoreWindowDays));
+
+/// Whether "Восстановить" is worth offering. A legacy row kept no number, and
+/// an expired one is refused by the backend 404 — a button that can only fail
+/// is worse than none. The backend re-checks both on the write, so a skewed
+/// clock here costs a message, never a wrong restore.
+bool _restorable(CourierRecord courier) {
+  final deletedAt = courier.deletedAt;
+  return deletedAt != null &&
+      courier.phone != null &&
+      _restoreDeadline(deletedAt).isAfter(DateTime.now());
+}
+
+String _deadlineLabel(DateTime deletedAt) {
+  final deadline = _restoreDeadline(deletedAt);
+  return deadline.isAfter(DateTime.now())
+      ? 'Восстановить можно до ${DateFormat('dd.MM.yyyy').format(deadline)}'
+      : 'Срок восстановления истёк';
+}
 
 class CouriersScreen extends StatelessWidget {
   const CouriersScreen({super.key});
@@ -30,18 +54,38 @@ class CouriersScreen extends StatelessWidget {
       children: [
         Text('Курьеры', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 16),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.icon(
-            key: const Key('new-courier'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.terracotta,
+        AdaptiveChipRow(
+          children: [
+            ChoiceChip(
+              key: const ValueKey('couriers.filter.active'),
+              label: const Text('Активные'),
+              selected: !s.includeDeleted,
+              onSelected: busy ? null : (_) => cubit.load(s.branchId),
             ),
-            onPressed: busy ? null : () => _edit(context, null),
-            icon: const Icon(Icons.add),
-            label: const Text('Новый курьер'),
-          ),
+            ChoiceChip(
+              key: const ValueKey('couriers.filter.deleted'),
+              label: const Text('Удалённые'),
+              selected: s.includeDeleted,
+              onSelected: busy ? null : (_) => cubit.loadDeleted(),
+            ),
+          ],
         ),
+        const SizedBox(height: 16),
+        // Nothing to create from the deleted tab: the courier would land in the
+        // other one, and `save` switches back to it on its own.
+        if (!s.includeDeleted)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              key: const Key('new-courier'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.terracotta,
+              ),
+              onPressed: busy ? null : () => _edit(context, null),
+              icon: const Icon(Icons.add),
+              label: const Text('Новый курьер'),
+            ),
+          ),
         if (busy) const LinearProgressIndicator(),
         if (s.error != null)
           Padding(
@@ -51,64 +95,95 @@ class CouriersScreen extends StatelessWidget {
               children: [
                 Text(s.error!),
                 TextButton(
-                  onPressed: busy ? null : () => cubit.load(s.branchId),
+                  // Retries the tab that failed, not the default one: a
+                  // restore that lost its connection must not dump the owner
+                  // back into "Активные".
+                  onPressed: busy
+                      ? null
+                      : () => cubit.load(
+                          s.branchId,
+                          includeDeleted: s.includeDeleted,
+                        ),
                   child: const Text('Повторить'),
                 ),
               ],
             ),
           ),
         if (s.status == CouriersStatus.loaded && s.rows.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Text('Курьеры ещё не добавлены'),
-          ),
-        for (final courier in s.rows)
-          Card(
-            key: ValueKey('courier-${courier.id}'),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    courier.name,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  Text(courier.phone ?? 'без номера'),
-                  Text(
-                    '${courier.isActive ? 'Активен' : 'Заблокирован'} · ${courier.isAvailable ? 'Свободен' : 'Занят'}',
-                  ),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      TextButton.icon(
-                        onPressed: busy ? null : () => _edit(context, courier),
-                        icon: const Icon(Icons.edit),
-                        label: const Text('Изменить'),
-                      ),
-                      TextButton.icon(
-                        key: ValueKey('toggle-${courier.id}'),
-                        onPressed: busy
-                            ? null
-                            : () => cubit.save(
-                                id: courier.id,
-                                name: courier.name,
-                                isActive: !courier.isActive,
-                              ),
-                        icon: Icon(
-                          courier.isActive ? Icons.block : Icons.lock_open,
-                        ),
-                        label: Text(
-                          courier.isActive ? 'Заблокировать' : 'Разблокировать',
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Text(
+              s.includeDeleted
+                  ? 'Удалённых курьеров нет'
+                  : 'Курьеры ещё не добавлены',
             ),
           ),
+        for (final courier in s.rows) _card(context, cubit, courier, busy),
       ],
+    );
+  }
+
+  Widget _card(
+    BuildContext context,
+    CouriersCubit cubit,
+    CourierRecord courier,
+    bool busy,
+  ) {
+    final deletedAt = courier.deletedAt;
+    return Card(
+      key: ValueKey('courier-${courier.id}'),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(courier.name, style: Theme.of(context).textTheme.titleMedium),
+            Text(courier.phone ?? 'без номера'),
+            if (deletedAt != null)
+              Text(_deadlineLabel(deletedAt))
+            else
+              Text(
+                '${courier.isActive ? 'Активен' : 'Заблокирован'} · ${courier.isAvailable ? 'Свободен' : 'Занят'}',
+              ),
+            Wrap(
+              spacing: 8,
+              children: [
+                // A deleted row is only ever brought back: editing or blocking
+                // an account nobody can log into says nothing useful.
+                if (deletedAt == null) ...[
+                  TextButton.icon(
+                    onPressed: busy ? null : () => _edit(context, courier),
+                    icon: const Icon(Icons.edit),
+                    label: const Text('Изменить'),
+                  ),
+                  TextButton.icon(
+                    key: ValueKey('toggle-${courier.id}'),
+                    onPressed: busy
+                        ? null
+                        : () => cubit.save(
+                            id: courier.id,
+                            name: courier.name,
+                            isActive: !courier.isActive,
+                          ),
+                    icon: Icon(
+                      courier.isActive ? Icons.block : Icons.lock_open,
+                    ),
+                    label: Text(
+                      courier.isActive ? 'Заблокировать' : 'Разблокировать',
+                    ),
+                  ),
+                ] else if (_restorable(courier))
+                  TextButton.icon(
+                    key: ValueKey('restore-${courier.id}'),
+                    onPressed: busy ? null : () => cubit.restore(courier.id),
+                    icon: const Icon(Icons.restore),
+                    label: const Text('Восстановить'),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
