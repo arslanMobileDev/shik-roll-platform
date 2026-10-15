@@ -29,10 +29,10 @@ export const COURIER_LOCATION_MIN_INTERVAL_MS = Number(
 );
 
 /**
- * Written over a self-deleted courier's own name. Product copy, not tuning —
- * the owner reads it in the staff courier list — so it is a constant, not an
- * env var, and dev and production cannot drift. A placeholder is needed at all
- * because the row survives deletion (see the courier_account_deletion
- * migration) while `name` is NOT NULL.
+ * How long a self-deleted courier account can be brought back by
+ * POST /couriers/auth/restore. Not environment tuning, same reasoning as
+ * PHONE_RELEASE_WINDOW_DAYS on the customer side: the owner promises one
+ * window, and dev/test/production must not drift on it. Tests backdate a
+ * deletion instead of shortening the window.
  */
-export const DELETED_COURIER_NAME = 'Удалённый курьер';
+export const COURIER_RESTORE_WINDOW_DAYS = 7;

@@ -22,6 +22,12 @@ import { TenantContext } from './tenant.types';
  * one row per tenant, so two rows mean two tenants, which saves the second
  * query. If that invariant ever stops holding, switch to `distinct: ['tenantId']`
  * and accept the extra round trip.
+ *
+ * Careful since the courier restore window: `uq_couriers_tenant_id_phone` is
+ * partial (live rows only), so a soft-deleted row can share the number and the
+ * invariant holds only for callers that filter the soft-delete column
+ * themselves. `lookupByKey`/`lookupScoped` must do it, or a two-row answer in a
+ * single tenant turns into a bogus 409 AMBIGUOUS_TENANT.
  */
 export async function resolveLoginRow<T>(
   declared: TenantContext | undefined,

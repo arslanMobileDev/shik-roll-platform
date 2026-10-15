@@ -75,6 +75,7 @@ describe('CourierJwtAuthGuard', () => {
           branchId: true,
           tenantId: true,
           isActive: true,
+          deletedAt: true,
         },
       }),
     );
@@ -158,6 +159,49 @@ describe('CourierJwtAuthGuard', () => {
         phone: '+79991234567',
         branchId: 'branch-1',
         isActive: false,
+      }),
+    );
+    const token = await jwt.signAsync(courierPayload, { expiresIn: 3600 });
+    const { context } = contextFor({ authorization: `Bearer ${token}` });
+    await expect(guard.canActivate(context)).rejects.toMatchObject({
+      response: { code: 'TOKEN_INVALID' },
+    });
+  });
+
+  it('rejects a valid token for a soft-deleted courier that still holds its phone', async () => {
+    // The restore window keeps phone/pinHash intact for seven days, so the row
+    // resolves and is the shape of a live courier in every field but deletedAt.
+    // Without that arm the still-valid JWT would keep working.
+    const guard = new CourierJwtAuthGuard(
+      jwt,
+      prismaWithCourier({
+        id: 'courier-1',
+        phone: '+79991234567',
+        branchId: 'branch-1',
+        tenantId: 'tenant-1',
+        isActive: false,
+        deletedAt: new Date('2026-10-14T12:00:00Z'),
+      }),
+    );
+    const token = await jwt.signAsync(courierPayload, { expiresIn: 3600 });
+    const { context } = contextFor({ authorization: `Bearer ${token}` });
+    await expect(guard.canActivate(context)).rejects.toMatchObject({
+      response: { code: 'TOKEN_INVALID' },
+    });
+  });
+
+  it('rejects a soft-deleted courier even while the row is still active', async () => {
+    // Pins the arm itself: isActive true and a phone present, deletedAt set.
+    // Nothing else in the check can answer 401 for this row.
+    const guard = new CourierJwtAuthGuard(
+      jwt,
+      prismaWithCourier({
+        id: 'courier-1',
+        phone: '+79991234567',
+        branchId: 'branch-1',
+        tenantId: 'tenant-1',
+        isActive: true,
+        deletedAt: new Date('2026-10-14T12:00:00Z'),
       }),
     );
     const token = await jwt.signAsync(courierPayload, { expiresIn: 3600 });

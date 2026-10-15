@@ -1,4 +1,4 @@
-import { createHash, randomUUID, timingSafeEqual } from 'crypto';
+import { createHash, timingSafeEqual } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { constantTimePinCheck } from '../tenant/pin-timing';
 import {
@@ -34,8 +34,8 @@ import { DeleteCourierAccountDto } from './dto/delete-courier-account.dto';
 import {
   COURIER_LOCATION_MAX_CLOCK_SKEW_MS,
   COURIER_LOCATION_MIN_INTERVAL_MS,
+  COURIER_RESTORE_WINDOW_DAYS,
   COURIER_TOKEN_TTL_SECONDS,
-  DELETED_COURIER_NAME,
   PIN_BCRYPT_ROUNDS,
 } from './couriers.config';
 import { AuthenticatedCourier, CourierTokenPayload } from './couriers.types';
@@ -68,21 +68,35 @@ export class CouriersService {
     // (ADR-1622 step 4, C4). The raw phone is the key because it is also the
     // lookup value — a variant that misses the row has no account to guess.
     pinRateLimitConsume('courier', tenant?.code, dto.phone);
-    // `phone` is unique per tenant, not globally (ADR-1622 step 4b).
+    // `phone` is unique per tenant among LIVE rows, not globally (ADR-1622
+    // step 4b). `deletedAt: null` is what keeps resolveLoginRow's "at most one
+    // row per tenant" invariant true — the unique index is partial since the
+    // restore window, so a deleted row can hold the same number, and two rows
+    // in one tenant would answer a bogus 409 AMBIGUOUS_TENANT. A deleted
+    // courier must not authenticate at all either way.
     const courier = await resolveLoginRow(
       tenant,
       () =>
         this.prisma.courier.findMany({
-          where: { phone: dto.phone, tenant: ACTIVE_TENANT_FILTER },
+          where: {
+            phone: dto.phone,
+            deletedAt: null,
+            tenant: ACTIVE_TENANT_FILTER,
+          },
           take: 2,
         }),
       (tenantId) =>
-        this.prisma.courier.findUnique({
+        // findFirst, not findUnique: dropping the @@unique declaration from the
+        // schema took the generated tenantId_phone key with it. Same filters,
+        // same single row.
+        this.prisma.courier.findFirst({
           // Same as the staff lookup: the declared tenant is re-checked in the
           // query itself, so a tenant suspended between the middleware and here
           // cannot mint a courier token.
           where: {
-            tenantId_phone: { tenantId, phone: dto.phone },
+            tenantId,
+            phone: dto.phone,
+            deletedAt: null,
             tenant: ACTIVE_TENANT_FILTER,
           },
         }),
@@ -92,23 +106,132 @@ export class CouriersService {
     // must not receive a token at all (ADR-1622 step 3, blocker A2).
     // verifyPin runs unconditionally so a missing row pays the bcrypt cost
     // too (ADR-1622 step 4, C3).
-    // `phone` is part of the check because it is a JWT claim and the login key:
-    // deleteOwnAccount nulls it, and a row with no number has nothing to
-    // authenticate with. (Deletion also clears isActive, so this arm is
-    // unreachable today — it is here so the type stays honest rather than
-    // asserting non-null on an invariant another file has to keep.)
+    // `phone` is part of the check because it is a JWT claim and the login key.
+    // Nothing nulls it any more — deleteOwnAccount keeps the number for the
+    // 7-day restore window — and the rows the old deletion did null are all
+    // soft-deleted, so the lookup above already filtered them out. The arm is
+    // here for the narrowing the payload needs rather than asserting non-null
+    // on an invariant another file has to keep.
     const pinOk = await this.verifyPin(courier, dto.pin);
     if (!courier || !courier.isActive || !courier.phone || !pinOk) {
-      throw new UnauthorizedException({
-        statusCode: 401,
-        code: 'INVALID_CREDENTIALS',
-        message: 'Invalid phone or PIN',
-      });
+      throw this.invalidCredentials();
     }
 
+    pinRateLimitReset('courier', tenant?.code, dto.phone);
+    return this.issueSession(courier, courier.phone);
+  }
+
+  /**
+   * Brings back a self-deleted account inside its window (Apple 5.1.1(v) gives
+   * the courier the deletion; this is what keeps it survivable — a mis-tap
+   * otherwise costs the account, the PIN and the delivery history).
+   *
+   * A variant of the login rather than a flow of its own: the credential is the
+   * same phone + PIN pair, the row it revives is the one authenticateByPin
+   * would have found had it not been deleted, and the answer is the same
+   * session. Only the set of lookup candidates differs — deleted rows inside
+   * the window instead of live ones — which is also why the caller must be
+   * anonymous: the deleted courier's JWT is dead by design.
+   *
+   * `deletedAt` is non-null by construction in the lookup (the comparison
+   * excludes nulls) and is written by no one but deleteOwnAccount: the staff
+   * DELETE writes isActive alone, so this cannot lift a staff block.
+   */
+  async restoreAccount(dto: CourierPinAuthDto, tenant?: TenantContext) {
+    // The login contour, deliberately shared: this endpoint is a PIN oracle
+    // over deleted rows, so an attacker must not get a second, unthrottled
+    // budget by asking here instead of /auth/pin. Reset on success for the same
+    // reason as the login — a spent budget means nothing once the PIN is known.
+    pinRateLimitConsume('courier', tenant?.code, dto.phone);
+
+    // One cutoff for both branches, so the two lookups cannot disagree about
+    // what the window is.
+    const cutoff = restoreCutoff();
+
+    const courier = await resolveLoginRow(
+      tenant,
+      () =>
+        this.prisma.courier.findMany({
+          where: {
+            phone: dto.phone,
+            deletedAt: { gt: cutoff },
+            tenant: ACTIVE_TENANT_FILTER,
+          },
+          // Most recent deletion first: that is the row whose number the
+          // courier still holds in hand.
+          orderBy: { deletedAt: 'desc' },
+          take: 2,
+        }),
+      (tenantId) =>
+        this.prisma.courier.findFirst({
+          where: {
+            tenantId,
+            phone: dto.phone,
+            deletedAt: { gt: cutoff },
+            tenant: ACTIVE_TENANT_FILTER,
+          },
+          orderBy: { deletedAt: 'desc' },
+        }),
+    );
+
+    // Unconditional, like every other PIN check: an unknown phone pays the
+    // bcrypt cost too. A row whose pinHash the window's expiry job has already
+    // burned fails here — the credential survives the deletion only because the
+    // window keeps it.
+    const pinOk = await this.verifyPin(courier, dto.pin);
+    if (!courier || !courier.phone || !pinOk) {
+      throw this.invalidCredentials();
+    }
+
+    // The window predicate rides on the write as well: a restore that raced the
+    // expiry job would otherwise revive a row whose data is already burned.
+    let count: number;
+    try {
+      ({ count } = await this.prisma.courier.updateMany({
+        where: { id: courier.id, deletedAt: { gt: cutoff } },
+        // Exactly the inverse of deleteOwnAccount, and nothing else: name,
+        // phone and pinHash were never touched by the deletion, so the account
+        // comes back whole.
+        data: { deletedAt: null, isActive: true },
+      }));
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        // The number was re-issued to another courier while this row was
+        // deleted (uq_couriers_tenant_id_phone covers live rows). The database
+        // is the guard: two live rows with one number in a tenant is what the
+        // login lookup cannot survive, so the restore is refused instead.
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'COURIER_PHONE_EXISTS',
+          message: 'Phone is already registered',
+        });
+      }
+      throw error;
+    }
+    if (count === 0) {
+      // The window closed, or a concurrent restore won the row. Both mean the
+      // account is not this call's to revive.
+      throw this.invalidCredentials();
+    }
+
+    pinRateLimitReset('courier', tenant?.code, dto.phone);
+    return this.issueSession(courier, courier.phone);
+  }
+
+  /**
+   * The session both PIN doors answer with — the login and the restore. One
+   * payload shape, so the client handles a restored account exactly like a
+   * logged-in one. The phone is passed alongside the row because it is the one
+   * field the callers have already narrowed to a string (the column is nullable
+   * for rows deleted before the window landed).
+   */
+  private async issueSession(courier: Courier, phone: string) {
     const payload: CourierTokenPayload = {
       sub: courier.id,
-      phone: courier.phone,
+      phone,
       branchId: courier.branchId,
       role: 'COURIER',
       type: 'access',
@@ -116,7 +239,6 @@ export class CouriersService {
     const token = await this.jwt.signAsync(payload, {
       expiresIn: COURIER_TOKEN_TTL_SECONDS,
     });
-    pinRateLimitReset('courier', tenant?.code, dto.phone);
 
     return {
       token,
@@ -125,14 +247,25 @@ export class CouriersService {
       courier: {
         id: courier.id,
         name: courier.name,
-        phone: courier.phone,
+        phone,
       },
     };
   }
 
+  /** One body for every failed PIN door, so none of them answers differently. */
+  private invalidCredentials(): UnauthorizedException {
+    return new UnauthorizedException({
+      statusCode: 401,
+      code: 'INVALID_CREDENTIALS',
+      message: 'Invalid phone or PIN',
+    });
+  }
+
   /**
-   * Self-service account deletion (Apple 5.1.1(v)): soft delete plus
-   * anonymization. The row survives because orders reference it — see the
+   * Self-service account deletion (Apple 5.1.1(v)): soft delete, no erasure.
+   * The row keeps name, phone and PIN hash for the 7-day restore window, so the
+   * account can be handed back whole; the data is burned at the end of the
+   * window, not here. The row survives because orders reference it — see the
    * courier_account_deletion migration for why hard deletion is not an option.
    *
    * The re-entered PIN is the whole second factor. Unlike the customer flow
@@ -185,16 +318,19 @@ export class CouriersService {
         },
       },
       data: {
-        name: DELETED_COURIER_NAME,
-        // Releases uq_couriers_tenant_id_phone, and removes the login key: a
-        // NULL never matches the phone lookup in authenticateByPin.
-        phone: null,
-        // Erased like the rest of the personal data rather than left in place.
-        // Nothing reaches it any more — no phone to look the row up by — but a
-        // live hash of the courier's PIN is still their PIN.
-        pinHash: await bcrypt.hash(randomUUID(), PIN_BCRYPT_ROUNDS),
+        // Deletion flips two flags and touches nothing else: name, phone and
+        // PIN hash stay for the 7-day restore window, which is the whole point
+        // of the window — a restore that came back as "Удалённый курьер" with a
+        // dead PIN would not be one. The phone in particular has to stay, it is
+        // the login key. Keeping it no longer blocks the number for a live
+        // courier: uq_couriers_tenant_id_phone is partial (deleted_at IS NULL)
+        // since 20261014140000_courier_phone_restore_window.
+        //
+        // Nothing else is retained past the window: CourierMaintenanceProcessor
+        // hard-deletes the row (and with it the name, the number and the hash)
+        // once deletedAt is older than COURIER_RESTORE_WINDOW_DAYS, which is
+        // what makes the deletion real for 152-FZ and Apple 5.1.1(v).
         isActive: false,
-        isAvailable: false,
         deletedAt: new Date(),
       },
     });
@@ -603,4 +739,13 @@ export class CouriersService {
       createdAt: order.createdAt.toISOString(),
     };
   }
+}
+
+/**
+ * Start of the restore window: a deletion newer than this can still be undone.
+ * `deletedAt: null` is deliberately not covered — a live row is not a candidate
+ * and the comparison says so by itself.
+ */
+export function restoreCutoff(now: Date = new Date()): Date {
+  return new Date(now.getTime() - COURIER_RESTORE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 }

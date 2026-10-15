@@ -3,6 +3,10 @@ import { Global, Logger, Module } from '@nestjs/common';
 import { KitchenModule } from '../kitchen/kitchen.module';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
 import {
+  COURIER_MAINTENANCE_QUEUE,
+  CourierMaintenanceProcessor,
+} from './courier-maintenance.processor';
+import {
   CUSTOMER_MAINTENANCE_QUEUE,
   CustomerMaintenanceProcessor,
 } from './customer-maintenance.processor';
@@ -66,6 +70,7 @@ export class QueuesModule {
             }),
             BullModule.registerQueue({ name: ORDER_PROCESSING_QUEUE }),
             BullModule.registerQueue({ name: CUSTOMER_MAINTENANCE_QUEUE }),
+            BullModule.registerQueue({ name: COURIER_MAINTENANCE_QUEUE }),
           ],
       providers: disabled
         ? [
@@ -91,8 +96,20 @@ export class QueuesModule {
                 upsertJobScheduler: async () => ({ id: 'disabled' }),
               },
             },
+            {
+              // Same parity holder as the customer sweep above.
+              provide: getQueueToken(COURIER_MAINTENANCE_QUEUE),
+              useValue: {
+                upsertJobScheduler: async () => ({ id: 'disabled' }),
+              },
+            },
           ]
-        : [OrderQueuesService, OrderProcessingProcessor, CustomerMaintenanceProcessor],
+        : [
+            OrderQueuesService,
+            OrderProcessingProcessor,
+            CustomerMaintenanceProcessor,
+            CourierMaintenanceProcessor,
+          ],
       exports: disabled
         ? [OrderQueuesService, getQueueToken(ORDER_PROCESSING_QUEUE)]
         : [BullModule, OrderQueuesService],

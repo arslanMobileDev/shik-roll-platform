@@ -75,13 +75,17 @@ export class CourierJwtAuthGuard implements CanActivate {
         branchId: true,
         tenantId: true,
         isActive: true,
+        deletedAt: true,
       },
     });
     // A self-deleted courier lands here on its next request: deleteOwnAccount
-    // clears isActive in the same update as the phone, so the still-valid JWT
-    // dies with the row. `!courier.phone` is the same narrowed type as the
-    // login check in CouriersService.authenticateByPin.
-    if (!courier || !courier.isActive || !courier.phone) {
+    // sets deletedAt in the same update as isActive, so the still-valid JWT dies
+    // with the row. `deletedAt` is the arm that carries the guarantee — the
+    // restore window keeps the phone on the deleted row for seven days, so
+    // `!courier.phone` alone would let the token outlive the account.
+    // `!courier.phone` stays as the narrowed type the identity needs (and as
+    // the same check CouriersService.authenticateByPin makes).
+    if (!courier || !courier.isActive || courier.deletedAt || !courier.phone) {
       throw new UnauthorizedException({
         statusCode: 401,
         code: 'TOKEN_INVALID',

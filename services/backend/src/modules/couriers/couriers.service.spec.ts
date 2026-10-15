@@ -7,11 +7,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { OrderStatus, OrderType, PaymentMethod } from '@prisma/client';
+import { OrderStatus, OrderType, PaymentMethod, Prisma } from '@prisma/client';
 import { CouriersService } from './couriers.service';
 import {
+  COURIER_RESTORE_WINDOW_DAYS,
   COURIER_TOKEN_TTL_SECONDS,
-  DELETED_COURIER_NAME,
 } from './couriers.config';
 import { AuthenticatedCourier, CourierTokenPayload } from './couriers.types';
 import { __pinRateLimitResetForTests } from '../tenant/pin-rate-limit';
@@ -22,6 +22,7 @@ function prismaMock() {
   const mock: any = {
     courier: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -169,6 +170,7 @@ describe('CouriersService.authenticateByPin', () => {
     expect(prisma.courier.findMany).toHaveBeenCalledWith({
       where: {
         phone: existingCourier.phone,
+        deletedAt: null,
         tenant: { status: 'ACTIVE', deletedAt: null },
       },
       take: 2,
@@ -176,7 +178,7 @@ describe('CouriersService.authenticateByPin', () => {
   });
 
   it('scopes the declared-tenant lookup to an active owning tenant', async () => {
-    prisma.courier.findUnique.mockResolvedValue(null);
+    prisma.courier.findFirst.mockResolvedValue(null);
     const sign = jest.spyOn(jwt, 'signAsync');
 
     await expect(
@@ -190,9 +192,11 @@ describe('CouriersService.authenticateByPin', () => {
 
     // Same suspension window as the legacy branch, one query later: the
     // declared tenant is re-checked in the row lookup itself.
-    expect(prisma.courier.findUnique).toHaveBeenCalledWith({
+    expect(prisma.courier.findFirst).toHaveBeenCalledWith({
       where: {
-        tenantId_phone: { tenantId: 'tenant-a', phone: existingCourier.phone },
+        tenantId: 'tenant-a',
+        phone: existingCourier.phone,
+        deletedAt: null,
         tenant: { status: 'ACTIVE', deletedAt: null },
       },
     });
@@ -835,26 +839,23 @@ describe('CouriersService.deleteOwnAccount', () => {
     prisma.courier.updateMany.mockResolvedValue({ count: 1 });
   });
 
-  it('erases the personal fields and blocks the row', async () => {
+  it('flags the row and writes nothing else back', async () => {
     const result = await service.deleteOwnAccount(jwtCourier, { pin: '1234' });
 
     expect(result).toEqual({ deleted: true });
     const data = prisma.courier.updateMany.mock.calls[0][0].data;
-    expect(data.name).toBe(DELETED_COURIER_NAME);
-    // The number is the login key and the unique slot — both have to go.
-    expect(data.phone).toBeNull();
-    expect(data.isActive).toBe(false);
-    expect(data.isAvailable).toBe(false);
-    expect(data.deletedAt).toBeInstanceOf(Date);
-    // The old PIN must not survive as a credential of the deleted account.
-    expect(await bcrypt.compare('1234', data.pinHash)).toBe(false);
+    // Exact object on purpose: the 7-day restore window is only real while the
+    // row keeps everything a restored account needs. A field added here — a
+    // nulled phone, a rotated pinHash, an anonymized name — silently breaks the
+    // restore, so it has to be a deliberate edit to this assertion.
+    expect(data).toEqual({ isActive: false, deletedAt: expect.any(Date) });
   });
 
   it('scopes the write to the courier own claimable orders', async () => {
     await service.deleteOwnAccount(jwtCourier, { pin: '1234' });
 
     // The order guard is in the WHERE, not in a count before it: that is what
-    // makes "no live delivery" and "the row is anonymized" one atomic step.
+    // makes "no live delivery" and "the row is deleted" one atomic step.
     // A branch's unassigned COOKING order is absent on purpose — it is not
     // this courier's to finish, so it must not block.
     expect(prisma.courier.updateMany).toHaveBeenCalledWith({
@@ -906,5 +907,167 @@ describe('CouriersService.deleteOwnAccount', () => {
     await expect(
       service.deleteOwnAccount(jwtCourier, { pin: '1234' }),
     ).resolves.toEqual({ deleted: true });
+  });
+});
+
+describe('CouriersService.restoreAccount', () => {
+  let prisma: ReturnType<typeof prismaMock>;
+  let jwt: JwtService;
+  let service: CouriersService;
+
+  /** The row deleteOwnAccount leaves behind: deleted, data intact. */
+  const deletedCourier = {
+    ...existingCourier,
+    pinHash: bcrypt.hashSync('1234', 4),
+    isActive: false,
+    deletedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+  };
+
+  beforeEach(() => {
+    __pinRateLimitResetForTests();
+    prisma = prismaMock();
+    jwt = new JwtService({ secret: SECRET });
+    service = new CouriersService(
+      prisma as any,
+      jwt,
+      eventsMock() as any,
+      loyaltyMock() as any,
+    );
+    prisma.courier.findMany.mockResolvedValue([deletedCourier]);
+    prisma.courier.findFirst.mockResolvedValue(deletedCourier);
+    prisma.courier.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it('looks up deleted rows inside the window, newest first', async () => {
+    prisma.courier.findMany.mockResolvedValue([]);
+
+    await expect(
+      service.restoreAccount({ phone: existingCourier.phone, pin: '1234' }),
+    ).rejects.toMatchObject({ response: { code: 'INVALID_CREDENTIALS' } });
+
+    // Query-shape assertion: the whole feature is this WHERE clause. A plain
+    // `deletedAt: null` would make restore a second login, and dropping the
+    // lower bound would revive an account whose window (and, once the expiry
+    // job lands, whose data) is long gone.
+    const args = prisma.courier.findMany.mock.calls[0][0];
+    expect(args.take).toBe(2);
+    expect(args.where).toEqual({
+      phone: existingCourier.phone,
+      deletedAt: { gt: expect.any(Date) },
+      tenant: { status: 'ACTIVE', deletedAt: null },
+    });
+    // Newest deletion wins: if the number was deleted twice inside one window,
+    // the row to revive is the one the courier deleted last.
+    expect(args.orderBy).toEqual({ deletedAt: 'desc' });
+
+    const cutoffDays =
+      (Date.now() - args.where.deletedAt.gt.getTime()) / (24 * 60 * 60 * 1000);
+    expect(cutoffDays).toBeCloseTo(COURIER_RESTORE_WINDOW_DAYS, 3);
+  });
+
+  it('scopes the declared-tenant lookup to an active owning tenant', async () => {
+    prisma.courier.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.restoreAccount(
+        { phone: existingCourier.phone, pin: '1234' },
+        { id: 'tenant-a', code: 'SHIK_ROLL' },
+      ),
+    ).rejects.toMatchObject({ response: { code: 'INVALID_CREDENTIALS' } });
+
+    expect(prisma.courier.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-a',
+        phone: existingCourier.phone,
+        deletedAt: { gt: expect.any(Date) },
+        tenant: { status: 'ACTIVE', deletedAt: null },
+      },
+      orderBy: { deletedAt: 'desc' },
+    });
+    expect(prisma.courier.findMany).not.toHaveBeenCalled();
+  });
+
+  it('revives the row, writes nothing but the two flags and returns a session', async () => {
+    const result = await service.restoreAccount({
+      phone: existingCourier.phone,
+      pin: '1234',
+    });
+
+    // Exact object on purpose — the inverse of the deletion. Anything else
+    // written here (a reset isAvailable, a re-hashed PIN) is a change to what
+    // the account comes back as.
+    const args = prisma.courier.updateMany.mock.calls[0][0];
+    expect(args.data).toEqual({ deletedAt: null, isActive: true });
+    // The window rides on the write too, so a restore racing the window closing
+    // cannot revive a row the expiry job is already burning.
+    expect(args.where).toEqual({
+      id: 'courier-1',
+      deletedAt: { gt: expect.any(Date) },
+    });
+
+    const payload = await jwt.verifyAsync<CourierTokenPayload>(result.token);
+    expect(payload).toMatchObject({
+      sub: 'courier-1',
+      phone: existingCourier.phone,
+      branchId: 'branch-1',
+      role: 'COURIER',
+      type: 'access',
+    });
+    expect(result.tokenType).toBe('Bearer');
+    expect(result.expiresInSeconds).toBe(COURIER_TOKEN_TTL_SECONDS);
+    // Same shape the login answers with, so the client has one session path.
+    expect(result.courier).toEqual({
+      id: 'courier-1',
+      name: 'Курьер 4567',
+      phone: existingCourier.phone,
+    });
+  });
+
+  it('rejects a wrong PIN and writes nothing', async () => {
+    await expect(
+      service.restoreAccount({ phone: existingCourier.phone, pin: '9999' }),
+    ).rejects.toMatchObject({ response: { code: 'INVALID_CREDENTIALS' } });
+
+    expect(prisma.courier.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects a row whose PIN hash the window has already burned', async () => {
+    // What the expiry job will leave behind. Nothing nulls the column on
+    // deletion — the PIN survives only because the window keeps it.
+    prisma.courier.findMany.mockResolvedValue([
+      { ...deletedCourier, pinHash: '' },
+    ]);
+
+    await expect(
+      service.restoreAccount({ phone: existingCourier.phone, pin: '1234' }),
+    ).rejects.toMatchObject({ response: { code: 'INVALID_CREDENTIALS' } });
+    expect(prisma.courier.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('401s when the window predicate matches no row on the write', async () => {
+    // The window closed (or a concurrent restore won the row) between the
+    // lookup and the update.
+    prisma.courier.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.restoreAccount({ phone: existingCourier.phone, pin: '1234' }),
+    ).rejects.toMatchObject({ response: { code: 'INVALID_CREDENTIALS' } });
+  });
+
+  it('409s when the number was re-issued to a live courier', async () => {
+    // uq_couriers_tenant_id_phone covers live rows, so reviving this row while
+    // another live courier holds the number is what the database refuses.
+    prisma.courier.updateMany.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '6.14.0',
+      }),
+    );
+
+    await expect(
+      service.restoreAccount({ phone: existingCourier.phone, pin: '1234' }),
+    ).rejects.toMatchObject({
+      response: { code: 'COURIER_PHONE_EXISTS', statusCode: 409 },
+    });
   });
 });

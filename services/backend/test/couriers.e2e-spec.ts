@@ -3,10 +3,13 @@ import * as path from 'node:path';
 import { INestApplication, ValidationPipe, BadRequestException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { OrderStatus, PrismaClient } from '@prisma/client';
+import { Queue } from 'bullmq';
 import * as bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { DELETED_COURIER_NAME } from '../src/modules/couriers/couriers.config';
+import { COURIER_RESTORE_WINDOW_DAYS } from '../src/modules/couriers/couriers.config';
+import { CourierMaintenanceProcessor } from '../src/modules/queues/courier-maintenance.processor';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 const TEST_DATABASE_URL =
   process.env.DATABASE_URL_TEST ??
@@ -359,8 +362,8 @@ describe('Couriers API (e2e)', () => {
   /**
    * Apple 5.1.1(v) self-service deletion.
    *
-   * Declared last on purpose: the success case anonymizes the fixture courier
-   * for good, so every test above has to have run by then. The non-destructive
+   * Declared last on purpose: the success case deletes the fixture courier for
+   * good, so every test above has to have run by then. The non-destructive
    * cases come first and assert the account is untouched, which is what keeps
    * this ordering honest rather than merely convenient.
    */
@@ -404,19 +407,24 @@ describe('Couriers API (e2e)', () => {
       await deleteAccount('9999', courierToken).expect(401);
     });
 
-    it('deletes: anonymizes the row, erases the phone and revokes access', async () => {
+    it('deletes: flags the row, keeps the data and revokes access', async () => {
       const res = await deleteAccount(fx.courierPin, courierToken).expect(200);
       expect(res.body).toEqual({ deleted: true });
 
       const courier = await readCourier();
-      expect(courier.name).toBe(DELETED_COURIER_NAME);
-      expect(courier.phone).toBeNull();
+      // Kept on purpose — the 7-day restore window hands the account back
+      // whole, so everything a restored courier needs has to still be here.
+      expect(courier.name).toBe('Courier E2E');
+      expect(courier.phone).toBe(fx.courierPhone);
       expect(courier.isActive).toBe(false);
-      expect(courier.isAvailable).toBe(false);
       expect(courier.deletedAt).toBeInstanceOf(Date);
+      // Untouched: availability is the courier's own shift toggle, not part of
+      // the deletion, and restore must not have to reset it.
+      expect(courier.isAvailable).toBe(true);
 
-      // The PIN that just authorized the deletion is not a credential of the
-      // deleted account any more.
+      // The phone still resolves — this 401 is the deletedAt filter in the
+      // lookup, not a missing number, which is the whole reason the guard needs
+      // its own deletedAt arm.
       await http()
         .post('/couriers/auth/pin')
         .send({ phone: fx.courierPhone, pin: fx.courierPin })
@@ -431,7 +439,9 @@ describe('Couriers API (e2e)', () => {
     });
 
     it('releases the phone for a new courier', async () => {
-      // The unique slot is only genuinely free if this insert succeeds; a
+      // The deleted row still holds the number, so this insert only succeeds
+      // because uq_couriers_tenant_id_phone is partial (deleted_at IS NULL).
+      // The unique slot is also only genuinely free if this insert succeeds; a
       // 'deleted:<uuid>' tombstone would have made it fail with P2002.
       const replacement = await prisma.courier.create({
         data: {
@@ -449,6 +459,166 @@ describe('Couriers API (e2e)', () => {
         .post('/couriers/auth/pin')
         .send({ phone: fx.courierPhone, pin: '4321' })
         .expect(200);
+    });
+  });
+
+  /**
+   * The other half of Apple 5.1.1(v): the deletion has to be survivable, or a
+   * mis-tap costs the account, the PIN and the delivery history.
+   *
+   * Declared after the delete block, which leaves exactly the state a restore
+   * has to cope with: a deleted row inside its window AND a live replacement
+   * holding the same number.
+   */
+  describe('POST /couriers/auth/restore', () => {
+    const restore = (phone: string, pin: string) =>
+      http().post('/couriers/auth/restore').send({ phone, pin });
+
+    const readCourier = () =>
+      prisma.courier.findUniqueOrThrow({ where: { id: fx.courierId } });
+
+    it('401 on an unknown phone', async () => {
+      await restore('+70000000000', fx.courierPin).expect(401);
+    });
+
+    it('401 on a wrong PIN, leaving the row deleted', async () => {
+      await restore(fx.courierPhone, '9999').expect(401);
+
+      const courier = await readCourier();
+      expect(courier.deletedAt).toBeInstanceOf(Date);
+      expect(courier.isActive).toBe(false);
+      expect(courier.phone).toBe(fx.courierPhone);
+    });
+
+    it('409 COURIER_PHONE_EXISTS when the number has been re-issued', async () => {
+      // The delete block's replacement holds this number live, which is the one
+      // thing the partial unique index forbids a restore from doing. The
+      // database is the guard here, not a count before the write.
+      const res = await restore(fx.courierPhone, fx.courierPin).expect(409);
+      expect(res.body.code).toBe('COURIER_PHONE_EXISTS');
+
+      expect((await readCourier()).deletedAt).toBeInstanceOf(Date);
+    });
+
+    it('restores the account whole and issues a session that works', async () => {
+      // Drop the replacement: one live row per number is the invariant the
+      // previous test proved the restore respects.
+      await prisma.courier.deleteMany({
+        where: { phone: fx.courierPhone, deletedAt: null },
+      });
+
+      const res = await restore(fx.courierPhone, fx.courierPin).expect(200);
+      expect(res.body.tokenType).toBe('Bearer');
+      expect(res.body.courier).toEqual({
+        id: fx.courierId,
+        name: 'Courier E2E',
+        phone: fx.courierPhone,
+      });
+
+      const courier = await readCourier();
+      expect(courier.deletedAt).toBeNull();
+      expect(courier.isActive).toBe(true);
+      // Everything the deletion kept is what made this whole: the real name,
+      // the login number, the PIN, and the shift toggle that was never part of
+      // the deletion.
+      expect(courier.name).toBe('Courier E2E');
+      expect(courier.phone).toBe(fx.courierPhone);
+      expect(courier.isAvailable).toBe(true);
+
+      // The PIN logs in again, and the session handed back by the restore is
+      // accepted by the guard the deletion used to reject.
+      await http()
+        .post('/couriers/auth/pin')
+        .send({ phone: fx.courierPhone, pin: fx.courierPin })
+        .expect(200);
+      await http()
+        .get('/couriers/orders/active')
+        .set('Authorization', `Bearer ${res.body.token}`)
+        .expect(200);
+    });
+
+    it('401 once the window has closed, leaving the row deleted', async () => {
+      // Backdate the deletion past the window rather than waiting 7 days:
+      // COURIER_RESTORE_WINDOW_DAYS is a product constant, not env tuning.
+      await prisma.courier.update({
+        where: { id: fx.courierId },
+        data: {
+          isActive: false,
+          deletedAt: new Date(
+            Date.now() - (COURIER_RESTORE_WINDOW_DAYS + 1) * 24 * 60 * 60 * 1000,
+          ),
+        },
+      });
+
+      await restore(fx.courierPhone, fx.courierPin).expect(401);
+
+      const courier = await readCourier();
+      expect(courier.deletedAt).toBeInstanceOf(Date);
+      expect(courier.isActive).toBe(false);
+    });
+  });
+
+  /**
+   * The sweep is driven directly rather than through BullMQ: every e2e spec runs
+   * with DISABLE_QUEUES, so no worker is registered and no scheduler ever fires.
+   * What this covers is the sweep against a real database — where the window
+   * boundary falls, and what burning a courier does to the deliveries that point
+   * at it.
+   */
+  describe('expiry sweep (courier-maintenance)', () => {
+    const sweep = new CourierMaintenanceProcessor(
+      prisma as unknown as PrismaService,
+      { upsertJobScheduler: async () => ({ id: 'unused' }) } as unknown as Queue,
+    );
+
+    const createCourierDeletedDaysAgo = async (phone: string, daysAgo: number | null) =>
+      prisma.courier.create({
+        data: {
+          name: `Sweep ${phone}`,
+          phone,
+          pinHash: await bcrypt.hash('1234', 4),
+          brandId: fx.brandId,
+          branchId: fx.branchId,
+          tenantId: fx.tenantId,
+          // isActive false either way — a self-deleted row and a staff block look
+          // the same here. deletedAt is what separates them.
+          isActive: false,
+          deletedAt:
+            daysAgo === null ? null : new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000),
+        },
+      });
+
+    it('burns the expired account, keeps the one inside the window, and leaves the delivery standing', async () => {
+      const expired = await createCourierDeletedDaysAgo(
+        '+79995550090',
+        COURIER_RESTORE_WINDOW_DAYS + 1,
+      );
+      const insideWindow = await createCourierDeletedDaysAgo('+79995550091', 1);
+      const orderId = await createOrderInStatus(OrderStatus.COMPLETED, {
+        courierId: expired.id,
+      });
+
+      await sweep.expireDeletedCouriers();
+
+      expect(await prisma.courier.findUnique({ where: { id: expired.id } })).toBeNull();
+      expect(
+        await prisma.courier.findUnique({ where: { id: insideWindow.id } }),
+      ).not.toBeNull();
+
+      // The burn does not take the delivery history with it: orders.courier_id is
+      // ON DELETE SET NULL, so the order the customer cares about survives with
+      // the courier unlinked.
+      const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+      expect(order.courierId).toBeNull();
+      expect(order.status).toBe(OrderStatus.COMPLETED);
+    });
+
+    it('leaves a blocked courier alone — no deletedAt means nothing to expire', async () => {
+      const blocked = await createCourierDeletedDaysAgo('+79995550092', null);
+
+      await sweep.expireDeletedCouriers();
+
+      expect(await prisma.courier.findUnique({ where: { id: blocked.id } })).not.toBeNull();
     });
   });
 });
