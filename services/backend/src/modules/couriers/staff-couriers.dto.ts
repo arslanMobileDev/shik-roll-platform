@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export function normalizeCourierPhone(value: unknown): unknown {
@@ -11,8 +11,24 @@ export function normalizeCourierPhone(value: unknown): unknown {
 }
 const trimName = ({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value;
 
+// A query string carries booleans as text. Anything that is neither spelling is
+// left untouched so @IsBoolean rejects it: `?includeDeleted=1` silently meaning
+// "live couriers only" is the kind of misread that hides rows from the panel.
+const toBoolean = ({ value }: { value: unknown }): unknown =>
+  value === 'true' || value === true
+    ? true
+    : value === 'false' || value === false
+      ? false
+      : value;
+
 export class CourierBranchQueryDto {
   @ApiProperty() @IsUUID() branchId!: string;
+
+  @ApiPropertyOptional({
+    description: 'Lists self-deleted couriers inside the restore window instead of live ones',
+  })
+  @IsOptional() @Transform(toBoolean) @IsBoolean()
+  includeDeleted?: boolean;
 }
 export class CreateCourierDto {
   @ApiProperty() @Transform(trimName) @IsString() @MinLength(1) @MaxLength(100)

@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { PrismaService } from '../../prisma/prisma.service';
+import { COURIER_RESTORE_WINDOW_DAYS } from './couriers.config';
 import { StaffCouriersController } from './staff-couriers.controller';
 
 const branchId = '904331fe-5efe-4ca8-9c17-ceccc6dd3839';
@@ -46,7 +47,7 @@ describe('StaffCouriersController HTTP contract', () => {
   });
   afterEach(() => app.close());
   const token = () => `Bearer ${jwt.sign({ sub: 'owner', role: 'OWNER', type: 'access', brandId: 'untrusted-brand' })}`;
-  const paths = [['get', `/staff/couriers?branchId=${branchId}`], ['post', '/staff/couriers'], ['patch', `/staff/couriers/${courierId}`], ['delete', `/staff/couriers/${courierId}`]];
+  const paths = [['get', `/staff/couriers?branchId=${branchId}`], ['post', '/staff/couriers'], ['patch', `/staff/couriers/${courierId}`], ['delete', `/staff/couriers/${courierId}`], ['post', `/staff/couriers/${courierId}/restore`]];
   it.each(paths)('%s %s rejects missing bearer', async (method, path) => {
     await (request(app.getHttpServer()) as any)[method](path).expect(401);
   });
@@ -67,7 +68,7 @@ describe('StaffCouriersController HTTP contract', () => {
     const response = await request(app.getHttpServer()).post('/staff/couriers').set('Authorization', token()).send({ ...body, phone, brandId: 'forged' }).expect(200);
     expect(response.body.phone).toBe('+79280000000');
     expect(response.body).not.toHaveProperty('pinHash');
-    expect(Object.keys(response.body).sort()).toEqual(['id','name','phone','branchId','isActive','isAvailable','createdAt'].sort());
+    expect(Object.keys(response.body).sort()).toEqual(['id','name','phone','branchId','isActive','isAvailable','createdAt','deletedAt'].sort());
     const data = db.courier.create.mock.calls[0][0].data;
     expect(data.brandId).toBe(brandId);
     expect(bcrypt.getRounds(data.pinHash)).toBe(12);
@@ -124,5 +125,44 @@ describe('StaffCouriersController HTTP contract', () => {
   it('requires a valid branch UUID and courier UUID', async () => {
     await request(app.getHttpServer()).get('/staff/couriers').set('Authorization', token()).expect(400);
     await request(app.getHttpServer()).patch('/staff/couriers/bad-id').set('Authorization', token()).send({ name: 'Иван' }).expect(400);
+  });
+  it('lists deleted couriers when includeDeleted is set', async () => {
+    await request(app.getHttpServer()).get('/staff/couriers').query({ branchId, includeDeleted: 'true' }).set('Authorization', token()).expect(200);
+    expect(db.courier.findMany.mock.calls[0][0].where).toEqual({ brandId, branchId, deletedAt: { not: null } });
+  });
+  it('rejects an includeDeleted that is neither true nor false', async () => {
+    // '1' is not a boolean spelling: reading it as falsy would silently answer
+    // with live couriers only, which is how the deleted list goes missing.
+    await request(app.getHttpServer()).get('/staff/couriers').query({ branchId, includeDeleted: '1' }).set('Authorization', token()).expect(400);
+    expect(db.courier.findMany).not.toHaveBeenCalled();
+  });
+  it('restores a courier inside the window and returns the live row', async () => {
+    const response = await request(app.getHttpServer()).post(`/staff/couriers/${courierId}/restore`).set('Authorization', token()).expect(200);
+    expect(response.body).toMatchObject({ id: courierId, isActive: true, deletedAt: null });
+    const args = db.courier.updateMany.mock.calls[0][0];
+    expect(args.where.id).toBe(courierId);
+    expect(args.where.brandId).toBe(brandId);
+    // The phone arm is what keeps a pre-window row — number erased, PIN
+    // randomized by the old deletion — from coming back as an account nobody
+    // can log into, reported as a success.
+    expect(args.where.phone).toEqual({ not: null });
+    expect(args.data).toEqual({ deletedAt: null, isActive: true });
+    const days = (Date.now() - args.where.deletedAt.gt.getTime()) / (24 * 60 * 60 * 1000);
+    expect(days).toBeCloseTo(COURIER_RESTORE_WINDOW_DAYS, 3);
+  });
+  it('answers 404 when nothing was restored', async () => {
+    // One code for all four misses: already live, out of the window, no number
+    // to log in with, and an id that does not exist.
+    db.courier.updateMany.mockResolvedValueOnce({ count: 0 });
+    await request(app.getHttpServer()).post(`/staff/couriers/${courierId}/restore`).set('Authorization', token()).expect(404);
+    expect(db.courier.findFirstOrThrow).not.toHaveBeenCalled();
+  });
+  it('maps a re-issued number to 409 instead of a 500', async () => {
+    db.courier.updateMany.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError('duplicate', { code: 'P2002', clientVersion: 'test' }));
+    const response = await request(app.getHttpServer()).post(`/staff/couriers/${courierId}/restore`).set('Authorization', token()).expect(409);
+    expect(response.body.code).toBe('COURIER_PHONE_EXISTS');
+  });
+  it('rejects a non-UUID courier id on restore', async () => {
+    await request(app.getHttpServer()).post('/staff/couriers/bad-id/restore').set('Authorization', token()).expect(400);
   });
 });
