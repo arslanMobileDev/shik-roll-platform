@@ -52,6 +52,27 @@ export class CouriersController {
   }
 
   /**
+   * The undo of POST /couriers/me/delete, for the 7 days that follow it. Public
+   * for the same reason the login is: a deleted courier holds no usable JWT, so
+   * the phone + PIN pair is the only credential left.
+   */
+  @Post('auth/restore')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Restore a self-deleted courier account' })
+  @ApiUnauthorizedResponse({
+    description: 'UNAUTHORIZED / INVALID_CREDENTIALS — unknown, wrong PIN, or window closed',
+  })
+  @ApiConflictResponse({
+    description: 'COURIER_PHONE_EXISTS — the number was re-issued to a live courier',
+  })
+  async authRestore(
+    @Body() dto: CourierPinAuthDto,
+    @CurrentTenant() tenant: TenantContext | undefined,
+  ) {
+    return this.couriersService.restoreAccount(dto, tenant);
+  }
+
+  /**
    * ADR-1617: branch and courier identity come from the verified JWT only;
    * legacy branchId/courierId query params are ignored.
    */

@@ -38,6 +38,26 @@ describe('CouriersController auth wiring', () => {
     );
   });
 
+  it('leaves POST /couriers/auth/restore public and forwards DTO and tenant', async () => {
+    // Public like the login: the deleted courier's JWT is dead by design, so
+    // the phone + PIN pair is the only credential that can reopen the account.
+    expect(guardsOf(CouriersController.prototype.authRestore)).not.toContain(
+      CourierJwtAuthGuard,
+    );
+
+    const couriersService = {
+      restoreAccount: jest.fn().mockResolvedValue({ token: 'jwt' }),
+    };
+    const controller = new CouriersController(couriersService as any, {} as any);
+    const dto = { phone: '+79991234567', pin: '1234' };
+    const tenant = { id: 'tenant-1', code: 'SHIK_ROLL' };
+
+    await controller.authRestore(dto, tenant);
+
+    // The tenant is what scopes the lookup to one row per phone.
+    expect(couriersService.restoreAccount).toHaveBeenCalledWith(dto, tenant);
+  });
+
   it('scopes the orders feed to the JWT branch and courier identity', async () => {
     const couriersService = { getActiveOrders: jest.fn().mockResolvedValue([]) };
     const controller = new CouriersController(couriersService as any, {} as any);

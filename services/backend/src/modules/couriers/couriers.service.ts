@@ -34,6 +34,7 @@ import { DeleteCourierAccountDto } from './dto/delete-courier-account.dto';
 import {
   COURIER_LOCATION_MAX_CLOCK_SKEW_MS,
   COURIER_LOCATION_MIN_INTERVAL_MS,
+  COURIER_RESTORE_WINDOW_DAYS,
   COURIER_TOKEN_TTL_SECONDS,
   PIN_BCRYPT_ROUNDS,
 } from './couriers.config';
@@ -113,16 +114,124 @@ export class CouriersService {
     // on an invariant another file has to keep.
     const pinOk = await this.verifyPin(courier, dto.pin);
     if (!courier || !courier.isActive || !courier.phone || !pinOk) {
-      throw new UnauthorizedException({
-        statusCode: 401,
-        code: 'INVALID_CREDENTIALS',
-        message: 'Invalid phone or PIN',
-      });
+      throw this.invalidCredentials();
     }
 
+    pinRateLimitReset('courier', tenant?.code, dto.phone);
+    return this.issueSession(courier, courier.phone);
+  }
+
+  /**
+   * Brings back a self-deleted account inside its window (Apple 5.1.1(v) gives
+   * the courier the deletion; this is what keeps it survivable — a mis-tap
+   * otherwise costs the account, the PIN and the delivery history).
+   *
+   * A variant of the login rather than a flow of its own: the credential is the
+   * same phone + PIN pair, the row it revives is the one authenticateByPin
+   * would have found had it not been deleted, and the answer is the same
+   * session. Only the set of lookup candidates differs — deleted rows inside
+   * the window instead of live ones — which is also why the caller must be
+   * anonymous: the deleted courier's JWT is dead by design.
+   *
+   * `deletedAt` is non-null by construction in the lookup (the comparison
+   * excludes nulls) and is written by no one but deleteOwnAccount: the staff
+   * DELETE writes isActive alone, so this cannot lift a staff block.
+   */
+  async restoreAccount(dto: CourierPinAuthDto, tenant?: TenantContext) {
+    // The login contour, deliberately shared: this endpoint is a PIN oracle
+    // over deleted rows, so an attacker must not get a second, unthrottled
+    // budget by asking here instead of /auth/pin. Reset on success for the same
+    // reason as the login — a spent budget means nothing once the PIN is known.
+    pinRateLimitConsume('courier', tenant?.code, dto.phone);
+
+    // One cutoff for both branches, so the two lookups cannot disagree about
+    // what the window is.
+    const cutoff = restoreCutoff();
+
+    const courier = await resolveLoginRow(
+      tenant,
+      () =>
+        this.prisma.courier.findMany({
+          where: {
+            phone: dto.phone,
+            deletedAt: { gt: cutoff },
+            tenant: ACTIVE_TENANT_FILTER,
+          },
+          // Most recent deletion first: that is the row whose number the
+          // courier still holds in hand.
+          orderBy: { deletedAt: 'desc' },
+          take: 2,
+        }),
+      (tenantId) =>
+        this.prisma.courier.findFirst({
+          where: {
+            tenantId,
+            phone: dto.phone,
+            deletedAt: { gt: cutoff },
+            tenant: ACTIVE_TENANT_FILTER,
+          },
+          orderBy: { deletedAt: 'desc' },
+        }),
+    );
+
+    // Unconditional, like every other PIN check: an unknown phone pays the
+    // bcrypt cost too. A row whose pinHash the window's expiry job has already
+    // burned fails here — the credential survives the deletion only because the
+    // window keeps it.
+    const pinOk = await this.verifyPin(courier, dto.pin);
+    if (!courier || !courier.phone || !pinOk) {
+      throw this.invalidCredentials();
+    }
+
+    // The window predicate rides on the write as well: a restore that raced the
+    // expiry job would otherwise revive a row whose data is already burned.
+    let count: number;
+    try {
+      ({ count } = await this.prisma.courier.updateMany({
+        where: { id: courier.id, deletedAt: { gt: cutoff } },
+        // Exactly the inverse of deleteOwnAccount, and nothing else: name,
+        // phone and pinHash were never touched by the deletion, so the account
+        // comes back whole.
+        data: { deletedAt: null, isActive: true },
+      }));
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        // The number was re-issued to another courier while this row was
+        // deleted (uq_couriers_tenant_id_phone covers live rows). The database
+        // is the guard: two live rows with one number in a tenant is what the
+        // login lookup cannot survive, so the restore is refused instead.
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'COURIER_PHONE_EXISTS',
+          message: 'Phone is already registered',
+        });
+      }
+      throw error;
+    }
+    if (count === 0) {
+      // The window closed, or a concurrent restore won the row. Both mean the
+      // account is not this call's to revive.
+      throw this.invalidCredentials();
+    }
+
+    pinRateLimitReset('courier', tenant?.code, dto.phone);
+    return this.issueSession(courier, courier.phone);
+  }
+
+  /**
+   * The session both PIN doors answer with — the login and the restore. One
+   * payload shape, so the client handles a restored account exactly like a
+   * logged-in one. The phone is passed alongside the row because it is the one
+   * field the callers have already narrowed to a string (the column is nullable
+   * for rows deleted before the window landed).
+   */
+  private async issueSession(courier: Courier, phone: string) {
     const payload: CourierTokenPayload = {
       sub: courier.id,
-      phone: courier.phone,
+      phone,
       branchId: courier.branchId,
       role: 'COURIER',
       type: 'access',
@@ -130,7 +239,6 @@ export class CouriersService {
     const token = await this.jwt.signAsync(payload, {
       expiresIn: COURIER_TOKEN_TTL_SECONDS,
     });
-    pinRateLimitReset('courier', tenant?.code, dto.phone);
 
     return {
       token,
@@ -139,9 +247,18 @@ export class CouriersService {
       courier: {
         id: courier.id,
         name: courier.name,
-        phone: courier.phone,
+        phone,
       },
     };
+  }
+
+  /** One body for every failed PIN door, so none of them answers differently. */
+  private invalidCredentials(): UnauthorizedException {
+    return new UnauthorizedException({
+      statusCode: 401,
+      code: 'INVALID_CREDENTIALS',
+      message: 'Invalid phone or PIN',
+    });
   }
 
   /**
@@ -621,4 +738,13 @@ export class CouriersService {
       createdAt: order.createdAt.toISOString(),
     };
   }
+}
+
+/**
+ * Start of the restore window: a deletion newer than this can still be undone.
+ * `deletedAt: null` is deliberately not covered — a live row is not a candidate
+ * and the comparison says so by itself.
+ */
+export function restoreCutoff(now: Date = new Date()): Date {
+  return new Date(now.getTime() - COURIER_RESTORE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 }

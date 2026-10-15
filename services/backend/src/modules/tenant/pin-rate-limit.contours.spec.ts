@@ -138,6 +138,26 @@ describe('PIN rate limit is scoped per auth contour', () => {
       expect(consume).toHaveBeenCalledWith('courier', TENANT.code, PHONE);
     });
 
+    it('courier restore spends the login contour, not a fresh one', async () => {
+      // Restore is a PIN oracle over deleted rows, so it has to draw on the
+      // same budget: a contour of its own would double an attacker's attempts
+      // per phone.
+      const courierDb = courierPrisma();
+      courierDb.courier.findFirst.mockResolvedValue(null);
+      const couriers = new CouriersService(
+        courierDb as never,
+        jwt,
+        { emitCourierLocation: jest.fn() } as never,
+        { earnCashback: jest.fn() } as never,
+      );
+
+      await expect(
+        couriers.restoreAccount({ phone: PHONE, pin: PIN }, TENANT),
+      ).rejects.toThrow();
+
+      expect(consume).toHaveBeenCalledWith('courier', TENANT.code, PHONE);
+    });
+
     it('kitchen passes its own contour and keys on the terminal code', async () => {
       const kitchenDb = { kitchenTerminal: { findUnique: jest.fn() } };
       kitchenDb.kitchenTerminal.findUnique.mockResolvedValue(null);

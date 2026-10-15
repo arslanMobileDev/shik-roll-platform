@@ -6,6 +6,7 @@ import { OrderStatus, PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { COURIER_RESTORE_WINDOW_DAYS } from '../src/modules/couriers/couriers.config';
 
 const TEST_DATABASE_URL =
   process.env.DATABASE_URL_TEST ??
@@ -455,6 +456,102 @@ describe('Couriers API (e2e)', () => {
         .post('/couriers/auth/pin')
         .send({ phone: fx.courierPhone, pin: '4321' })
         .expect(200);
+    });
+  });
+
+  /**
+   * The other half of Apple 5.1.1(v): the deletion has to be survivable, or a
+   * mis-tap costs the account, the PIN and the delivery history.
+   *
+   * Declared after the delete block, which leaves exactly the state a restore
+   * has to cope with: a deleted row inside its window AND a live replacement
+   * holding the same number.
+   */
+  describe('POST /couriers/auth/restore', () => {
+    const restore = (phone: string, pin: string) =>
+      http().post('/couriers/auth/restore').send({ phone, pin });
+
+    const readCourier = () =>
+      prisma.courier.findUniqueOrThrow({ where: { id: fx.courierId } });
+
+    it('401 on an unknown phone', async () => {
+      await restore('+70000000000', fx.courierPin).expect(401);
+    });
+
+    it('401 on a wrong PIN, leaving the row deleted', async () => {
+      await restore(fx.courierPhone, '9999').expect(401);
+
+      const courier = await readCourier();
+      expect(courier.deletedAt).toBeInstanceOf(Date);
+      expect(courier.isActive).toBe(false);
+      expect(courier.phone).toBe(fx.courierPhone);
+    });
+
+    it('409 COURIER_PHONE_EXISTS when the number has been re-issued', async () => {
+      // The delete block's replacement holds this number live, which is the one
+      // thing the partial unique index forbids a restore from doing. The
+      // database is the guard here, not a count before the write.
+      const res = await restore(fx.courierPhone, fx.courierPin).expect(409);
+      expect(res.body.code).toBe('COURIER_PHONE_EXISTS');
+
+      expect((await readCourier()).deletedAt).toBeInstanceOf(Date);
+    });
+
+    it('restores the account whole and issues a session that works', async () => {
+      // Drop the replacement: one live row per number is the invariant the
+      // previous test proved the restore respects.
+      await prisma.courier.deleteMany({
+        where: { phone: fx.courierPhone, deletedAt: null },
+      });
+
+      const res = await restore(fx.courierPhone, fx.courierPin).expect(200);
+      expect(res.body.tokenType).toBe('Bearer');
+      expect(res.body.courier).toEqual({
+        id: fx.courierId,
+        name: 'Courier E2E',
+        phone: fx.courierPhone,
+      });
+
+      const courier = await readCourier();
+      expect(courier.deletedAt).toBeNull();
+      expect(courier.isActive).toBe(true);
+      // Everything the deletion kept is what made this whole: the real name,
+      // the login number, the PIN, and the shift toggle that was never part of
+      // the deletion.
+      expect(courier.name).toBe('Courier E2E');
+      expect(courier.phone).toBe(fx.courierPhone);
+      expect(courier.isAvailable).toBe(true);
+
+      // The PIN logs in again, and the session handed back by the restore is
+      // accepted by the guard the deletion used to reject.
+      await http()
+        .post('/couriers/auth/pin')
+        .send({ phone: fx.courierPhone, pin: fx.courierPin })
+        .expect(200);
+      await http()
+        .get('/couriers/orders/active')
+        .set('Authorization', `Bearer ${res.body.token}`)
+        .expect(200);
+    });
+
+    it('401 once the window has closed, leaving the row deleted', async () => {
+      // Backdate the deletion past the window rather than waiting 7 days:
+      // COURIER_RESTORE_WINDOW_DAYS is a product constant, not env tuning.
+      await prisma.courier.update({
+        where: { id: fx.courierId },
+        data: {
+          isActive: false,
+          deletedAt: new Date(
+            Date.now() - (COURIER_RESTORE_WINDOW_DAYS + 1) * 24 * 60 * 60 * 1000,
+          ),
+        },
+      });
+
+      await restore(fx.courierPhone, fx.courierPin).expect(401);
+
+      const courier = await readCourier();
+      expect(courier.deletedAt).toBeInstanceOf(Date);
+      expect(courier.isActive).toBe(false);
     });
   });
 });
