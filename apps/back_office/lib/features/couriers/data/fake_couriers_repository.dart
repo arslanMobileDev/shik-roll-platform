@@ -6,10 +6,49 @@ final class FakeCouriersRepository implements CouriersRepository {
   final List<CourierRecord> _rows;
   int _next = 0;
   @override
-  Future<List<CourierRecord>> list(String branchId) async {
-    final rows = _rows.where((r) => r.branchId == branchId).toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+  Future<List<CourierRecord>> list(
+    String branchId, {
+    bool includeDeleted = false,
+  }) async {
+    final rows =
+        _rows
+            .where(
+              (r) =>
+                  r.branchId == branchId &&
+                  (includeDeleted ? r.deletedAt != null : r.deletedAt == null),
+            )
+            .toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
     return List.unmodifiable(rows);
+  }
+
+  @override
+  Future<void> restore(String id) async {
+    final index = _rows.indexWhere((r) => r.id == id);
+    final row = index < 0 ? null : _rows[index];
+    // Same three refusals the backend folds into one 404: live already, no
+    // number to log in with, or nothing to restore at all.
+    if (row == null || row.deletedAt == null || row.phone == null) {
+      throw const CouriersApiException(
+        'Курьер уже активен или срок восстановления истёк.',
+      );
+    }
+    if (_rows.any(
+      (r) => r.id != id && r.deletedAt == null && r.phone == row.phone,
+    )) {
+      throw const CouriersApiException(
+        'Этот телефон уже занят другим курьером.',
+      );
+    }
+    _rows[index] = CourierRecord(
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      branchId: row.branchId,
+      isActive: true,
+      isAvailable: row.isAvailable,
+      createdAt: row.createdAt,
+    );
   }
 
   @override
@@ -28,7 +67,9 @@ final class FakeCouriersRepository implements CouriersRepository {
           name.trim().isEmpty) {
         throw const CouriersApiException('Проверьте данные курьера.');
       }
-      if (_rows.any((r) => r.phone == normalized)) {
+      // Only live rows: the backend's unique index is partial on
+      // `deleted_at IS NULL`, so a deleted row's number is free to reuse.
+      if (_rows.any((r) => r.deletedAt == null && r.phone == normalized)) {
         throw const CouriersApiException('Этот телефон уже зарегистрирован.');
       }
       _rows.add(
@@ -57,6 +98,7 @@ final class FakeCouriersRepository implements CouriersRepository {
       isActive: isActive ?? current.isActive,
       isAvailable: current.isAvailable,
       createdAt: current.createdAt,
+      deletedAt: current.deletedAt,
     );
   }
 }

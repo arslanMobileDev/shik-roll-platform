@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { INestApplication, ValidationPipe, BadRequestException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -619,6 +620,168 @@ describe('Couriers API (e2e)', () => {
       await sweep.expireDeletedCouriers();
 
       expect(await prisma.courier.findUnique({ where: { id: blocked.id } })).not.toBeNull();
+    });
+  });
+
+  /**
+   * The staff surface of the same window: the panel lists what the courier
+   * deleted and hands a row back for the courier who cannot do it himself.
+   *
+   * Seeded with its own rows and its own owner rather than reusing the state
+   * the blocks above leave behind — jest runs these in order, and a test that
+   * only passes because of the previous block is a test that fails when run
+   * alone.
+   */
+  describe('staff couriers: deleted list and restore', () => {
+    const ownerPhone = '+79990000033';
+    let ownerToken: string;
+
+    const seedCourier = async (phone: string | null, deletedDaysAgo: number | null) =>
+      prisma.courier.create({
+        data: {
+          name: `Staff ${phone ?? 'legacy'}`,
+          phone,
+          pinHash: await bcrypt.hash('1234', 4),
+          brandId: fx.brandId,
+          branchId: fx.branchId,
+          tenantId: fx.tenantId,
+          isActive: deletedDaysAgo === null,
+          deletedAt:
+            deletedDaysAgo === null
+              ? null
+              : new Date(Date.now() - deletedDaysAgo * 24 * 60 * 60 * 1000),
+        },
+      });
+
+    const staffList = (query: Record<string, string>) =>
+      http()
+        .get('/staff/couriers')
+        .query({ branchId: fx.branchId, ...query })
+        .set('Authorization', `Bearer ${ownerToken}`);
+
+    const staffRestore = (id: string) =>
+      http()
+        .post(`/staff/couriers/${id}/restore`)
+        .set('Authorization', `Bearer ${ownerToken}`);
+
+    const readCourierById = (id: string) =>
+      prisma.courier.findUniqueOrThrow({ where: { id } });
+
+    beforeAll(async () => {
+      await prisma.staff.create({
+        data: {
+          name: 'Courier E2E Owner',
+          phone: ownerPhone,
+          pinHash: await bcrypt.hash('1234', 4),
+          role: 'OWNER',
+          brandId: fx.brandId,
+          tenantId: fx.tenantId,
+        },
+      });
+      const login = await http()
+        .post('/staff/auth/pin')
+        .send({ phone: ownerPhone, pin: '1234' })
+        .expect(200);
+      ownerToken = login.body.token;
+    });
+
+    afterAll(async () => {
+      // `staff.brand_id` is fk_staff_brands (Restrict), so a leftover owner row
+      // breaks the next suite's brand delete — the same debt menu.e2e-spec
+      // documents at its own afterAll.
+      await prisma.staff.deleteMany({ where: { phone: ownerPhone } });
+    });
+
+    it('lists live couriers by default and the deleted ones on request', async () => {
+      const live = await seedCourier('+79995550101', null);
+      const deleted = await seedCourier('+79995550102', 1);
+
+      const liveRows = (await staffList({}).expect(200)).body;
+      const deletedRows = (await staffList({ includeDeleted: 'true' }).expect(200)).body;
+
+      expect(liveRows.map((c: any) => c.id)).toContain(live.id);
+      expect(liveRows.map((c: any) => c.id)).not.toContain(deleted.id);
+      expect(deletedRows.map((c: any) => c.id)).toContain(deleted.id);
+      expect(deletedRows.map((c: any) => c.id)).not.toContain(live.id);
+
+      // The panel dates the burn from deletedAt, so it has to be in the
+      // payload — and a live row has to answer null for it, not omit the key.
+      const deletedRow = deletedRows.find((c: any) => c.id === deleted.id);
+      expect(typeof deletedRow.deletedAt).toBe('string');
+      const liveRow = liveRows.find((c: any) => c.id === live.id);
+      expect(liveRow.deletedAt).toBeNull();
+    });
+
+    it('hands back a deleted account with its number and PIN intact', async () => {
+      const row = await seedCourier('+79995550110', 2);
+
+      const res = await staffRestore(row.id).expect(200);
+      expect(res.body).toMatchObject({
+        id: row.id,
+        phone: '+79995550110',
+        isActive: true,
+        deletedAt: null,
+      });
+
+      const courier = await readCourierById(row.id);
+      expect(courier.deletedAt).toBeNull();
+      expect(courier.isActive).toBe(true);
+      expect(courier.phone).toBe('+79995550110');
+
+      // Restored means usable: the PIN the courier already knows logs in again.
+      await http()
+        .post('/couriers/auth/pin')
+        .send({ phone: '+79995550110', pin: '1234' })
+        .expect(200);
+    });
+
+    it('404 on a courier that is not deleted', async () => {
+      const live = await seedCourier('+79995550111', null);
+
+      await staffRestore(live.id).expect(404);
+
+      expect((await readCourierById(live.id)).isActive).toBe(true);
+    });
+
+    it('404 on a pre-window row whose number the old deletion erased', async () => {
+      // Rows the old deletion touched still carry a fresh deletedAt but no
+      // number and a randomized PIN. Reviving one is an account nobody can log
+      // into, so the write refuses it rather than reporting a success.
+      const legacy = await seedCourier(null, 1);
+
+      await staffRestore(legacy.id).expect(404);
+
+      const courier = await readCourierById(legacy.id);
+      expect(courier.deletedAt).toBeInstanceOf(Date);
+      expect(courier.isActive).toBe(false);
+    });
+
+    it('404 once the window has closed', async () => {
+      const expired = await seedCourier(
+        '+79995550112',
+        COURIER_RESTORE_WINDOW_DAYS + 1,
+      );
+
+      await staffRestore(expired.id).expect(404);
+
+      expect((await readCourierById(expired.id)).isActive).toBe(false);
+    });
+
+    it('404 on an id that does not exist', async () => {
+      await staffRestore(randomUUID()).expect(404);
+    });
+
+    it('409 COURIER_PHONE_EXISTS when the number has been re-issued', async () => {
+      // The partial index lets a live courier hold the number a deleted row
+      // still has — the delete block above creates exactly that pair. Un-
+      // deleting the old row would then leave two live rows on one number,
+      // which is the state the login lookup cannot survive.
+      const deleted = await seedCourier('+79995550120', 1);
+      await seedCourier('+79995550120', null);
+
+      const res = await staffRestore(deleted.id).expect(409);
+      expect(res.body.code).toBe('COURIER_PHONE_EXISTS');
+      expect((await readCourierById(deleted.id)).deletedAt).toBeInstanceOf(Date);
     });
   });
 });

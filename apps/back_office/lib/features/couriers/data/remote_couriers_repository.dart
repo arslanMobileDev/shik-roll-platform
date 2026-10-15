@@ -15,12 +15,27 @@ final class RemoteCouriersRepository implements CouriersRepository {
         404 => 'Курьер или филиал не найден. Обновите список.',
         _ => 'Нет связи с сервером. Попробуйте снова.',
       });
+  // The restore has its own two answers: 404 is the one code the backend uses
+  // for "already live" / "outside the window" / "no number", and 409 means a
+  // live courier took the number this row still holds.
+  CouriersApiException _restoreError(DioException error) =>
+      CouriersApiException(switch (error.response?.statusCode) {
+        404 => 'Курьер уже активен или срок восстановления истёк.',
+        409 => 'Этот телефон уже занят другим курьером.',
+        _ => _error(error).message,
+      });
   @override
-  Future<List<CourierRecord>> list(String branchId) async {
+  Future<List<CourierRecord>> list(
+    String branchId, {
+    bool includeDeleted = false,
+  }) async {
     try {
       final response = await _dio.get<List<dynamic>>(
         '/staff/couriers',
-        queryParameters: {'branchId': branchId},
+        queryParameters: {
+          'branchId': branchId,
+          if (includeDeleted) 'includeDeleted': true,
+        },
       );
       final data = response.data;
       if (data == null) {
@@ -31,6 +46,15 @@ final class RemoteCouriersRepository implements CouriersRepository {
       );
     } on DioException catch (error) {
       throw _error(error);
+    }
+  }
+
+  @override
+  Future<void> restore(String id) async {
+    try {
+      await _dio.post<void>('/staff/couriers/$id/restore');
+    } on DioException catch (error) {
+      throw _restoreError(error);
     }
   }
 

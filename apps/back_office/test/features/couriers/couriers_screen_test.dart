@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:back_office/core/theme/app_theme.dart';
 import 'package:back_office/features/couriers/bloc/couriers_cubit.dart';
 import 'package:back_office/features/couriers/data/couriers_repository.dart';
@@ -17,6 +18,25 @@ CourierRecord courier() => CourierRecord(
   isAvailable: false,
   createdAt: DateTime(2026),
 );
+CourierRecord deletedCourier({
+  String id = 'gone',
+  String? phone = '+79280000001',
+  Duration ago = const Duration(days: 1),
+}) => CourierRecord(
+  id: id,
+  name: 'Ушедший',
+  phone: phone,
+  branchId: branch,
+  isActive: false,
+  isAvailable: false,
+  createdAt: DateTime(2026),
+  deletedAt: DateTime.now().subtract(ago),
+);
+Future<void> openDeleted(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('couriers.filter.deleted')));
+  await tester.pumpAndSettle();
+}
+
 Future<CouriersCubit> render(
   WidgetTester tester, {
   List<CourierRecord> rows = const [],
@@ -140,7 +160,10 @@ void main() {
     testWidgets('editing it can be saved without re-entering a phone', (
       tester,
     ) async {
-      final cubit = await render(tester, rows: [CourierRecord.fromJson(json())]);
+      final cubit = await render(
+        tester,
+        rows: [CourierRecord.fromJson(json())],
+      );
       await tester.tap(find.text('Изменить'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Сохранить'));
@@ -149,6 +172,89 @@ void main() {
       expect(find.text('Введите российский телефон'), findsNothing);
       expect(find.byType(AlertDialog), findsNothing);
       expect(cubit.state.rows, hasLength(1));
+    });
+  });
+
+  group('Удалённые', () {
+    testWidgets('the tab lists the self-deleted and brings one back', (
+      tester,
+    ) async {
+      final gone = deletedCourier();
+      final cubit = await render(tester, rows: [courier(), gone]);
+      expect(find.text('Ушедший'), findsNothing);
+
+      await openDeleted(tester);
+      expect(find.text('Ушедший'), findsOneWidget);
+      expect(find.text('Иван'), findsNothing);
+      expect(find.byKey(const Key('new-courier')), findsNothing);
+      final deadline = DateFormat(
+        'dd.MM.yyyy',
+      ).format(gone.deletedAt!.add(const Duration(days: 7)));
+      expect(find.text('Восстановить можно до $deadline'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('restore-gone')));
+      await tester.pumpAndSettle();
+      expect(find.text('Удалённых курьеров нет'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('couriers.filter.active')));
+      await tester.pumpAndSettle();
+      expect(cubit.state.rows, hasLength(2));
+      final live = cubit.state.rows.firstWhere((r) => r.name == 'Ушедший');
+      expect(live.isActive, isTrue);
+      expect(live.deletedAt, isNull);
+      expect(find.text('Ушедший'), findsOneWidget);
+    });
+
+    testWidgets('a legacy row with no number cannot be restored', (
+      tester,
+    ) async {
+      await render(tester, rows: [deletedCourier(phone: null)]);
+
+      await openDeleted(tester);
+      expect(find.text('Ушедший'), findsOneWidget);
+      expect(find.text('без номера'), findsOneWidget);
+      expect(find.byKey(const ValueKey('restore-gone')), findsNothing);
+    });
+
+    testWidgets('an expired window says so instead of offering restore', (
+      tester,
+    ) async {
+      await render(
+        tester,
+        rows: [deletedCourier(ago: const Duration(days: 8))],
+      );
+
+      await openDeleted(tester);
+      expect(find.text('Срок восстановления истёк'), findsOneWidget);
+      expect(find.byKey(const ValueKey('restore-gone')), findsNothing);
+    });
+
+    testWidgets('a link the backend refuses says why and keeps the row', (
+      tester,
+    ) async {
+      // The live courier holds the number the deleted row still carries — the
+      // one state the restore cannot produce, and the only 409 there is.
+      await render(
+        tester,
+        rows: [
+          courier(),
+          deletedCourier(phone: '+79280000000'),
+        ],
+      );
+
+      await openDeleted(tester);
+      await tester.tap(find.byKey(const ValueKey('restore-gone')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Этот телефон уже занят другим курьером.'),
+        findsOneWidget,
+      );
+      expect(find.text('Ушедший'), findsOneWidget);
+
+      await tester.tap(find.text('Повторить'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ушедший'), findsOneWidget);
+      expect(find.text('Иван'), findsNothing);
     });
   });
 }
