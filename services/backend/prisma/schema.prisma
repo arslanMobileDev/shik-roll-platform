@@ -855,9 +855,10 @@ model Courier {
   name        String
   // Nullable only for rows self-deleted before the 7-day restore window landed
   // (deleteOwnAccount nulled the number then). Deletion keeps it now — the
-  // number is the login key a restore needs — and the window's expiry job burns
-  // it at the end. Same reasoning as Customer.phone for why a 'deleted:<uuid>'
-  // tombstone is the wrong answer — see the customer_account_deletion migration.
+  // number is the login key a restore needs — and the window's expiry job
+  // deletes the row outright at the end. Same reasoning as Customer.phone for
+  // why a 'deleted:<uuid>' tombstone is the wrong answer — see the
+  // customer_account_deletion migration.
   phone       String?
   pinHash     String   @map("pin_hash")
   brandId     String   @map("brand_id") @db.Uuid

@@ -3,10 +3,13 @@ import * as path from 'node:path';
 import { INestApplication, ValidationPipe, BadRequestException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { OrderStatus, PrismaClient } from '@prisma/client';
+import { Queue } from 'bullmq';
 import * as bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { COURIER_RESTORE_WINDOW_DAYS } from '../src/modules/couriers/couriers.config';
+import { CourierMaintenanceProcessor } from '../src/modules/queues/courier-maintenance.processor';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 const TEST_DATABASE_URL =
   process.env.DATABASE_URL_TEST ??
@@ -552,6 +555,70 @@ describe('Couriers API (e2e)', () => {
       const courier = await readCourier();
       expect(courier.deletedAt).toBeInstanceOf(Date);
       expect(courier.isActive).toBe(false);
+    });
+  });
+
+  /**
+   * The sweep is driven directly rather than through BullMQ: every e2e spec runs
+   * with DISABLE_QUEUES, so no worker is registered and no scheduler ever fires.
+   * What this covers is the sweep against a real database — where the window
+   * boundary falls, and what burning a courier does to the deliveries that point
+   * at it.
+   */
+  describe('expiry sweep (courier-maintenance)', () => {
+    const sweep = new CourierMaintenanceProcessor(
+      prisma as unknown as PrismaService,
+      { upsertJobScheduler: async () => ({ id: 'unused' }) } as unknown as Queue,
+    );
+
+    const createCourierDeletedDaysAgo = async (phone: string, daysAgo: number | null) =>
+      prisma.courier.create({
+        data: {
+          name: `Sweep ${phone}`,
+          phone,
+          pinHash: await bcrypt.hash('1234', 4),
+          brandId: fx.brandId,
+          branchId: fx.branchId,
+          tenantId: fx.tenantId,
+          // isActive false either way — a self-deleted row and a staff block look
+          // the same here. deletedAt is what separates them.
+          isActive: false,
+          deletedAt:
+            daysAgo === null ? null : new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000),
+        },
+      });
+
+    it('burns the expired account, keeps the one inside the window, and leaves the delivery standing', async () => {
+      const expired = await createCourierDeletedDaysAgo(
+        '+79995550090',
+        COURIER_RESTORE_WINDOW_DAYS + 1,
+      );
+      const insideWindow = await createCourierDeletedDaysAgo('+79995550091', 1);
+      const orderId = await createOrderInStatus(OrderStatus.COMPLETED, {
+        courierId: expired.id,
+      });
+
+      await sweep.expireDeletedCouriers();
+
+      expect(await prisma.courier.findUnique({ where: { id: expired.id } })).toBeNull();
+      expect(
+        await prisma.courier.findUnique({ where: { id: insideWindow.id } }),
+      ).not.toBeNull();
+
+      // The burn does not take the delivery history with it: orders.courier_id is
+      // ON DELETE SET NULL, so the order the customer cares about survives with
+      // the courier unlinked.
+      const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+      expect(order.courierId).toBeNull();
+      expect(order.status).toBe(OrderStatus.COMPLETED);
+    });
+
+    it('leaves a blocked courier alone — no deletedAt means nothing to expire', async () => {
+      const blocked = await createCourierDeletedDaysAgo('+79995550092', null);
+
+      await sweep.expireDeletedCouriers();
+
+      expect(await prisma.courier.findUnique({ where: { id: blocked.id } })).not.toBeNull();
     });
   });
 });

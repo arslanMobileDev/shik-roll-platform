@@ -326,9 +326,10 @@ export class CouriersService {
         // courier: uq_couriers_tenant_id_phone is partial (deleted_at IS NULL)
         // since 20261014140000_courier_phone_restore_window.
         //
-        // Nothing burns the retained data yet — the expiry job is what closes
-        // the window. Until it lands, a deleted courier keeps its data
-        // indefinitely, so that job is not optional follow-up work.
+        // Nothing else is retained past the window: CourierMaintenanceProcessor
+        // hard-deletes the row (and with it the name, the number and the hash)
+        // once deletedAt is older than COURIER_RESTORE_WINDOW_DAYS, which is
+        // what makes the deletion real for 152-FZ and Apple 5.1.1(v).
         isActive: false,
         deletedAt: new Date(),
       },
