@@ -1,6 +1,7 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Customer } from '@prisma/client';
+import { maskPhone } from '../../common/utils/mask-phone';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   DEV_OTP_CODE,
@@ -124,6 +125,19 @@ describe('AuthService', () => {
 
     it('OTP TTL defaults to 300 seconds (5 minutes)', () => {
       expect(OTP_TTL_SECONDS).toBe(300);
+    });
+
+    it('logs the dev-mode OTP against a masked phone, never the full number', async () => {
+      const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+      try {
+        await service.sendOtp({ phone: PHONE });
+
+        const logged = log.mock.calls.flat().join(' ');
+        expect(logged).toContain(`OTP for ${maskPhone(PHONE)}`);
+        expect(logged).not.toContain(PHONE);
+      } finally {
+        log.mockRestore();
+      }
     });
 
     it('forces the fixed dev code in production when DEV_OTP=true', async () => {

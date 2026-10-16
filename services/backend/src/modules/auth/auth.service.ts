@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Customer } from '@prisma/client';
+import { maskPhone } from '../../common/utils/mask-phone';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CustomersService } from '../customers/customers.service';
 import {
@@ -106,7 +107,7 @@ export class AuthService {
 
     if (devMode) {
       // Dev/test only: fixed code 1111, no SMS is dispatched.
-      this.logger.log(`OTP for ${dto.phone}: ${code} (dev mode, SMS not sent)`);
+      this.logger.log(`OTP for ${maskPhone(dto.phone)}: ${code} (dev mode, SMS not sent)`);
     } else {
       // Production: hand the code to the configured gateway. The provider
       // throws on transport failure so the client gets a 5xx and can retry;
@@ -236,10 +237,5 @@ export class AuthService {
       });
     }
     return toCustomerEntity(customer);
-  }
-
-  /** Production logs carry only the masked phone (+7******11), never the OTP. */
-  private maskPhone(phone: string): string {
-    return phone.length > 4 ? `${phone.slice(0, 2)}******${phone.slice(-2)}` : '***';
   }
 }
