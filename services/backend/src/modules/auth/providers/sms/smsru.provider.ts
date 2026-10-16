@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { maskPhone } from '../../../../common/utils/mask-phone';
 import { SmsProvider } from './sms.provider';
 
 /**
@@ -66,9 +67,4 @@ export class SmsRuProvider implements SmsProvider {
 
     this.logger.log(`OTP dispatched via SMS.ru for ${maskPhone(phone)}`);
   }
-}
-
-/** 152-FZ hygiene: production logs never carry the full phone. */
-function maskPhone(phone: string): string {
-  return phone.length > 4 ? `${phone.slice(0, 2)}******${phone.slice(-2)}` : '***';
 }
