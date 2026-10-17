@@ -182,6 +182,15 @@ describe('AuthService', () => {
       await expect(service.sendOtp({ phone: PHONE })).rejects.toThrow('gateway down');
     });
 
+    it('releases the resend slot when the SMS provider fails, so the retry is not 429', async () => {
+      process.env.NODE_ENV = 'production';
+      sms.send.mockRejectedValueOnce(new Error('gateway down'));
+
+      await expect(service.sendOtp({ phone: PHONE })).rejects.toThrow('gateway down');
+      await expect(service.sendOtp({ phone: PHONE })).resolves.toMatchObject({ phone: PHONE });
+      expect(sms.send).toHaveBeenCalledTimes(2);
+    });
+
     it('rate limits resend: second send within the cooldown window is rejected (429)', async () => {
       await service.sendOtp({ phone: PHONE });
       await expect(service.sendOtp({ phone: PHONE })).rejects.toMatchObject({

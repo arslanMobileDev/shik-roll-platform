@@ -112,7 +112,14 @@ export class AuthService {
       // Production: hand the code to the configured gateway. The provider
       // throws on transport failure so the client gets a 5xx and can retry;
       // the code is already stored with its TTL and stays valid.
-      await this.sms.send(dto.phone, code, ip);
+      try {
+        await this.sms.send(dto.phone, code, ip);
+      } catch (error) {
+        // The code never reached the customer, so the resend cooldown must not
+        // apply — otherwise a gateway outage answers the retry with 429.
+        await this.otpStore.releaseSendSlot(dto.phone);
+        throw error;
+      }
     }
 
     return {

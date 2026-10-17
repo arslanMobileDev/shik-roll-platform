@@ -30,6 +30,11 @@ export interface OtpStore {
    * slot), false while the previous send is still within the cooldown window.
    */
   acquireSendSlot(phone: string, cooldownSeconds: number): Promise<boolean>;
+  /**
+   * Gives the slot back when the send itself failed, so a gateway outage does
+   * not lock the phone out of requesting a new code for the whole cooldown.
+   */
+  releaseSendSlot(phone: string): Promise<void>;
 }
 
 interface MemoryEntry extends OtpEntry {
@@ -82,6 +87,11 @@ export class InMemoryOtpStore implements OtpStore {
     }
     this.sendLocks.set(phone, Date.now() + cooldownSeconds * 1000);
     return Promise.resolve(true);
+  }
+
+  releaseSendSlot(phone: string): Promise<void> {
+    this.sendLocks.delete(phone);
+    return Promise.resolve();
   }
 }
 
@@ -136,6 +146,10 @@ export class RedisOtpStore implements OtpStore, OnModuleDestroy {
       'NX',
     );
     return result === 'OK';
+  }
+
+  async releaseSendSlot(phone: string): Promise<void> {
+    await this.client.del(this.sendLockKey(phone));
   }
 
   async onModuleDestroy(): Promise<void> {
