@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
 import { buildRedisConnection } from '../queues/queues.module';
@@ -26,15 +27,18 @@ export interface OtpStore {
   incrementAttempts(phone: string): Promise<number | null>;
   delete(phone: string): Promise<void>;
   /**
-   * Resend cooldown: returns true when the caller may send now (and takes the
-   * slot), false while the previous send is still within the cooldown window.
+   * Resend cooldown: returns an owner token when the caller may send now (and
+   * takes the slot), null while the previous send is still within the cooldown
+   * window.
    */
-  acquireSendSlot(phone: string, cooldownSeconds: number): Promise<boolean>;
+  acquireSendSlot(phone: string, cooldownSeconds: number): Promise<string | null>;
   /**
-   * Gives the slot back when the send itself failed, so a gateway outage does
-   * not lock the phone out of requesting a new code for the whole cooldown.
+   * Gives the slot back when the send it belongs to failed, so a gateway
+   * outage does not lock the phone out for the whole cooldown. The token makes
+   * the release compare-and-delete: a slow, stale send can never free a slot
+   * taken by a newer request.
    */
-  releaseSendSlot(phone: string): Promise<void>;
+  releaseSendSlot(phone: string, token: string): Promise<void>;
 }
 
 interface MemoryEntry extends OtpEntry {
@@ -44,7 +48,7 @@ interface MemoryEntry extends OtpEntry {
 @Injectable()
 export class InMemoryOtpStore implements OtpStore {
   private readonly entries = new Map<string, MemoryEntry>();
-  private readonly sendLocks = new Map<string, number>();
+  private readonly sendLocks = new Map<string, { token: string; until: number }>();
 
   set(phone: string, code: string, ttlSeconds: number): Promise<void> {
     this.entries.set(phone, {
@@ -80,17 +84,20 @@ export class InMemoryOtpStore implements OtpStore {
     return Promise.resolve();
   }
 
-  acquireSendSlot(phone: string, cooldownSeconds: number): Promise<boolean> {
-    const lockedUntil = this.sendLocks.get(phone);
-    if (lockedUntil !== undefined && lockedUntil > Date.now()) {
-      return Promise.resolve(false);
+  acquireSendSlot(phone: string, cooldownSeconds: number): Promise<string | null> {
+    const lock = this.sendLocks.get(phone);
+    if (lock !== undefined && lock.until > Date.now()) {
+      return Promise.resolve(null);
     }
-    this.sendLocks.set(phone, Date.now() + cooldownSeconds * 1000);
-    return Promise.resolve(true);
+    const token = randomUUID();
+    this.sendLocks.set(phone, { token, until: Date.now() + cooldownSeconds * 1000 });
+    return Promise.resolve(token);
   }
 
-  releaseSendSlot(phone: string): Promise<void> {
-    this.sendLocks.delete(phone);
+  releaseSendSlot(phone: string, token: string): Promise<void> {
+    if (this.sendLocks.get(phone)?.token === token) {
+      this.sendLocks.delete(phone);
+    }
     return Promise.resolve();
   }
 }
@@ -136,20 +143,28 @@ export class RedisOtpStore implements OtpStore, OnModuleDestroy {
     await this.client.del(this.key(phone));
   }
 
-  async acquireSendSlot(phone: string, cooldownSeconds: number): Promise<boolean> {
-    // SET NX EX: atomic "take the slot only when no lock exists".
+  async acquireSendSlot(phone: string, cooldownSeconds: number): Promise<string | null> {
+    // SET NX EX: atomic "take the slot only when no lock exists". The value is
+    // the owner token, so release can tell whose slot it is deleting.
+    const token = randomUUID();
     const result = await this.client.set(
       this.sendLockKey(phone),
-      '1',
+      token,
       'EX',
       cooldownSeconds,
       'NX',
     );
-    return result === 'OK';
+    return result === 'OK' ? token : null;
   }
 
-  async releaseSendSlot(phone: string): Promise<void> {
-    await this.client.del(this.sendLockKey(phone));
+  async releaseSendSlot(phone: string, token: string): Promise<void> {
+    // Compare-and-delete: only the request that took the slot may free it.
+    await this.client.eval(
+      "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+      1,
+      this.sendLockKey(phone),
+      token,
+    );
   }
 
   async onModuleDestroy(): Promise<void> {

@@ -191,6 +191,27 @@ describe('AuthService', () => {
       expect(sms.send).toHaveBeenCalledTimes(2);
     });
 
+    it('does not store a code when the SMS provider fails', async () => {
+      process.env.NODE_ENV = 'production';
+      sms.send.mockRejectedValueOnce(new Error('gateway down'));
+
+      await expect(service.sendOtp({ phone: PHONE })).rejects.toThrow('gateway down');
+      await expect(otpStore.get(PHONE)).resolves.toBeNull();
+      // A failed send must not hand out a fresh 5-attempt budget: there is no
+      // stored code to guess, so verify answers OTP_EXPIRED and counts nothing.
+      await expect(service.verifyOtp({ phone: PHONE, code: '1111' })).rejects.toMatchObject({
+        response: { code: 'OTP_EXPIRED' },
+      });
+    });
+
+    it('keeps the gateway error when releasing the slot fails', async () => {
+      process.env.NODE_ENV = 'production';
+      sms.send.mockRejectedValueOnce(new Error('gateway down'));
+      jest.spyOn(otpStore, 'releaseSendSlot').mockRejectedValueOnce(new Error('redis down'));
+
+      await expect(service.sendOtp({ phone: PHONE })).rejects.toThrow('gateway down');
+    });
+
     it('rate limits resend: second send within the cooldown window is rejected (429)', async () => {
       await service.sendOtp({ phone: PHONE });
       await expect(service.sendOtp({ phone: PHONE })).rejects.toMatchObject({
@@ -207,6 +228,31 @@ describe('AuthService', () => {
         await expect(service.sendOtp({ phone: PHONE })).resolves.toMatchObject({
           phone: PHONE,
         });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
+  describe('InMemoryOtpStore send slot', () => {
+    it('releases only the slot owned by the given token', async () => {
+      const store = new InMemoryOtpStore();
+      jest.useFakeTimers();
+      try {
+        const stale = await store.acquireSendSlot(PHONE, 1);
+        expect(stale).not.toBeNull();
+        jest.advanceTimersByTime(2_000);
+
+        const fresh = await store.acquireSendSlot(PHONE, 60);
+        expect(fresh).not.toBeNull();
+        expect(fresh).not.toBe(stale);
+
+        // A slow, stale send must not free the slot a newer request owns.
+        await store.releaseSendSlot(PHONE, stale!);
+        await expect(store.acquireSendSlot(PHONE, 60)).resolves.toBeNull();
+
+        await store.releaseSendSlot(PHONE, fresh!);
+        await expect(store.acquireSendSlot(PHONE, 60)).resolves.not.toBeNull();
       } finally {
         jest.useRealTimers();
       }

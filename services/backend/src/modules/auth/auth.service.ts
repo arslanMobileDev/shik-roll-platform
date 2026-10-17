@@ -84,11 +84,11 @@ export class AuthService {
   }
 
   async sendOtp(dto: SendOtpDto, ip?: string): Promise<SendOtpResponse> {
-    const slotAcquired = await this.otpStore.acquireSendSlot(
+    const slotToken = await this.otpStore.acquireSendSlot(
       dto.phone,
       OTP_SEND_COOLDOWN_SECONDS,
     );
-    if (!slotAcquired) {
+    if (slotToken === null) {
       throw new HttpException(
         {
           statusCode: HttpStatus.TOO_MANY_REQUESTS,
@@ -103,23 +103,32 @@ export class AuthService {
     const code = devMode
       ? DEV_OTP_CODE
       : String(Math.floor(1000 + Math.random() * 9000));
-    await this.otpStore.set(dto.phone, code, OTP_TTL_SECONDS);
 
     if (devMode) {
       // Dev/test only: fixed code 1111, no SMS is dispatched.
+      await this.otpStore.set(dto.phone, code, OTP_TTL_SECONDS);
       this.logger.log(`OTP for ${maskPhone(dto.phone)}: ${code} (dev mode, SMS not sent)`);
     } else {
-      // Production: hand the code to the configured gateway. The provider
-      // throws on transport failure so the client gets a 5xx and can retry;
-      // the code is already stored with its TTL and stays valid.
+      // Production: hand the code to the configured gateway first. Storing it
+      // only after the gateway accepted the message means a failed send never
+      // leaves a fresh code with a zeroed attempt counter — otherwise a
+      // gateway outage would let a caller restart the 5-attempt budget at
+      // will. If the message was accepted but the response was lost, the
+      // customer holds a code that was never stored; requesting a new one
+      // issues a fresh code.
       try {
         await this.sms.send(dto.phone, code, ip);
       } catch (error) {
         // The code never reached the customer, so the resend cooldown must not
-        // apply — otherwise a gateway outage answers the retry with 429.
-        await this.otpStore.releaseSendSlot(dto.phone);
+        // apply — otherwise a gateway outage answers the retry with 429. The
+        // release is best-effort: a Redis error must not mask the gateway
+        // error the client needs to see.
+        await this.otpStore
+          .releaseSendSlot(dto.phone, slotToken)
+          .catch(() => undefined);
         throw error;
       }
+      await this.otpStore.set(dto.phone, code, OTP_TTL_SECONDS);
     }
 
     return {
